@@ -141,22 +141,31 @@ def parse_gigaword_doc(doc_lines):
 	}
 
 
+def make_output_dirs():
+	os.makedirs(GIGAWORD_PLAINTEXT_DIR)
+	for i in range(4096):
+		hexnum = hex(i)[2:]
+		dirname = '0' * (3 - len(hexnum)) + hexnum
+		dirpath = os.path.join(GIGAWORD_PLAINTEXT_DIR, dirname)
+		os.makedirs(dirpath)
+
+
 def preprocess_gigaword():
 
 	# Make the output directory if it doesn't exist
 	if not os.path.exists(GIGAWORD_PLAINTEXT_DIR):
-		os.makedirs(GIGAWORD_PLAINTEXT_DIR)
+		make_output_dirs()
 
 	# We'll skip these misclassified documents
 	docs_to_skip = read_docs_to_skip()
 
 	# Use trackers to keep track of which files have been processed
 	file_tracker = t4k.ProgressTracker(
-		os.path.join(DATA_DIR, 'gigaword_files'))
+		os.path.join(DATA_DIR, 'gigaword-files'))
 
 	# Use a tracker to keep track of the documents extracted
 	doc_tracker = t4k.ProgressTracker(
-		os.path.join(DATA_DIR, 'gigaword_docs'))
+		os.path.join(DATA_DIR, 'gigaword-docs'))
 	doc_tracker.hold()
 
 	# Process each file, extracting plain text for all the news articles
@@ -166,45 +175,58 @@ def preprocess_gigaword():
 		# use a tracker to keep track of whether the file has been processed
 		if file_tracker.check_or_add(fpath):
 			print 'skipping %s' % fpath
+			continue
 		else:
 			print 'processing %s' % fpath
 
 		# Get the plain text for each document in the file
-		for raw_doc in gigaword_raw_documents(fpath):
+		try:
+			for raw_doc in gigaword_raw_documents(fpath):
 
-			doc = parse_gigaword_doc(raw_doc)
+				doc = parse_gigaword_doc(raw_doc)
 
-			# We only use news stories
-			if doc['type'] != 'story':
-				continue
+				# We only use news stories
+				if doc['type'] != 'story':
+					continue
 
-			# If the document is among the misclassified documents, skip it
-			if doc['id'] in docs_to_skip:
-				print '\tskipping misclassified: %s' % doc['id']
+				# If the document is among the misclassified documents,
+				# skip it
+				if doc['id'] in docs_to_skip:
+					print '\tskipping misclassified: %s' % doc['id']
 
-			# Show progress.  Periodically sync the dock_tracker
-			if i % 1000 == 0:
-				print '\t.'
-				doc_tracker.unhold()
-				doc_tracker.hold()
+				# Show progress.  Periodically sync the dock_tracker
+				if i % 1000 == 0:
+					print '\t.'
+					doc_tracker.unhold()
+					doc_tracker.hold()
+				i += 1
 
-			# The output document's file name is made from hash of its id
-			doc_hash = hashlib.sha1(doc['id']).hexdigest()[:16]
-			out_fname = doc_hash + '.txt'
-			out_path = os.path.join(GIGAWORD_PLAINTEXT_DIR, out_fname)
+				# The output document's file name is made from hash of its 
+				# id
+				doc_hash = hashlib.sha1(doc['id']).hexdigest()[:16]
+				out_fname = doc_hash + '.txt'
+				out_path = os.path.join(
+						GIGAWORD_PLAINTEXT_DIR, out_fname[:3], out_fname)
 
-			# Save the document in its own file
-			open(out_path, 'w').write(doc['text'])
+				# Save the document in its own file
+				open(out_path, 'w').write(doc['text'])
 
-			# Keep the document's metadata in the tracker
-			doc_tracker.check_or_add(out_fname)
-			doc_tracker.set(out_fname, 'from-file', os.path.basename(fpath))
-			doc_tracker.set(out_fname, 'id', doc['id'])
-			doc_tracker.set(out_fname, 'headline', doc['headline'])
-			doc_tracker.set(out_fname, 'dateline', doc['dateline'])
+				# Keep the document's metadata in the tracker
+				doc_tracker.check_or_add(out_fname)
+				doc_tracker.set(
+					out_fname, 'from-file', os.path.basename(fpath))
+				doc_tracker.set(out_fname, 'id', doc['id'])
+				doc_tracker.set(out_fname, 'headline', doc['headline'])
+				doc_tracker.set(out_fname, 'dateline', doc['dateline'])
 
-		# Mark this file as done
-		file_tracker.markdone(fpath)
+		# Some of the gziped files are corrupted.  Step over them and 
+		# don't mark them done
+		except IOError:
+			pass
+
+		# Mark files that got processed completely as done
+		else:
+			file_tracker.mark_done(fpath)
 
 	doc_tracker.unhold()
 
