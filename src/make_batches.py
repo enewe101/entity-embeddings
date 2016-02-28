@@ -23,7 +23,7 @@ def make_batches():
 	batches_f = open(BATCHES_PATH, 'w')
 	dirnames = [
 		''.join(c) 
-		for c in itertools.product('0123456789abcdef', repeat=2)
+		for c in itertools.product('0123456789abcdef', repeat=3)
 	]
 
 	# Make the batches for the aida linking step 
