@@ -30,26 +30,12 @@ def make_batches():
 	for dirname in dirnames:
 		in_dir = os.path.join(SCRATCH_DIR, 'scraped-text', dirname)
 		out_dir = os.path.join(SCRATCH_DIR, 'worldviews', dirname)
-		aida_batch = {
-			'in_dirs': in_dir,
+		bacth = {
+			'in_dir': in_dir,
 			'out_dir': out_dir,
-			'until': 'aida-link'
+			'only': ['stanford-parse', 'aida-link']
 		}
-		batches_f.write(json.dumps(aida_batch) + '\n')
-
-	# Make the batches for all steps other than aida linking step
-	for dirname in dirnames:
-		in_dir = os.path.join(SCRATCH_DIR, 'scraped-text', dirname)
-		out_dir = os.path.join(SCRATCH_DIR, 'worldviews', dirname)
-		all_but_aida_batch = {
-			'in_dirs': in_dir,
-			'out_dir': out_dir,
-			'skip': [
-				'extract-intervening-texts','patty-edgelist',
-				'aggregate-edgelists'
-			]
-		}
-		batches_f.write(json.dumps(all_but_aida_batch) + '\n')
+		batches_f.write(json.dumps(bacth) + '\n')
 
 
 if __name__ == '__main__':
