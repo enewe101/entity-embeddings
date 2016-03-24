@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 import subprocess
-from SETTINGS import WORLDVIEWS_DIR
+from SETTINGS import WORLDVIEWS_DIR, SCRATCH_DIR, DATA_DIR
 import os
 import sys
 from getopt import getopt, GetoptError
 from lib import utils
+from extract_entity_cooccurrences import extract_entity_cooccurrences
 
 DEFAULT_NUM_CORES = 12
 WORLDVIEWS_EXECUTABLE = os.path.join(WORLDVIEWS_DIR, 'run.py')
@@ -62,13 +63,16 @@ def preprocess_gigaword():
 	print 'skip', skip
 	print 'only', only
 
-	# Invoke the worldviews pipeline
+	# Convert batch num into hex format
+	batch_name = '0'*(3-len(hex(batch_num-1)[2:])) + hex(batch_num-1)[2:]
+
+	# Prepare the worldviews pipeline command
 	worldviews_command = [
 		WORLDVIEWS_EXECUTABLE,
 		'-i', in_dir,
 		'-o', out_dir,
 		'-n', str(num_processes),
-		'-l', '0'*(3-len(hex(batch_num-1)[2:])) + hex(batch_num-1)[2:]
+		'-l', batch_name
 	]
 	if until is not None:
 		worldviews_command.extend(['-u', until])
@@ -78,7 +82,17 @@ def preprocess_gigaword():
 		only = ','.join(only)
 		worldviews_command.extend(['-j', only])
 	
+	# Invoke the worldviews pipeline
 	subprocess.check_call(worldviews_command)
+
+	# Extract all the entity cooccurrence information
+	extract_entity_cooccurrences(num_processes, in_dir, out_dir)
+
+	# Archive the useful files
+	archive_command = ['./archive.sh', batch_name, SCRATCH_DIR, DATA_DIR]
+	subprocess.check_call(archive_command)
+
+
 
 
 if __name__ == '__main__':
