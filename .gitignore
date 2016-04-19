@@ -4,3 +4,4 @@ SETTINGS.py
 *.pyc
 data
 .DS_Store
+del
