@@ -59,6 +59,66 @@ class EntityEmbedder(object):
 		))
 
 
+	def embed_relationship(self, entity_pairs):
+		'''
+		Get the embedding(s) for the entity_pair(s) by calling the
+		compiled theano function.  The function has to be compiled the
+		first time this is called.
+		'''
+
+		if self._embed_relationship is None:
+			self._compile_embed_relationship()
+		return self._embed_relationship(entity_pairs)
+
+
+	def _compile_embed_relationship(self):
+		'''
+		Compiles a function that computes the relationship embedding
+		given two entities (i.e. it does a partial forward pass, 
+		not including the part of the network dedicated to the context
+		'''
+
+		input_var = T.matrix('entities')
+		entity1 = input_var[:,0]
+		entity2 = input_var[:,1]
+
+		# Take in and embed entity1
+		l_in_entity1 = layers.InputLayer(
+			shape=(batch_size,), input_var=entity1
+		)
+		l_embed_entity1 = layers.EmbeddingLayer(
+			l_in_entity1, 
+			self.entity_vocab_size, 
+			self.num_embedding_dimensions,
+			W=self.l_embed_entity1.W
+		)
+
+		# Take in and embed entity2 -- note this uses same parameters as
+		# embedding for entity1
+		l_in_entity2 = layers.InputLayer(
+			shape=(batch_size,), input_var=entity2
+		)
+		l_embed_entity2 = layers.EmbeddingLayer(
+			l_in_entity2,
+			self.entity_vocab_size,
+			self.num_embedding_dimensions,
+			W=l_embed_entity1.W	# recall, the entity embedders share params
+		)
+
+		# Merge the entities and embed their relationship
+		l_merge_embeddings = layers.MergeLayer(
+			(l_embed_entity1, l_embed_entity2), axis=1
+		)
+		l_relation = layers.DenseLayer(
+			l_merge_entities, self.num_embedding_dimensions,
+			W=self.l_relation.W, b=self.l_relation.b
+		)
+		relation_embedding = get_output(l_relation)
+
+		# Compile the function
+		self._embed_relationship = function([input_var], relation_embedding)
+		
+
 	def get_params(self):
 		# Note that parameters for l_embed_entity1 are the same as
 		# for l_embed_entity2, so we only need to fetch params for one
