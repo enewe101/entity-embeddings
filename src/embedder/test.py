@@ -11,6 +11,8 @@ from minibatch_generator import MinibatchGenerator, parse
 from unittest import TestCase, main
 
 
+# TODO: make this test.  It should know what entity pairs and contexts
+# have a high probability of arising with the data, following NCE form
 class TestEntityEmbedder(TestCase):
 
 	def test_learning(self):
