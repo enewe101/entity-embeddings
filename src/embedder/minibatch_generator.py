@@ -59,7 +59,6 @@ class MinibatchGenerator(object):
 		skip=[],
 		entity_dictionary=None,
 		context_dictionary=None,
-		unigram_dictionary=None,
 		noise_ratio=15,
 		batch_size = 1000,
 		parse=parse,
@@ -76,21 +75,13 @@ class MinibatchGenerator(object):
 		if entity_dictionary is not None:
 			self.entity_dictionary = entity_dictionary
 		else:
-			self.entity_dictionary = Dictionary()
+			self.entity_dictionary = UnigramDictionary()
 
 		# Load the context dictionary, if supplied
 		if context_dictionary:
 			self.context_dictionary = context_dictionary
 		else:
-			self.context_dictionary = Dictionary()
-
-		# Load the unigram_dictionary distribution, if supplied.  
-		# Note other choises for sampling noise are possible, which will be 
-		# explored later.
-		if unigram_dictionary is not None:
-			self.unigram_dictionary = unigram_dictionary
-		else:
-			self.unigram_dictionary = UnigramDictionary()
+			self.context_dictionary = UnigramDictionary()
 
 		self.noise_ratio = noise_ratio
 		self.batch_size = batch_size
@@ -98,7 +89,7 @@ class MinibatchGenerator(object):
 
 	def load(self, directory):
 		'''
-		Load both the dictionary and unigram_dictionary, assuming default filenames
+		Load both the dictionary and context_dictionary, assuming default filenames
 		(dictionary.gz and unigram-dictionary.gz), by specifying their containing
 		directory
 		'''
@@ -108,9 +99,6 @@ class MinibatchGenerator(object):
 		self.context_dictionary.load(os.path.join(
 			directory, 'context-dictionary.gz'
 		))
-		self.unigram_dictionary.load(os.path.join(
-			directory, 'unigram-dictionary.gz'
-		))
 	
 	def load_entity_dictionary(self, filename):
 		self.entity_dictionary.load(filename)
@@ -118,21 +106,17 @@ class MinibatchGenerator(object):
 	def load_context_dictionary(self, filename):
 		self.context_dictionary.load(filename)
 
-	def load_unigram_dictionary(self, filename):
-		self.unigram_dictionary.load(filename)
-
 
 	def save(self, directory):
 		'''
-		Save both the dictionary and unigram_dictionary, using default filenames
+		Save both the dictionary and context_dictionary, using default filenames
 		(dictionary.gz and unigram-dictionary.gz), by specifying only their containing
 		directory
 		'''
 		self.entity_dictionary.save(
-			os.path.join(directory, 'entity-dictionary.gz'))
+			os.path.join(directory, 'entity-dictionary'))
 		self.context_dictionary.save(
-			os.path.join(directory, 'context-dictionary.gz'))
-		self.unigram_dictionary.save(os.path.join(directory, 'unigram-dictionary.gz'))
+			os.path.join(directory, 'context-dictionary'))
 
 
 	def save_entity_dictionary(self, filename):
@@ -140,10 +124,6 @@ class MinibatchGenerator(object):
 
 	def save_context_dictionary(self, filename):
 		self.context_dictionary.save(filename)
-
-	def save_unigram(self, filename):
-		self.unigram_dictionary.save(filename)
-
 
 	def check_access(self, savedir):
 
@@ -167,7 +147,7 @@ class MinibatchGenerator(object):
 
 	def prepare(self, savedir=None):
 		# Before any minibatches can be generated, we need to run over
-		# the corpus to determine the unigram_dictionary distribution and create
+		# the corpus to determine the context_dictionary distribution and create
 		# a dictionary mapping all words in the corpus vocabulary to int's.
 
 		# But first, if a savedir was supplied do an IO check
@@ -176,16 +156,13 @@ class MinibatchGenerator(object):
 
 		# For each line, get the context tokens and entity tokens.
 		# Add both to the respective dictionaries.  Also add the context
-		# tokens (after converting them to ids) to the unigram_dictionary noise model
+		# tokens (after converting them to ids) to the context_dictionary noise model
 		for line in self.corpus_reader.read_no_q():
 			context_tokens, entity_spans = line
-			context_token_ids = self.context_dictionary.update(
-				context_tokens
-			)
-			self.unigram_dictionary.update(context_token_ids)
+			self.context_dictionary.update(context_tokens)
 			self.entity_dictionary.update(entity_spans.keys())
 
-		# save the dictionaries and unigram_dictionary noise model
+		# save the dictionaries and context_dictionary noise model
 		if savedir is not None:
 			self.save(savedir)
 
@@ -340,7 +317,8 @@ class MinibatchGenerator(object):
 				signal_batch[i, :] = [e1_id, e2_id, context_token_id]
 
 				# Sample tokens from the noise
-				noise_context_ids = self.unigram_dictionary.sample((self.noise_ratio,))
+				noise_context_ids = self.context_dictionary.sample(
+					(self.noise_ratio,))
 
 				# Figure out the position within the noise batch
 				j = i*self.noise_ratio

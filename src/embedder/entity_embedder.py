@@ -1,4 +1,6 @@
-from lasagne import layers, get_output, get_all_params, get_all_param_values
+from lasagne import layers
+from lasagne.layers import get_output, get_all_params, get_all_param_values
+from lasagne.init import Normal
 from word2vec import NoiseContraster, row_dot, sigmoid
 
 class EntityEmbedder(object):

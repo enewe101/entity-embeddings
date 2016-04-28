@@ -4,32 +4,21 @@ import time
 import sys
 import re
 from minibatch_generator import MinibatchGenerator
-from word2vec import (
-    Word2Vec as W, NoiseContraster, Word2VecEmbedder,
-)
+from entity_embedder import EntityEmbedder
+from word2vec import NoiseContraster
 
 DIRECTORIES = [
-	#'/home/rldata/gigaword-corenlp/cooccurrence',
+	'/home/rldata/gigaword-corenlp/cooccurrence',
 	'/home/rldata/gigaword-corenlp/cooccurrence/0'
 ]
 SKIP = [
 	re.compile('README.txt')
 ]
 BATCH_SIZE=10000
-THRESHOLD = 1 # This means there will be no discarding
 NOISE_RATIO = 15
-SAVEDIR = '/home/2012/enewel3/entity-embeddings/data/word2vec'
+SAVEDIR = '/home/2012/enewel3/entity-embeddings/data/relation2vec'
 MIN_FREQUENCY = 5
 NUM_EMBEDDING_DIMENSIONS = 500
-
-
-def parse(filename):
-
-	tokenized_sentences = []
-	for line in open(filename):
-		tokenized_sentences.append(line.split('\t')[1].split())
-
-	return tokenized_sentences
 
 
 def prepare():
@@ -37,15 +26,13 @@ def prepare():
 		directories=DIRECTORIES,
 		skip=SKIP,
 		batch_size=BATCH_SIZE,
-		t=THRESHOLD,
-		parse=parse
 	)
 	minibatch_generator.prepare(
 		savedir=SAVEDIR
 	)
 
 
-def train_w2v():
+def train():
 
 	# Define the input theano variables
 	signal_input = T.imatrix('query_input')
@@ -100,7 +87,7 @@ def train_w2v():
 	embedings_filename = os.path.join(SAVEDIR, 'embeddings.npz')
 	word2vec_embedder.save(embeddings_filename)
 
-	print 'total training time: %f' (time.time() - training_start)
+	print 'total training time: %f' % (time.time() - training_start)
 	# Return the trained word2vec_embedder
 	return word2vec_embedder
 
@@ -114,9 +101,9 @@ if __name__ == '__main__':
 		elapsed = time.time() - start
 		print 'Elapsed:', elapsed
 
-	if sys.argv[1] == 'train':
+	elif sys.argv[1] == 'train':
 		train()
 
-        else:
-            print 'usage: ./train_w2v.py [ prepare | train ]'
+	else:
+		print 'usage: ./train_w2v.py [ prepare | train ]'
 

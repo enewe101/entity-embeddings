@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import os
 from theano import tensor as T
 import time
 import sys
@@ -8,11 +9,11 @@ from word2vec import (
 )
 
 DIRECTORIES = [
-	#'/home/rldata/gigaword-corenlp/cooccurrence',
+	'/home/rldata/gigaword-corenlp/cooccurrence',
 	'/home/rldata/gigaword-corenlp/cooccurrence/0'
 ]
 SKIP = [
-	re.compile('README.txt')
+	re.compile(r'README\.txt'),
 ]
 BATCH_SIZE=10000
 THRESHOLD = 1 # This means there will be no discarding
@@ -20,7 +21,7 @@ NOISE_RATIO = 15
 SAVEDIR = '/home/2012/enewel3/entity-embeddings/data/word2vec'
 MIN_FREQUENCY = 5
 NUM_EMBEDDING_DIMENSIONS = 500
-
+NUM_EPOCHS = 1
 
 def parse(filename):
 
@@ -56,9 +57,13 @@ def train():
 
 	# Make a MinibatchGenerator
 	minibatch_generator = MinibatchGenerator(
-		directories=DIRECTORIES, skip=SKIP,
-		noise_ratio=NOISE_RATIO, t=THRESHOLD,
-		batch_size=BATCH_SIZE, parse=parse
+		directories=DIRECTORIES,
+		skip=SKIP,
+		noise_ratio=NOISE_RATIO,
+		t=THRESHOLD,
+		batch_size=BATCH_SIZE, 
+		parse=parse,
+		verbose=True
 	)
 
 	# load the minibatch generator.  Prune very rare tokens.
@@ -69,7 +74,7 @@ def train():
 	word2vec_embedder = Word2VecEmbedder(
 		combined_input,
 		batch_size=BATCH_SIZE,
-		vocab_size=len(minibatch_generator.unigram_dictionary),
+		vocabulary_size=len(minibatch_generator.unigram_dictionary),
 		num_embedding_dimensions = NUM_EMBEDDING_DIMENSIONS
 	)
 
@@ -82,7 +87,7 @@ def train():
 
 	# Iterate over the corpus, training the embeddings
 	training_start = time.time()
-	for epoch in range(num_epochs):
+	for epoch in range(NUM_EPOCHS):
 		print 'starting epoch %d' % epoch
 		epoch_start = time.time()
 		batch_num = -1
@@ -93,13 +98,17 @@ def train():
 				print '\tloss: %f' % loss
 
 		epoch_elapsed = time.time() - epoch_start
-		print '\tFinished epoch %d.  Time elapsed %2.1f.' % epoch_elapsed
+		print (
+			'\tFinished epoch %d.  Time elapsed %2.1f.' 
+			% (epoch, epoch_elapsed)
+		)
 
 	# Save the model (the embeddings) if savedir was provided
-	embedings_filename = os.path.join(SAVEDIR, 'embeddings.npz')
+	print 'Saving model...'
+	embeddings_filename = os.path.join(SAVEDIR, 'embeddings.npz')
 	word2vec_embedder.save(embeddings_filename)
 
-	print 'total training time: %f' (time.time() - training_start)
+	print 'total training time: %f' % (time.time() - training_start)
 	# Return the trained word2vec_embedder
 	return word2vec_embedder
 
@@ -113,9 +122,9 @@ if __name__ == '__main__':
 		elapsed = time.time() - start
 		print 'Elapsed:', elapsed
 
-	if sys.argv[1] == 'train':
+	elif sys.argv[1] == 'train':
 		train()
 
-        else:
-            print 'usage: ./train_w2v.py [ prepare | train ]'
+	else:
+		print 'usage: ./train_w2v.py [ prepare | train ]'
 
