@@ -3,8 +3,9 @@ from theano import tensor as T
 import time
 import sys
 import re
+from minibatch_generator import MinibatchGenerator
 from word2vec import (
-    Word2Vec as W, NoiseContraster, Word2VecEmbedder, MinibatchGenerator
+    Word2Vec as W, NoiseContraster, Word2VecEmbedder,
 )
 
 DIRECTORIES = [
@@ -44,7 +45,7 @@ def prepare():
 	)
 
 
-def train():
+def train_w2v():
 
 	# Define the input theano variables
 	signal_input = T.imatrix('query_input')
