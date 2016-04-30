@@ -9,6 +9,7 @@ from word2vec import CorpusReader, UnigramDictionary
 import numpy as np
 import gzip
 import os
+from word2vec.token_map import UNK
 
 TAB_SPLITTER = re.compile(r'\t+')
 
@@ -94,10 +95,10 @@ class MinibatchGenerator(object):
 		directory
 		'''
 		self.entity_dictionary.load(os.path.join(
-			directory, 'entity-dictionary.gz'
+			directory, 'entity-dictionary'
 		))
 		self.context_dictionary.load(os.path.join(
-			directory, 'context-dictionary.gz'
+			directory, 'context-dictionary'
 		))
 	
 	def load_entity_dictionary(self, filename):
@@ -167,6 +168,15 @@ class MinibatchGenerator(object):
 			self.save(savedir)
 
 
+	def prune(self, min_frequency=5):
+		'''
+		Exposes the prune function for the underlying UnigramDictionary
+		used for the context_dictionary.
+		'''
+		self.context_dictionary.prune(min_frequency)
+		self.entity_dictionary.prune(min_frequency)
+
+
 	def __iter__(self):
 
 		# Once iter is called, a subprocess will be started which
@@ -221,12 +231,12 @@ class MinibatchGenerator(object):
 		# we don't care about the embedding of the UNK token
 		signal_batch = np.full(
 			(self.batch_size, 3),
-			self.context_dictionary.UNK,
+			UNK,
 			dtype='int32'
 		)
 		noise_batch = np.full(
 			(self.batch_size * self.noise_ratio, 3),
-			self.context_dictionary.UNK,
+			UNK,
 			dtype='int32'
 		)
 		return signal_batch, noise_batch

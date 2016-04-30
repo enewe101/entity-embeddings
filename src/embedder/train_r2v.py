@@ -6,20 +6,25 @@ import re
 from minibatch_generator import MinibatchGenerator
 from entity_embedder import EntityEmbedder
 from word2vec import NoiseContraster
+import os
 
 DIRECTORIES = [
-	'/home/rldata/gigaword-corenlp/cooccurrence',
-	'/home/rldata/gigaword-corenlp/cooccurrence/0'
+	#'/home/rldata/gigaword-corenlp/cooccurrence',
+	#'/home/rldata/gigaword-corenlp/cooccurrence/0'
+]
+FILES = [
+	'/home/rldata/gigaword-corenlp/cooccurrence/0/002.tsv'
 ]
 SKIP = [
 	re.compile('README.txt')
 ]
-BATCH_SIZE=10000
+BATCH_SIZE=1000
 NOISE_RATIO = 15
 SAVEDIR = '/home/2012/enewel3/entity-embeddings/data/relation2vec'
-MIN_FREQUENCY = 5
+MIN_FREQUENCY = 20
 NUM_EMBEDDING_DIMENSIONS = 500
-
+NUM_EPOCHS = 1
+LEARNING_RATE = 0.1
 
 def prepare():
 	minibatch_generator = MinibatchGenerator(
@@ -34,43 +39,56 @@ def prepare():
 
 def train():
 
+	print 'one'
+
 	# Define the input theano variables
 	signal_input = T.imatrix('query_input')
 	noise_input = T.imatrix('noise_input')
 
+	print 'two'
 	# Make a NoiseContraster, and get the combined input
-	noise_contraster = NoiseContraster(signal_input, noise_input)
+	noise_contraster = NoiseContraster(
+		signal_input, noise_input, learning_rate=LEARNING_RATE
+	)
 	combined_input = noise_contraster.get_combined_input()
 
+	print 'three'
 	# Make a MinibatchGenerator
 	minibatch_generator = MinibatchGenerator(
-		directories=DIRECTORIES, skip=SKIP,
-		noise_ratio=NOISE_RATIO, t=THRESHOLD,
-		batch_size=BATCH_SIZE, parse=parse
+		files=FILES, directories=DIRECTORIES, skip=SKIP,
+		noise_ratio=NOISE_RATIO,
+		batch_size=BATCH_SIZE,
 	)
 
+	print 'four'
 	# load the minibatch generator.  Prune very rare tokens.
 	minibatch_generator.load(SAVEDIR)
 	minibatch_generator.prune(min_frequency=MIN_FREQUENCY)
+	print 'entity vocabulary:', len(minibatch_generator.entity_dictionary)
+	print 'context vocabulary:', len(minibatch_generator.context_dictionary)
 
-	# Make a Word2VecEmbedder object, feed it the combined input
-	word2vec_embedder = Word2VecEmbedder(
+	print 'five'
+	# Make a EntityEmbedder object, feed it the combined input
+	entity_embedder = EntityEmbedder(
 		combined_input,
 		batch_size=BATCH_SIZE,
-		vocab_size=len(minibatch_generator.unigram_dictionary),
+		entity_vocab_size=len(minibatch_generator.entity_dictionary),
+		context_vocab_size=len(minibatch_generator.context_dictionary),
 		num_embedding_dimensions = NUM_EMBEDDING_DIMENSIONS
 	)
 
+	print 'six'
+	print 'six'
 	# Get the params and output from the word2vec embedder, feed that
 	# back to the noise_contraster to get the training function
-	combined_output = word2vec_embedder.get_output()
-	params = word2vec_embedder.get_params()
+	combined_output = entity_embedder.get_output()
+	params = entity_embedder.get_params()
 	train = noise_contraster.get_train_func(combined_output, params)
 
-
+	print 'seven'
 	# Iterate over the corpus, training the embeddings
 	training_start = time.time()
-	for epoch in range(num_epochs):
+	for epoch in range(NUM_EPOCHS):
 		print 'starting epoch %d' % epoch
 		epoch_start = time.time()
 		batch_num = -1
@@ -81,15 +99,19 @@ def train():
 				print '\tloss: %f' % loss
 
 		epoch_elapsed = time.time() - epoch_start
-		print '\tFinished epoch %d.  Time elapsed %2.1f.' % epoch_elapsed
+		print (
+			'\tFinished epoch %d.  Time elapsed %2.1f.' 
+			% (epoch, epoch_elapsed)
+		)
 
+	print 'eight'
 	# Save the model (the embeddings) if savedir was provided
-	embedings_filename = os.path.join(SAVEDIR, 'embeddings.npz')
-	word2vec_embedder.save(embeddings_filename)
+	embeddings_filename = os.path.join(SAVEDIR, 'embeddings.npz')
+	entity_embedder.save(embeddings_filename)
 
 	print 'total training time: %f' % (time.time() - training_start)
-	# Return the trained word2vec_embedder
-	return word2vec_embedder
+	# Return the trained entity_embedder
+	return entity_embedder
 
 
 

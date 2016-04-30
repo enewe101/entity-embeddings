@@ -10,6 +10,9 @@ import unittest
 from minibatch_generator import MinibatchGenerator, parse
 from unittest import TestCase, main
 
+@np.vectorize
+def sigma(a):
+	return 1 / (1 + np.exp(-a))
 
 # TODO: make this test.  It should know what entity pairs and contexts
 # have a high probability of arising with the data, following NCE form
@@ -17,46 +20,147 @@ class TestEntityEmbedder(TestCase):
 
 	def test_learning(self):
 
-		files = ['test-data/test-corpus/b.tsv']
-		batch_size = 5
+		# Seed randomness for a reproducible test.  Using 2 because
+		# 1 was particularly bad by chance
+		np.random.seed(2)
+
+		# Some constants for the test
+		files = ['test-data/test-corpus/c.tsv']
+		batch_size = 50
 		noise_ratio = 15
 		num_embedding_dimensions = 5
-		num_epochs
+		num_epochs = 5
+		num_replicates=5
+		learning_rate = 0.01
+		tolerance = 0.025
+		savedir = 'test-data/test-entity-embedder'
 
+		# Make a minibatcher to yield training batches from test corpus
 		minibatch_generator = MinibatchGenerator(
 			files=files,
 			batch_size=batch_size,
 			noise_ratio=noise_ratio,
 			verbose=False
 		)
-		minibatch_generator.prepare()
-		signal_input = T.matrix('signal')
-		noise_input = T.matrix('noise')
-		noise_contraster = NoiseContraster(signal_input, noise_input)
-		combined_input = noise_contraster.get_combined_input()
-		entity_embedder = EntityEmbedder(
-			combined_input,
-			batch_size,
-			minibatch_generator.entity_vocab_size(),
-			minibatch_generator.context_vocab_size(),
-			num_embedding_dimensions
+		minibatch_generator.prepare(savedir=savedir)
+
+		# Make signal and noise channels and prepared the noise contraster
+		signal_input = T.imatrix('signal')
+		noise_input = T.imatrix('noise')
+		noise_contraster = NoiseContraster(
+			signal_input, noise_input, learning_rate=learning_rate
 		)
-		output = entity_embedder.get_output()
-		params = entity_embedder.get_params()
-		train = noise_contraster.get_train_func(output, params)
+		combined_input = noise_contraster.get_combined_input()
 
-		for epoch in range(num_epochs):
-			print 'Epoch %d' % epoch
+		# We'll make and train an EntityEmbedder in a moment.  However,
+		# first we will get the IDs for the entities that occur together
+		# within the test corpus.  We'll be interested to see the 
+		# relationship embedding for them that is learnt during training
+		edict = minibatch_generator.entity_dictionary
+		expected_pairs = [
+			('A','B'), ('C','D'), ('E','F')
+		]
+		expected_pairs_ids = [
+			(edict.get_id(e1), edict.get_id(e2)) 
+			for e1, e2 in expected_pairs
+		]
 
-			for signal_batch, noise_batch in minibatch_generator:
-				loss = train(signal_batch, noise_batch)
-				print loss
 
-		expected_pairs = [(A,B),(C,D),(E,F),(E,G),(E,H),(F,G),(F,H),(G,H)]
-		relationship_embedding = 
-		for e1, e2 in expected_pairs:
+		# We will repeatedly make an EntityEmbedder, train it on the 
+		# test corpus, and then find its embedding for the entity-pairs
+		# of interest.  We do it num_replicate # of times to average
+		# results over enough trials that we can test if the learnt
+		# embeddings have roughly the expected properties
+		embedding_dot_products  = []
+		for replicate in range(num_replicates):
 
-		
+
+			# Make an EntityEmbedder
+			entity_embedder = EntityEmbedder(
+				combined_input,
+				batch_size,
+				minibatch_generator.entity_vocab_size(),
+				minibatch_generator.context_vocab_size(),
+				num_embedding_dimensions
+			)
+
+			# Get its output and make a theano training function
+			output = entity_embedder.get_output()
+			params = entity_embedder.get_params()
+			train = noise_contraster.get_train_func(output, params)
+
+			# Train on the dataset, running through it num_epochs # of times
+			for epoch in range(num_epochs):
+				#print 'Epoch %d' % epoch
+
+				for signal_batch, noise_batch in minibatch_generator:
+					loss = train(signal_batch, noise_batch)
+					#print loss
+
+
+			# Get the parameters out of the trained model
+			W_entity, W_context, W_relation, b_relation = (
+				entity_embedder.get_param_values()
+			)
+
+			# Get the embeddings for the entity-pairs ("relationships") 
+			# occuring in the test corpus
+			embedded_relationships = entity_embedder.embed_relationship(
+				expected_pairs_ids
+			)
+
+			# Take the dot product of the relationship embeddings
+			# with the context-word embeddings, and then process this
+			# through the sigmoid function.  This yields a 
+			# relationship-context "fit-score", being larger if they 
+			# have better fit according to the model.  The score has
+			# an interpretation as a probablity, see "Noise-Contrastive 
+			# Estimation of Unnormalized Statistical Models, with 
+			# Applications to Natural Image Statistics".
+			embedding_dot_product = np.round(sigma(np.dot(
+				embedded_relationships, W_context.T
+			)),2)
+			#print embedding_dot_product
+
+			# Accumulate fit scores over the replicates
+			embedding_dot_products.append(embedding_dot_product)
+
+
+		# Average the fit-scores over the replicates
+		avg_embedding_product = np.mean(embedding_dot_products, axis=0)
+		#print avg_embedding_product
+
+		# Find the context words that fit best with each entity-pair.
+		# These should be equal to the ids for the contexts actually
+		# occuring along with those entity pairs in the coropus.  To see
+		# where these numbers come from, compare the contexts cooccurring
+		# with entity pairs in the test-corpus with their ids in the 
+		# token_map saved at <savedir>
+		expected_best_fitting_context_ids = [2,5,8]
+		best_fitting_context_ids = np.argmax(avg_embedding_product, axis=1)
+		self.assertTrue(np.array_equal(
+			best_fitting_context_ids, expected_best_fitting_context_ids
+		))
+
+		# Get the probability accorded to each entity pair and the 
+		# context that they fit best with
+		predicted_fit = np.max(avg_embedding_product, axis=1)
+
+		# The optimal probability accorded to entity_pairs and contexts
+		# should be 0.375 for the entity pairs with their best fitting 
+		# contexts (this is according to the
+		# formulation of the loss function as part of Noise Contrastive
+		# Estimation, specifically, this is p(C=1 | (e1,e2,c)),
+		# see "Noise-Contrastive Estimation of Unnormalized Statistical 
+		# Models, with Applications to Natural Image Statistics".
+		expected_fit = 0.375
+
+		# The predictions should be "close" to the expected values
+		differences = [
+			abs(predicted - expected_fit)
+			for predicted in predicted_fit
+		]
+		self.assertTrue(all([diff < tolerance for diff in differences]))
 
 
 
