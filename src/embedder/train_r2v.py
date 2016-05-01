@@ -1,34 +1,43 @@
 #!/usr/bin/env python
+import numpy as np
 from theano import tensor as T
 import time
 import sys
+sys.path.append('..')
 import re
 from minibatch_generator import MinibatchGenerator
 from entity_embedder import EntityEmbedder
 from word2vec import NoiseContraster
 import os
+from SETTINGS import DATA_DIR, CORPUS_DIR
+
+# Seed randomness for reproducibility
+np.random.seed(0)
 
 DIRECTORIES = [
-	#'/home/rldata/gigaword-corenlp/cooccurrence',
-	#'/home/rldata/gigaword-corenlp/cooccurrence/0'
+	os.path.join(CORPUS_DIR, 'cooccurrence'),
+	os.path.join(CORPUS_DIR, 'cooccurrence/0')
 ]
 FILES = [
-	'/home/rldata/gigaword-corenlp/cooccurrence/0/002.tsv'
+	#os.path.join(CORPUS_DIR, 'cooccurrence/0/%s.tsv' % file_num)
+	#for file_num in 
+	#['002', '003', '006', '007', '009', '00d', '00e', '010', '017', '018']
 ]
 SKIP = [
 	re.compile('README.txt')
 ]
 BATCH_SIZE=1000
 NOISE_RATIO = 15
-SAVEDIR = '/home/2012/enewel3/entity-embeddings/data/relation2vec'
+SAVEDIR = os.path.join(DATA_DIR, 'relation2vec')
 MIN_FREQUENCY = 20
 NUM_EMBEDDING_DIMENSIONS = 500
 NUM_EPOCHS = 1
-LEARNING_RATE = 0.1
+LEARNING_RATE = 0.01
 
 def prepare():
 	minibatch_generator = MinibatchGenerator(
 		directories=DIRECTORIES,
+		files=FILES,
 		skip=SKIP,
 		batch_size=BATCH_SIZE,
 	)
@@ -78,7 +87,6 @@ def train():
 	)
 
 	print 'six'
-	print 'six'
 	# Get the params and output from the word2vec embedder, feed that
 	# back to the noise_contraster to get the training function
 	combined_output = entity_embedder.get_output()
@@ -125,6 +133,7 @@ if __name__ == '__main__':
 
 	elif sys.argv[1] == 'train':
 		train()
+		print 'success'
 
 	else:
 		print 'usage: ./train_w2v.py [ prepare | train ]'

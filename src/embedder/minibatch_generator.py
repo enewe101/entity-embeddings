@@ -316,6 +316,10 @@ class MinibatchGenerator(object):
 				filtered_token_ids = self.eliminate_spans(
 					token_ids, entity_spans[e1] + entity_spans[e2]
 				)
+				
+				# We can't train if there are no context words
+				if len(filtered_token_ids) == 0:
+					break
 
 				# Sample a token from the context
 				context_token_id = np.random.choice(filtered_token_ids, 1)[0]

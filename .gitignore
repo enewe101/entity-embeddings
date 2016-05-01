@@ -5,3 +5,4 @@ SETTINGS.py
 data
 .DS_Store
 del
+venv

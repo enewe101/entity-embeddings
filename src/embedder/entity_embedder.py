@@ -1,3 +1,4 @@
+import numpy as np
 from lasagne import layers
 from lasagne.layers import get_output, get_all_params, get_all_param_values
 from lasagne.init import Normal
@@ -169,18 +170,31 @@ class EntityEmbedder(object):
 		return self.output
 
 
+	#TODO: test
 	def save(self, filename):
-		W,C,D = self.get_param_values()
-		np.savez(filename, W=W, C=C, D=D)
+		W_entity,W_context,W_relation,b_relation = self.get_param_values()
+		np.savez(
+			filename, 
+			W_entity=W_entity,
+			W_context=W_context,
+			W_relation=W_relation,
+			b_relation=b_relation
+		)
 
 
+	#TODO: test
 	def load(self, filename):
 		npfile = np.load(filename)
-		W_loaded, C_loaded, D_loaded = npfile['W'], npfile['C'], npfile['D']
-		W_shared, C_shared, D_shared = self.get_params()
-		W_shared.set_value(W_loaded)
-		C_shared.set_value(C_loaded)
-		D_shared.set_value(D_loaded)
+		W_entity_ = npfile['W_entity']
+		W_context_ = npfile['W_context']
+		W_relation_ = npfile['W_relation']
+		b_relation_ = npfile['b_relation']
+
+		W_entity, W_context, W_relation, b_relation = self.get_params()
+		W_entity.set_value(W_entity_)
+		W_context.set_value(W_context_)
+		W_relation.set_value(W_relation_)
+		b_relation.set_value(b_relation_)
 
 
 
