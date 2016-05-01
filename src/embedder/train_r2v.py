@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import t4k
 import numpy as np
 from theano import tensor as T
 import time
@@ -15,13 +16,13 @@ from SETTINGS import DATA_DIR, CORPUS_DIR
 np.random.seed(0)
 
 DIRECTORIES = [
-	os.path.join(CORPUS_DIR, 'cooccurrence'),
-	os.path.join(CORPUS_DIR, 'cooccurrence/0')
+	#os.path.join(CORPUS_DIR, 'cooccurrence'),
+	#os.path.join(CORPUS_DIR, 'cooccurrence/0')
 ]
 FILES = [
-	#os.path.join(CORPUS_DIR, 'cooccurrence/0/%s.tsv' % file_num)
-	#for file_num in 
-	#['002', '003', '006', '007', '009', '00d', '00e', '010', '017', '018']
+	os.path.join(CORPUS_DIR, 'cooccurrence/0/%s.tsv' % file_num)
+	for file_num in 
+	['002', '003', '006', '007', '009', '00d', '00e', '010', '017', '018']
 ]
 SKIP = [
 	re.compile('README.txt')
@@ -46,7 +47,12 @@ def prepare():
 	)
 
 
-def train():
+def train(iteration_mode):
+
+	if iteration_mode not in ('generate', 'before', 'background'):
+		raise ValueError(
+			'Got unexpected iteration_mode: %s' % iteration_mode
+		)
 
 	print 'one'
 
@@ -93,14 +99,37 @@ def train():
 	params = entity_embedder.get_params()
 	train = noise_contraster.get_train_func(combined_output, params)
 
+	batching_start = time.time()
 	print 'seven'
+	# Figure out which iterator to use
+	if iteration_mode == 'generate':
+		print 'Generating minibatches to order'
+		get_minibatch_iterator = minibatch_generator.generate
+
+	elif iteration_mode == 'before':
+		print 'Generating all minibatches upfront (this could take awhile)'
+		minibatches = minibatch_generator.get_minibatches()
+		get_minibatch_iterator = lambda: minibatches
+		print 'Done generating minibatches.'
+
+	elif iteration_mode == 'background':
+		print 'Generating minibatches in the background'
+		get_minibatch_iterator = lambda: minibatch_generator
+
+	else:
+		raise ValueError(
+			'Got unexpected iteration_mode: %s' % iteration_mode
+		)
+
 	# Iterate over the corpus, training the embeddings
 	training_start = time.time()
 	for epoch in range(NUM_EPOCHS):
+
 		print 'starting epoch %d' % epoch
 		epoch_start = time.time()
 		batch_num = -1
-		for signal_batch, noise_batch in minibatch_generator.generate():
+		for signal_batch, noise_batch in get_minibatch_iterator():
+			t4k.out('.')
 			batch_num += 1
 			loss = train(signal_batch, noise_batch)
 			if batch_num % 100 == 0:
@@ -108,16 +137,20 @@ def train():
 
 		epoch_elapsed = time.time() - epoch_start
 		print (
-			'\tFinished epoch %d.  Time elapsed %2.1f.' 
+			'\tFinished epoch %d.  Time for epoch was %2.1f.' 
 			% (epoch, epoch_elapsed)
 		)
 
-	print 'eight'
+	elapsed = time.time() - batching_start
+	print 'Time needed for batching and training:', (
+		time.time() - batching_start)
+	print 'Time needed for training: %f' % (time.time() - training_start)
+
+	print 'Saving the model...'
 	# Save the model (the embeddings) if savedir was provided
 	embeddings_filename = os.path.join(SAVEDIR, 'embeddings.npz')
 	entity_embedder.save(embeddings_filename)
 
-	print 'total training time: %f' % (time.time() - training_start)
 	# Return the trained entity_embedder
 	return entity_embedder
 
@@ -132,7 +165,8 @@ if __name__ == '__main__':
 		print 'Elapsed:', elapsed
 
 	elif sys.argv[1] == 'train':
-		train()
+		iteration_mode = sys.argv[2]
+		train(iteration_mode)
 		print 'success'
 
 	else:

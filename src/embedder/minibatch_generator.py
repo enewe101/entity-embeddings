@@ -358,7 +358,36 @@ class MinibatchGenerator(object):
 			yield (signal_batch, noise_batch)
 
 
+	def get_minibatches(self):
+		'''
+		Reads through the entire corpus, generating all of the minibatches
+		up front, storing them in memory as a list.  Returns the list of
+		minibatches.
+		'''
+		minibatches = []
+		for signal_batch, noise_batch in self.generate():
+			minibatches.append((signal_batch, noise_batch))
+
+		return minibatches
+
+
 	def enqueue_minibatches(self, minibatch_queue, send_pipe):
+
+		'''
+		Reads through the minibatches, placing them on a queue as they
+		are ready.  This usually shouldn't be called directly, but 
+		is used when the MinibatchGenerator is treated as an iterator, e.g.:
+
+			for signal, noise in my_minibatch_generator:
+				do_something_with(signal, noise)
+
+		It causes the minibatches to be prepared in a separate process
+		using this function, placing them on a queue, while a generator
+		construct pulls them off the queue as the client process requests
+		them.  This keeps minibatch preparation running in the background
+		while the client process is busy processing previously yielded 
+		minibatches.
+		'''
 
 		# Continuously iterate through the dataset, enqueing each
 		# minibatch.  The consumer will process minibatches from
