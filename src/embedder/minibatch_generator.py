@@ -1,3 +1,4 @@
+from iterable_queue import IterableQueue
 import re
 import random
 import t4k
@@ -63,8 +64,16 @@ class MinibatchGenerator(object):
 		noise_ratio=15,
 		batch_size = 1000,
 		parse=parse,
-		verbose=True
+		verbose=True,
+		num_example_generators=10,
 	):
+
+		self.num_example_generators = num_example_generators
+		self.verbose = verbose
+		self.files = files
+		self.directories = directories
+		self.skip = skip
+		self.parse = parse
 
 		# Get a corpus reader
 		self.corpus_reader = CorpusReader(
@@ -90,9 +99,9 @@ class MinibatchGenerator(object):
 
 	def load(self, directory):
 		'''
-		Load both the dictionary and context_dictionary, assuming default filenames
-		(dictionary.gz and unigram-dictionary.gz), by specifying their containing
-		directory
+		Load both the dictionary and context_dictionary, assuming default 
+		filenames (dictionary.gz and unigram-dictionary.gz), by specifying 
+		their containing directory.
 		'''
 		self.entity_dictionary.load(os.path.join(
 			directory, 'entity-dictionary'
@@ -110,9 +119,9 @@ class MinibatchGenerator(object):
 
 	def save(self, directory):
 		'''
-		Save both the dictionary and context_dictionary, using default filenames
-		(dictionary.gz and unigram-dictionary.gz), by specifying only their containing
-		directory
+		Save both the dictionary and context_dictionary, using default 
+		filenames (dictionary.gz and unigram-dictionary.gz), by specifying 
+		only their containing directory
 		'''
 		self.entity_dictionary.save(
 			os.path.join(directory, 'entity-dictionary'))
@@ -148,8 +157,9 @@ class MinibatchGenerator(object):
 
 	def prepare(self, savedir=None):
 		# Before any minibatches can be generated, we need to run over
-		# the corpus to determine the context_dictionary distribution and create
-		# a dictionary mapping all words in the corpus vocabulary to int's.
+		# the corpus to determine the context_dictionary distribution and 
+		# create a dictionary mapping all words in the corpus vocabulary to 
+		# int's.
 
 		# But first, if a savedir was supplied do an IO check
 		if savedir is not None:
@@ -157,11 +167,13 @@ class MinibatchGenerator(object):
 
 		# For each line, get the context tokens and entity tokens.
 		# Add both to the respective dictionaries.  Also add the context
-		# tokens (after converting them to ids) to the context_dictionary noise model
-		for line in self.corpus_reader.read_no_q():
-			context_tokens, entity_spans = line
-			self.context_dictionary.update(context_tokens)
-			self.entity_dictionary.update(entity_spans.keys())
+		# tokens (after converting them to ids) to the context_dictionary 
+		# noise model
+		for filename in self.generate_filenames():
+			for line in self.parse(filename):
+				context_tokens, entity_spans = line
+				self.context_dictionary.update(context_tokens)
+				self.entity_dictionary.update(entity_spans.keys())
 
 		# save the dictionaries and context_dictionary noise model
 		if savedir is not None:
@@ -177,48 +189,264 @@ class MinibatchGenerator(object):
 		self.entity_dictionary.prune(min_frequency)
 
 
-	def __iter__(self):
+	def batch_examples(self, example_iter):
 
-		# Once iter is called, a subprocess will be started which
-		# begins generating minibatches.  These accumulate in a queue
-		# and iteration pulls from that queue.  That way, iteration
-		# can begin as soon as the first minibatch is prepared, and 
-		# later minibatches are prepared in the background while earlier
-		# minibatches are used.  The idea is that this will keep the 
-		# CPU(s) busy while training occurs on the GPU.
+		signal_batch, noise_batch = self.init_batch()
+
+		# i keeps track of position in the signal batch
+		i = -1
+		for signal_example, noise_examples in example_iter:
+
+			# Increment position within the batch
+			i += 1
+
+			# Add the signal example
+			signal_batch[i, :] = signal_example
+
+			# Figure out the position within the noise batch
+			j = i*self.noise_ratio
+
+			# block-assign the noise samples to the noise batch array
+			noise_batch[j:j+self.noise_ratio, :] = noise_examples
+
+			# Once we've finished assembling a minibatch, enqueue it
+			# and start assembling a new minibatch
+			if i == self.batch_size - 1:
+				yield (signal_batch, noise_batch)
+				signal_batch, noise_batch = self.init_batch()
+				i = -1
+
+		# Normally we'll have a partially filled minibatch after processing
+		# the corpus.  The elements in the batch that weren't overwritten
+		# contain UNK tokens, which act as padding.  Yield the partial
+		# minibatch.
+		if i >= 0:
+			yield (signal_batch, noise_batch)
+
+
+	def generate_minibatches(self):
+		for minibatch in self.batch_examples(self.generate_examples()):
+			yield minibatch
+
+
+	def generate_examples(self):
+		for filename in self.generate_filenames():
+			for example in self.process_file(filename):
+				yield example
+
+
+	def generate_minibatches_async(self, example_queue, minibatch_queue):
+		for minibatch in self.batch_examples(example_queue):
+			minibatch_queue.put(minibatch)
+		minibatch_queue.close()
+
+
+	def __iter__(self):
 
 		# TODO: enable having multiple reader processes.  This could
 		# provide a speed up for clusters with distributed IO
-
-		self.minibatches = Queue()
-		self.recv_pipe, send_pipe = Pipe()
-
-		# We'll fork a process to assemble minibatches, and return 
-		# immediatetely so that minibatches can be used as they are 
-		# constructed.
-
 		# TODO: currently the only randomness in minibatching comes from
 		# the signal context and noise contexts that are drawn for a 
 		# given entity query tuple.  But the entity query tuples are read
 		# deterministically in order through the corpus  Ideally examples
 		# should be totally shuffled..
 
-		minibatch_preparation = Process(
-			target=self.enqueue_minibatches,
-			args=(self.minibatches, send_pipe)
-		)
-		minibatch_preparation.start()
+		file_queue = IterableQueue()
+		example_queue = IterableQueue()
+		minibatch_queue = IterableQueue()
 
-		# Because we assemble the batches within a forked process, it's 
-		# access to randomness doesn't alter the state of the parent's 
-		# random number generator.  Multiple calls to this function
-		# would produce the same minibatching, which is not
-		# desired.  We make a call to the numpy random number generator
-		# to advance the parent's random number generator's state to avoid
-		# this problem:
+		# Fill the file queue
+		file_producer = file_queue.get_producer()
+		for filename in self.generate_filenames():
+			file_producer.put(filename)
+		file_producer.close()
+
+		# Make processes that process the files and put examples onto
+		# the example queue
+		for i in range(self.num_example_generators):
+			Process(target=self.process_file_async, args=(
+				file_queue.get_consumer(),
+				example_queue.get_producer()
+			)).start()
+			
+		# Make a processes that batches the files and puts examples onto
+		# the minibatch queue
+		Process(target=self.generate_minibatches_async, args=(
+			example_queue.get_consumer(),
+			minibatch_queue.get_producer()
+		)).start()
+
+		# Before closeing the queues, make a consumer that will be used for 
+		# yielding minibatches to the external call for iteration.
+		self.minibatch_consumer = minibatch_queue.get_consumer()
+
+		# Close all queues
+		file_queue.close()
+		example_queue.close()
+		minibatch_queue.close()
+
+		# This is necessary because accessing randomness in the child 
+		# processes doesn't advance the random state here in the parent
+		# process, which would, mean that the exact same minibatch sequence 
+		# would being generated on subsequent calls to `__iter__()`, which 
+		# is not desired.  The simplest solution is to advance the 
+		# random state by sampling randomness once.
 		np.random.uniform()
 
-		return self
+		# Return the minibatch_consumer as the iterator
+		return self.minibatch_consumer
+		
+
+	def process_file_async(self, file_queue, example_queue):
+		for filename in file_queue:
+			for example in self.process_file(filename):
+				example_queue.put(example)
+
+		example_queue.close()
+
+
+	def process_file(self, filename):
+		'''
+		Generator that reads the file `filename` parsing it into a 
+		file-format independent representation of the information relevant 
+		to the problem, and then generating training examples from that 
+		information.  Although the file is processed into (possibly) many 
+		examples in bulk, this generator yields examples individually.
+		'''
+
+		parsed = self.parse(filename)
+		examples = self.build_examples(parsed)
+		for example in examples:
+			yield example
+
+
+	def build_examples(self, parsed):
+
+		'''
+		Assembles bunches of examples from the parsed data coming from
+		files that were read.  Normally, this function might yield 
+		individual examples, however, in this case, we need to maintain
+		a distinction between the noise- and signal-examples, and to
+		keep them in consistent proportions.  So, here, we yield small 
+		bunches that consist of 1 signal example, and X noise examples,
+		where X depends on `self.noise_ratio`.
+		'''
+		# LEFT OFF: an issue here is that signal examples and noise
+		# examples aren't interchangeable in the batch.  So handing
+		# examples in arbitrary order to a batcher would not make 
+		# batches with proper signal / noise ratio nor with them in 
+		# their correct places.  Perhaps the examples can be labelled
+		# as signal vs. noise, so that the batcher knows what to do with
+		# them?  Can that problem be handled completely in build_examples
+		# or does it need a custom batcher?
+
+		for line in parsed:
+
+			context_tokens, entity_spans = line
+
+			# Sentences with less than two entities can't be used for 
+			# learning
+			if len(entity_spans) < 2:
+				continue
+
+			token_ids = self.context_dictionary.get_ids(context_tokens)
+
+			# We'll now generate generate signal examples and noise
+			# examples for training.  Iterate over every pairwise 
+			# of entities in this line
+			for e1, e2 in itools.combinations(entity_spans, 2):
+
+				# TODO test this
+				# Get the context tokens minus the entity_spans
+				filtered_token_ids = self.eliminate_spans(
+					token_ids, entity_spans[e1] + entity_spans[e2]
+				)
+
+				# We can't train if there are no context words
+				if len(filtered_token_ids) == 0:
+					break
+
+				# Sample a token from the context
+				context_token_id = np.random.choice(
+					filtered_token_ids, 1)[0]
+
+				# convert entities into ids
+				e1_id, e2_id = self.entity_dictionary.get_ids([e1, e2])
+
+				# Add the signal example
+				signal_example = [e1_id, e2_id, context_token_id]
+
+				# Sample tokens from the noise
+				noise_context_ids = self.context_dictionary.sample(
+					(self.noise_ratio,))
+
+				# block-assign the noise samples to the noise batch array
+				noise_examples = [
+					[e1_id, e2_id, noise_context_id]
+					for noise_context_id in noise_context_ids
+				]
+				#noise_batch[j:j+self.noise_ratio, :] = [
+				#	[e1_id, e2_id, noise_context_id]
+				#	for noise_context_id in noise_context_ids
+				#]
+
+				# Once we've finished assembling a minibatch, enqueue it
+				# and start assembling a new minibatch
+				yield (signal_example, noise_examples)
+
+
+	def generate_filenames(self):
+		'''
+		Generator that yields all the filenames (absolute paths) that 
+		make up the corpus.  Files might have been specified as a list
+		of directories and/or as a list of files.  This process consults 
+		the filesystem and resolves them to a list of files.  Also,
+		the `skip` argument can provide a list of regexes matching files
+		and directories to ignore, so this filters out files / directories
+		that match an entry in `skip`.
+		'''
+
+		# Process all the files listed in files, unles they match an
+		# entry in skip
+		#print 'starting reading'
+		if self.files is not None:
+			for filename in self.files:
+				filename = os.path.abspath(filename)
+
+				# Skip files if they match a regex in skip
+				if any([s.search(filename) for s in self.skip]):
+					continue
+
+				if self.verbose:
+					print 'processing', filename
+
+				yield filename
+
+		# Process all the files listed in each directory, unless they
+		# match an entry in skip
+		if self.directories is not None:
+			for dirname in self.directories:
+				dirname = os.path.abspath(dirname)
+
+				# Skip directories if they match a regex in skip
+				if any([s.search(dirname) for s in self.skip]):
+					continue
+
+				for filename in os.listdir(dirname):
+					filename = os.path.join(dirname, filename)
+
+					# Only process the *files* under the given directories
+					if not os.path.isfile(filename):
+						continue
+
+					# Skip files if they match a regex in skip
+					if any([s.search(filename) for s in self.skip]):
+						continue
+
+					if self.verbose:
+						print 'processing', filename
+
+					yield filename
 
 
 	def init_batch(self):
@@ -262,100 +490,101 @@ class MinibatchGenerator(object):
 		return t4k.skip(token_ids, adjusted_spans)
 
 
-	def generate(self):
-		'''
-		This iterates minibatches.  You can call this directly to provide
-		an iterable to loop through the dataset.  However, the 
-		MinibatchGenerator is itself iterable, so you can provide a 
-		MinibatchGenerator instance as the iterable in a looping construct.
 
-		These are not quite equivalent approaches.  Using a 
-		MinibatchGenerator instance starts a process in the background
-		that reads through the corpus and enqueues minibatches,
-		whereas using .generate() produces each minibatch as it is 
-		requested.  
-		
-		If the production of minibatches takes a similar 
-		amounts of time as their consumption, then passing the 
-		MinibatchGenerator instance will be faster.
+	#def generate(self):
+	#	'''
+	#	This iterates minibatches.  You can call this directly to provide
+	#	an iterable to loop through the dataset.  However, the 
+	#	MinibatchGenerator is itself iterable, so you can provide a 
+	#	MinibatchGenerator instance as the iterable in a looping construct.
 
-		If the consumption of minibatches takes longer, then this 
-		approach could fill up all the memory. (see TODO below).
+	#	These are not quite equivalent approaches.  Using a 
+	#	MinibatchGenerator instance starts a process in the background
+	#	that reads through the corpus and enqueues minibatches,
+	#	whereas using .generate() produces each minibatch as it is 
+	#	requested.  
+	#	
+	#	If the production of minibatches takes a similar 
+	#	amounts of time as their consumption, then passing the 
+	#	MinibatchGenerator instance will be faster.
 
-		If minibatches are consumed much faster than they are produced,
-		then it will make little difference which approach you use.
-		'''
-		# TODO: add some controls to avoid filling up all of the 
-		# 	memory by enqueing too many minibatches
+	#	If the consumption of minibatches takes longer, then this 
+	#	approach could fill up all the memory. (see TODO below).
 
-		signal_batch, noise_batch = self.init_batch()
+	#	If minibatches are consumed much faster than they are produced,
+	#	then it will make little difference which approach you use.
+	#	'''
+	#	# TODO: add some controls to avoid filling up all of the 
+	#	# 	memory by enqueing too many minibatches
 
-		# i keeps track of position in the signal batch
-		i = -1
-		for line in self.corpus_reader.read_no_q():
+	#	signal_batch, noise_batch = self.init_batch()
 
-			context_tokens, entity_spans = line
+	#	# i keeps track of position in the signal batch
+	#	i = -1
+	#	for line in self.corpus_reader.read_no_q():
 
-			# Sentences with less than two entities can't be used for 
-			# learning
-			if len(entity_spans) < 2:
-				continue
+	#		context_tokens, entity_spans = line
 
-			token_ids = self.context_dictionary.get_ids(context_tokens)
+	#		# Sentences with less than two entities can't be used for 
+	#		# learning
+	#		if len(entity_spans) < 2:
+	#			continue
 
-			# We'll now generate generate signal examples and noise
-			# examples for training.  Iterate over every pairwise 
-			# of entities in this line
-			for e1, e2 in itools.combinations(entity_spans, 2):
+	#		token_ids = self.context_dictionary.get_ids(context_tokens)
 
-				# Increment position within the batch
-				i += 1
+	#		# We'll now generate generate signal examples and noise
+	#		# examples for training.  Iterate over every pairwise 
+	#		# of entities in this line
+	#		for e1, e2 in itools.combinations(entity_spans, 2):
 
-				# TODO test this
-				# Get the context tokens minus the entity_spans
-				filtered_token_ids = self.eliminate_spans(
-					token_ids, entity_spans[e1] + entity_spans[e2]
-				)
-				
-				# We can't train if there are no context words
-				if len(filtered_token_ids) == 0:
-					break
+	#			# Increment position within the batch
+	#			i += 1
 
-				# Sample a token from the context
-				context_token_id = np.random.choice(filtered_token_ids, 1)[0]
+	#			# TODO test this
+	#			# Get the context tokens minus the entity_spans
+	#			filtered_token_ids = self.eliminate_spans(
+	#				token_ids, entity_spans[e1] + entity_spans[e2]
+	#			)
+	#			
+	#			# We can't train if there are no context words
+	#			if len(filtered_token_ids) == 0:
+	#				break
 
-				# convert entities into ids
-				e1_id, e2_id = self.entity_dictionary.get_ids([e1, e2])
+	#			# Sample a token from the context
+	#			context_token_id = np.random.choice(filtered_token_ids, 1)[0]
 
-				# Add the signal example
-				signal_batch[i, :] = [e1_id, e2_id, context_token_id]
+	#			# convert entities into ids
+	#			e1_id, e2_id = self.entity_dictionary.get_ids([e1, e2])
 
-				# Sample tokens from the noise
-				noise_context_ids = self.context_dictionary.sample(
-					(self.noise_ratio,))
+	#			# Add the signal example
+	#			signal_batch[i, :] = [e1_id, e2_id, context_token_id]
 
-				# Figure out the position within the noise batch
-				j = i*self.noise_ratio
+	#			# Sample tokens from the noise
+	#			noise_context_ids = self.context_dictionary.sample(
+	#				(self.noise_ratio,))
 
-				# block-assign the noise samples to the noise batch array
-				noise_batch[j:j+self.noise_ratio, :] = [
-					[e1_id, e2_id, noise_context_id]
-					for noise_context_id in noise_context_ids
-				]
+	#			# Figure out the position within the noise batch
+	#			j = i*self.noise_ratio
 
-				# Once we've finished assembling a minibatch, enqueue it
-				# and start assembling a new minibatch
-				if i == self.batch_size - 1:
-					yield (signal_batch, noise_batch)
-					signal_batch, noise_batch = self.init_batch()
-					i = -1
+	#			# block-assign the noise samples to the noise batch array
+	#			noise_batch[j:j+self.noise_ratio, :] = [
+	#				[e1_id, e2_id, noise_context_id]
+	#				for noise_context_id in noise_context_ids
+	#			]
 
-		# Normally we'll have a partially filled minibatch after processing
-		# the corpus.  The elements in the batch that weren't overwritten
-		# contain UNK tokens, which act as padding.  Yield the partial
-		# minibatch.
-		if i >= 0:
-			yield (signal_batch, noise_batch)
+	#			# Once we've finished assembling a minibatch, enqueue it
+	#			# and start assembling a new minibatch
+	#			if i == self.batch_size - 1:
+	#				yield (signal_batch, noise_batch)
+	#				signal_batch, noise_batch = self.init_batch()
+	#				i = -1
+
+	#	# Normally we'll have a partially filled minibatch after processing
+	#	# the corpus.  The elements in the batch that weren't overwritten
+	#	# contain UNK tokens, which act as padding.  Yield the partial
+	#	# minibatch.
+	#	if i >= 0:
+	#		yield (signal_batch, noise_batch)
 
 
 	def get_minibatches(self):
@@ -365,51 +594,40 @@ class MinibatchGenerator(object):
 		minibatches.
 		'''
 		minibatches = []
-		for signal_batch, noise_batch in self.generate():
-			minibatches.append((signal_batch, noise_batch))
+		for minibatch in self.generate_minibatches():
+			minibatches.append(minibatch)
 
 		return minibatches
 
 
-	def enqueue_minibatches(self, minibatch_queue, send_pipe):
+	#def enqueue_minibatches(self, minibatch_queue, send_pipe):
 
-		'''
-		Reads through the minibatches, placing them on a queue as they
-		are ready.  This usually shouldn't be called directly, but 
-		is used when the MinibatchGenerator is treated as an iterator, e.g.:
+	#	'''
+	#	Reads through the minibatches, placing them on a queue as they
+	#	are ready.  This usually shouldn't be called directly, but 
+	#	is used when the MinibatchGenerator is treated as an iterator, e.g.:
 
-			for signal, noise in my_minibatch_generator:
-				do_something_with(signal, noise)
+	#		for signal, noise in my_minibatch_generator:
+	#			do_something_with(signal, noise)
 
-		It causes the minibatches to be prepared in a separate process
-		using this function, placing them on a queue, while a generator
-		construct pulls them off the queue as the client process requests
-		them.  This keeps minibatch preparation running in the background
-		while the client process is busy processing previously yielded 
-		minibatches.
-		'''
+	#	It causes the minibatches to be prepared in a separate process
+	#	using this function, placing them on a queue, while a generator
+	#	construct pulls them off the queue as the client process requests
+	#	them.  This keeps minibatch preparation running in the background
+	#	while the client process is busy processing previously yielded 
+	#	minibatches.
+	#	'''
 
-		# Continuously iterate through the dataset, enqueing each
-		# minibatch.  The consumer will process minibatches from
-		# the queue at it's own pace.
-		for signal_batch, noise_batch in self.generate():
-			minibatch_queue.put((signal_batch, noise_batch))
+	#	# Continuously iterate through the dataset, enqueing each
+	#	# minibatch.  The consumer will process minibatches from
+	#	# the queue at it's own pace.
+	#	for signal_batch, noise_batch in self.generate():
+	#		minibatch_queue.put((signal_batch, noise_batch))
 
-		# Notify parent process that iteration through the corpus is
-		# complete (so it doesn't need to wait for more minibatches)
-		send_pipe.send(self.DONE)
+	#	# Notify parent process that iteration through the corpus is
+	#	# complete (so it doesn't need to wait for more minibatches)
+	#	send_pipe.send(self.DONE)
 
-
-	def next(self):
-		status = self.NOT_DONE
-		while status == self.NOT_DONE:
-			try:
-				return self.minibatches.get(timeout=0.1)
-			except Empty:
-				if self.recv_pipe.poll():
-					status = self.recv_pipe.recv()
-
-		raise StopIteration
 
 	def entity_vocab_size(self):
 		return len(self.entity_dictionary)

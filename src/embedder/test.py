@@ -65,7 +65,6 @@ class TestEntityEmbedder(TestCase):
 			for e1, e2 in expected_pairs
 		]
 
-
 		# We will repeatedly make an EntityEmbedder, train it on the 
 		# test corpus, and then find its embedding for the entity-pairs
 		# of interest.  We do it num_replicate # of times to average
@@ -73,7 +72,6 @@ class TestEntityEmbedder(TestCase):
 		# embeddings have roughly the expected properties
 		embedding_dot_products  = []
 		for replicate in range(num_replicates):
-
 
 			# Make an EntityEmbedder
 			entity_embedder = EntityEmbedder(
@@ -96,7 +94,6 @@ class TestEntityEmbedder(TestCase):
 				for signal_batch, noise_batch in minibatch_generator:
 					loss = train(signal_batch, noise_batch)
 					#print loss
-
 
 			# Get the parameters out of the trained model
 			W_entity, W_context, W_relation, b_relation = (
@@ -124,7 +121,6 @@ class TestEntityEmbedder(TestCase):
 
 			# Accumulate fit scores over the replicates
 			embedding_dot_products.append(embedding_dot_product)
-
 
 		# Average the fit-scores over the replicates
 		avg_embedding_product = np.mean(embedding_dot_products, axis=0)
@@ -164,7 +160,6 @@ class TestEntityEmbedder(TestCase):
 
 
 
-
 class TestMinibatchGenerator(TestCase):
 
 	def setUp(self):
@@ -181,6 +176,12 @@ class TestMinibatchGenerator(TestCase):
 			verbose=False
 		)
 		self.mini_gen.prepare()
+
+
+	def tearDown(self):
+		# Remove test files if they exist
+		if os.path.exists('test-data/test-minibatch-generator'):
+			shutil.rmtree('test-data/test-minibatch-generator')
 
 
 	def test_save_load(self):
@@ -212,16 +213,20 @@ class TestMinibatchGenerator(TestCase):
 		# check that the underlying data in the dictionaries and unigram
 		# are the same
 		self.assertEqual(
-			mini_gen.entity_dictionary.tokens,
-			new_mini_gen.entity_dictionary.tokens
+			mini_gen.entity_dictionary.token_map.tokens,
+			new_mini_gen.entity_dictionary.token_map.tokens
 		)
 		self.assertEqual(
-			mini_gen.context_dictionary.tokens,
-			new_mini_gen.context_dictionary.tokens
+			mini_gen.context_dictionary.token_map.tokens,
+			new_mini_gen.context_dictionary.token_map.tokens
 		)
 		self.assertEqual(
-			mini_gen.unigram.counts,
-			new_mini_gen.unigram.counts
+			mini_gen.entity_dictionary.counter_sampler.counts,
+			new_mini_gen.entity_dictionary.counter_sampler.counts
+		)
+		self.assertEqual(
+			mini_gen.context_dictionary.counter_sampler.counts,
+			new_mini_gen.context_dictionary.counter_sampler.counts
 		)
 
 		# Now we'll try using the component save and load functions
@@ -232,13 +237,10 @@ class TestMinibatchGenerator(TestCase):
 		# if it doesn't exist, so we need to make it
 		os.mkdir('test-data/test-minibatch-generator')
 		mini_gen.save_entity_dictionary(
-			'test-data/test-minibatch-generator/entity-dictionary.gz'
+			'test-data/test-minibatch-generator/entity-dictionary'
 		)
 		mini_gen.save_context_dictionary(
-			'test-data/test-minibatch-generator/context-dictionary.gz'
-		)
-		mini_gen.save_unigram(
-			'test-data/test-minibatch-generator/unigram.gz'
+			'test-data/test-minibatch-generator/context-dictionary'
 		)
 
 		new_new_mini_gen = MinibatchGenerator(
@@ -248,54 +250,84 @@ class TestMinibatchGenerator(TestCase):
 			verbose=False
 		)
 
-		mini_gen.load_entity_dictionary(
-			'test-data/test-minibatch-generator/entity-dictionary.gz'
+		new_new_mini_gen.load_entity_dictionary(
+			'test-data/test-minibatch-generator/entity-dictionary'
 		)
-		mini_gen.load_context_dictionary(
-			'test-data/test-minibatch-generator/context-dictionary.gz'
-		)
-		mini_gen.load_unigram(
-			'test-data/test-minibatch-generator/unigram.gz'
+		new_new_mini_gen.load_context_dictionary(
+			'test-data/test-minibatch-generator/context-dictionary'
 		)
 
-		# And again, check that the underlying data in the dictionaries and 
-		# unigram are the same
+		# check that the underlying data in the dictionaries and unigram
+		# are the same
 		self.assertEqual(
-			mini_gen.entity_dictionary.tokens,
-			new_mini_gen.entity_dictionary.tokens
+			mini_gen.entity_dictionary.token_map.tokens,
+			new_new_mini_gen.entity_dictionary.token_map.tokens
 		)
 		self.assertEqual(
-			mini_gen.context_dictionary.tokens,
-			new_mini_gen.context_dictionary.tokens
+			mini_gen.context_dictionary.token_map.tokens,
+			new_new_mini_gen.context_dictionary.token_map.tokens
 		)
 		self.assertEqual(
-			mini_gen.unigram.counts,
-			new_mini_gen.unigram.counts
+			mini_gen.entity_dictionary.counter_sampler.counts,
+			new_new_mini_gen.entity_dictionary.counter_sampler.counts
+		)
+		self.assertEqual(
+			mini_gen.context_dictionary.counter_sampler.counts,
+			new_new_mini_gen.context_dictionary.counter_sampler.counts
 		)
 
 
-	def test_generate_vs_async(self):
+	def test_generate_async_batch(self):
 		'''
 		MinibatchGenerator can produce minibatches asynchronously (meaning
 		that it generates future minibatches before they are requested and
 		stores them in a queue) or like an ordinary generator as the consumer 
 		requests them.  Both methods should give the same results.
 		'''
+
 		generator_batches = []
 		async_batches = []
 
-		np.random.seed(1)
-		for signal_batch, noise_batch in self.mini_gen:
-			async_batches.append((signal_batch, noise_batch))
+		# We will generate the minibatches using three alternative methods
+		# provided by the minibatch generator.  Provided we seed numpy's 
+		# randomness before generating, each should yield exactly the
+		# same minibatches.
 
+		# Collect the minibatches by treating the MinibatchGenerator
+		# as an iterator.  This leads to "asynchronous" multiprocessing
+		# batch generation
 		np.random.seed(1)
-		for signal_batch, noise_batch in self.mini_gen.generate():
-			generator_batches.append((signal_batch, noise_batch))
+		for minibatch in self.mini_gen:
+			async_batches.append(minibatch)
 
+		# Collect the minibatches by calling 
+		# `MinibatchGenerator.generate()`, which produces minibatches
+		# using the "generator" construct, without any multiprocessing
+		np.random.seed(1)
+		for minibatch in self.mini_gen.generate_minibatches():
+			generator_batches.append(minibatch)
+
+		# Collect the minibatches by calling 
+		# `MinibatchGenerator.get_minibatches()`, which returns a simple
+		# list of all minibatches, all generated "upfront"
+		np.random.seed(1)
+		upfront_batches = self.mini_gen.get_minibatches()
+
+		# Test that async and generate are the same
 		zipped_batches = zip(generator_batches, async_batches)
-		for ((async_sig, async_noise), (gen_sig, gen_noise)) in zipped_batches:
+		for (gen_batch, async_batch) in zipped_batches:
+			async_sig, async_noise = async_batch
+			gen_sig, gen_noise = gen_batch
 			self.assertTrue(np.equal(async_sig, gen_sig).all())
 			self.assertTrue(np.equal(async_noise, gen_noise).all())
+
+		# Test that generate and upfront are the same
+		zipped_batches = zip(generator_batches, upfront_batches)
+		for (gen_batch, upfront_batch) in zipped_batches:
+			upfront_sig, upfront_noise = upfront_batch
+			gen_sig, gen_noise = gen_batch
+			self.assertTrue(np.equal(upfront_sig, gen_sig).all())
+			self.assertTrue(np.equal(upfront_noise, gen_noise).all())
 
 
 	def test_batch_contents(self):
@@ -343,10 +375,6 @@ class TestMinibatchGenerator(TestCase):
 				seen_entity_pairs.append((e1_id, e2_id))
 
 		self.assertItemsEqual(seen_entity_pairs, valid_tokens.keys())
-
-
-
-
 		
 
 	def test_batch_shape(self):
