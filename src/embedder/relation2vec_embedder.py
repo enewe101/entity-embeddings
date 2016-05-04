@@ -5,7 +5,7 @@ from lasagne.init import Normal
 from theano import tensor as T, function
 from word2vec import NoiseContraster, row_dot, sigmoid
 
-class EntityEmbedder(object):
+class Relation2VecEmbedder(object):
 	def __init__(
 		self,
 		input_var,

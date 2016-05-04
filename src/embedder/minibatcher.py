@@ -6,7 +6,10 @@ import itertools as itools
 from collections import defaultdict
 from multiprocessing import Queue, Process, Pipe
 from Queue import Empty
-from word2vec import CorpusReader, UnigramDictionary
+from word2vec import (
+	Word2VecMinibatcher as _Word2VecMinibatcher, Minibatcher,
+	UnigramDictionary
+)
 import numpy as np
 import gzip
 import os
@@ -14,7 +17,29 @@ from word2vec.token_map import UNK
 
 TAB_SPLITTER = re.compile(r'\t+')
 
-def parse(filename):
+def word2vec_parse(filename):
+
+	tokenized_sentences = []
+	for line in open(filename):
+
+		# skip empty lines
+		if line.strip() == '':
+			continue
+
+		# Note that in cases where there are no entity spans, we get
+		# two tab delimiters in a row.  This tab splitter will consider
+		# any number of consecutive tabs as a single delimiter
+		fields = TAB_SPLITTER.split(line.strip())
+		num_unique, tokens = fields[0], fields[1]
+		tokens = tokens.split()
+
+		tokenized_sentences.append(tokens)
+
+	return tokenized_sentences
+
+
+def relation2vec_parse(filename):
+
 	tokenized_sentences = []
 	for line in open(filename):
 
@@ -49,7 +74,15 @@ def parse(filename):
 	return tokenized_sentences
 
 
-class MinibatchGenerator(object):
+# We need to slightly change the parser used in the word2vec minibatcher
+# in order to handle the file format in this project
+class Word2VecMinibatcher(_Word2VecMinibatcher):
+	def parse(self, filename):
+		return word2vec_parse(filename)
+
+
+
+class Relation2VecMinibatcher(object):
 
 	NOT_DONE = 0
 	DONE = 1
@@ -63,7 +96,6 @@ class MinibatchGenerator(object):
 		context_dictionary=None,
 		noise_ratio=15,
 		batch_size = 1000,
-		parse=parse,
 		verbose=True,
 		num_example_generators=10,
 	):
@@ -73,13 +105,6 @@ class MinibatchGenerator(object):
 		self.files = files
 		self.directories = directories
 		self.skip = skip
-		self.parse = parse
-
-		# Get a corpus reader
-		self.corpus_reader = CorpusReader(
-			files=files, directories=directories, skip=skip, parse=parse,
-			verbose=verbose
-		)
 
 		# Load the dictionary, if supplied
 		if entity_dictionary is not None:
@@ -96,6 +121,9 @@ class MinibatchGenerator(object):
 		self.noise_ratio = noise_ratio
 		self.batch_size = batch_size
 
+
+	def parse(self, filename):
+		return relation2vec_parse(filename)
 
 	def load(self, directory):
 		'''
@@ -154,17 +182,7 @@ class MinibatchGenerator(object):
 		f.close
 		os.remove(os.path.join(savedir, '.__test-w2v-access'))
 
-
-	def prepare(self, savedir=None):
-		# Before any minibatches can be generated, we need to run over
-		# the corpus to determine the context_dictionary distribution and 
-		# create a dictionary mapping all words in the corpus vocabulary to 
-		# int's.
-
-		# But first, if a savedir was supplied do an IO check
-		if savedir is not None:
-			self.check_access(savedir)
-
+	def preparation(self, savedir):
 		# For each line, get the context tokens and entity tokens.
 		# Add both to the respective dictionaries.  Also add the context
 		# tokens (after converting them to ids) to the context_dictionary 
@@ -174,6 +192,42 @@ class MinibatchGenerator(object):
 				context_tokens, entity_spans = line
 				self.context_dictionary.update(context_tokens)
 				self.entity_dictionary.update(entity_spans.keys())
+
+
+	def prepare(self, savedir=None, *args, **kwargs):
+		'''
+		Used to perform any preparation steps that are needed before
+		minibatching can be done.  E.g. assembling a dictionary that
+		maps tokens to integers, and determining the total vocabulary size
+		of the corpus.  It is assumed that files will need
+		to be saved as part of this process, and that they should be
+		saved under `savedir`, with `self.save()` managing the details 
+		of writing files under `savedir`.
+
+		INPUTS
+
+		* Note About Inputs *
+		the call signature of this method is variable and is
+		determined by the call signature of the core 
+		`self.preparation()` method.  Refer to that method's call 
+		signature.  Minimally, this method accepts `savedir`
+
+		* savedir [str]: path to directory in which preparation files 
+			should be saved.
+
+		RETURNS
+		* [None]
+		'''
+		# Before any minibatches can be generated, we need to run over
+		# the corpus to determine the context_dictionary distribution and 
+		# create a dictionary mapping all words in the corpus vocabulary to 
+		# int's.
+
+		# But first, if a savedir was supplied do an IO check
+		if savedir is not None:
+			self.check_access(savedir)
+
+		self.preparation(savedir, *args, **kwargs)
 
 		# save the dictionaries and context_dictionary noise model
 		if savedir is not None:
@@ -189,13 +243,13 @@ class MinibatchGenerator(object):
 		self.entity_dictionary.prune(min_frequency)
 
 
-	def batch_examples(self, example_iter):
+	def batch_examples(self, example_iterator):
 
 		signal_batch, noise_batch = self.init_batch()
 
 		# i keeps track of position in the signal batch
 		i = -1
-		for signal_example, noise_examples in example_iter:
+		for signal_example, noise_examples in example_iterator:
 
 			# Increment position within the batch
 			i += 1
@@ -276,7 +330,7 @@ class MinibatchGenerator(object):
 			minibatch_queue.get_producer()
 		)).start()
 
-		# Before closeing the queues, make a consumer that will be used for 
+		# Before closing the queues, make a consumer that will be used for 
 		# yielding minibatches to the external call for iteration.
 		self.minibatch_consumer = minibatch_queue.get_consumer()
 
@@ -307,11 +361,15 @@ class MinibatchGenerator(object):
 
 	def process_file(self, filename):
 		'''
-		Generator that reads the file `filename` parsing it into a 
-		file-format independent representation of the information relevant 
-		to the problem, and then generating training examples from that 
-		information.  Although the file is processed into (possibly) many 
-		examples in bulk, this generator yields examples individually.
+		Generator that yields training examples.  Accepts a filename, which
+		is read and parsed into a file-format-independant form by 
+		`self.parse`, and then is used to generate training examples.
+
+		INPUTS
+		* filename [str]: path to file to be processed.
+
+		YIELDS
+		* example [any]: object representing a training example.
 		'''
 
 		parsed = self.parse(filename)
@@ -331,14 +389,6 @@ class MinibatchGenerator(object):
 		bunches that consist of 1 signal example, and X noise examples,
 		where X depends on `self.noise_ratio`.
 		'''
-		# LEFT OFF: an issue here is that signal examples and noise
-		# examples aren't interchangeable in the batch.  So handing
-		# examples in arbitrary order to a batcher would not make 
-		# batches with proper signal / noise ratio nor with them in 
-		# their correct places.  Perhaps the examples can be labelled
-		# as signal vs. noise, so that the batcher knows what to do with
-		# them?  Can that problem be handled completely in build_examples
-		# or does it need a custom batcher?
 
 		for line in parsed:
 
@@ -385,13 +435,8 @@ class MinibatchGenerator(object):
 					[e1_id, e2_id, noise_context_id]
 					for noise_context_id in noise_context_ids
 				]
-				#noise_batch[j:j+self.noise_ratio, :] = [
-				#	[e1_id, e2_id, noise_context_id]
-				#	for noise_context_id in noise_context_ids
-				#]
 
-				# Once we've finished assembling a minibatch, enqueue it
-				# and start assembling a new minibatch
+				# Yield the example
 				yield (signal_example, noise_examples)
 
 
@@ -495,18 +540,18 @@ class MinibatchGenerator(object):
 	#	'''
 	#	This iterates minibatches.  You can call this directly to provide
 	#	an iterable to loop through the dataset.  However, the 
-	#	MinibatchGenerator is itself iterable, so you can provide a 
-	#	MinibatchGenerator instance as the iterable in a looping construct.
+	#	Relation2VecMinibatcher is itself iterable, so you can provide a 
+	#	Relation2VecMinibatcher instance as the iterable in a looping construct.
 
 	#	These are not quite equivalent approaches.  Using a 
-	#	MinibatchGenerator instance starts a process in the background
+	#	Relation2VecMinibatcher instance starts a process in the background
 	#	that reads through the corpus and enqueues minibatches,
 	#	whereas using .generate() produces each minibatch as it is 
 	#	requested.  
 	#	
 	#	If the production of minibatches takes a similar 
 	#	amounts of time as their consumption, then passing the 
-	#	MinibatchGenerator instance will be faster.
+	#	Relation2VecMinibatcher instance will be faster.
 
 	#	If the consumption of minibatches takes longer, then this 
 	#	approach could fill up all the memory. (see TODO below).
@@ -605,7 +650,7 @@ class MinibatchGenerator(object):
 	#	'''
 	#	Reads through the minibatches, placing them on a queue as they
 	#	are ready.  This usually shouldn't be called directly, but 
-	#	is used when the MinibatchGenerator is treated as an iterator, e.g.:
+	#	is used when the Relation2VecMinibatcher is treated as an iterator, e.g.:
 
 	#		for signal, noise in my_minibatch_generator:
 	#			do_something_with(signal, noise)
@@ -636,4 +681,259 @@ class MinibatchGenerator(object):
 		return len(self.context_dictionary)
 
 				
+
+class Relation2VecMinibatcher(Minibatcher):
+
+	NOT_DONE = 0
+	DONE = 1
+
+	def __init__(
+		self,
+		files=[],
+		directories=[],
+		skip=[],
+		entity_dictionary=None,
+		context_dictionary=None,
+		noise_ratio=15,
+		batch_size = 1000,
+		num_example_generators=10,
+		verbose=True,
+	):
+
+		super(Relation2VecMinibatcher, self).__init__(
+			files,
+			directories,
+			skip,
+			batch_size,
+			num_example_generators,
+			verbose
+		)
+
+		# Register the variable not already registered by `super()`
+		self.noise_ratio = noise_ratio
+
+		# Load the dictionary, if supplied
+		if entity_dictionary is not None:
+			self.entity_dictionary = entity_dictionary
+		else:
+			self.entity_dictionary = UnigramDictionary()
+
+		# Load the context dictionary, if supplied
+		if context_dictionary:
+			self.context_dictionary = context_dictionary
+		else:
+			self.context_dictionary = UnigramDictionary()
+
+
+	def parse(self, filename):
+		return relation2vec_parse(filename)
+
+
+	def entity_vocab_size(self):
+		return len(self.entity_dictionary)
+
+
+	def context_vocab_size(self):
+		return len(self.context_dictionary)
+
+
+	def load(self, directory):
+		'''
+		Load both the dictionary and context_dictionary, assuming default 
+		filenames (dictionary.gz and unigram-dictionary.gz), by specifying 
+		their containing directory.
+		'''
+		self.entity_dictionary.load(os.path.join(
+			directory, 'entity-dictionary'
+		))
+		self.context_dictionary.load(os.path.join(
+			directory, 'context-dictionary'
+		))
+	
+
+	def load_entity_dictionary(self, filename):
+		self.entity_dictionary.load(filename)
+
+
+	def load_context_dictionary(self, filename):
+		self.context_dictionary.load(filename)
+
+
+	def save(self, directory):
+		'''
+		Save both the dictionary and context_dictionary, using default 
+		filenames (dictionary.gz and unigram-dictionary.gz), by specifying 
+		only their containing directory
+		'''
+		self.entity_dictionary.save(
+			os.path.join(directory, 'entity-dictionary'))
+		self.context_dictionary.save(
+			os.path.join(directory, 'context-dictionary'))
+
+
+	def save_entity_dictionary(self, filename):
+		self.entity_dictionary.save(filename)
+
+
+	def save_context_dictionary(self, filename):
+		self.context_dictionary.save(filename)
+
+
+	def preparation(self, savedir):
+		# For each line, get the context tokens and entity tokens.
+		# Add both to the respective dictionaries.  Also add the context
+		# tokens (after converting them to ids) to the context_dictionary 
+		# noise model
+		for filename in self.generate_filenames():
+			for line in self.parse(filename):
+				context_tokens, entity_spans = line
+				self.context_dictionary.update(context_tokens)
+				self.entity_dictionary.update(entity_spans.keys())
+
+
+	def prune(self, min_frequency=5):
+		'''
+		Exposes the prune function for the underlying UnigramDictionary
+		used for the context_dictionary.
+		'''
+		self.context_dictionary.prune(min_frequency)
+		self.entity_dictionary.prune(min_frequency)
+
+
+	def batch_examples(self, example_iterator):
+
+		signal_batch, noise_batch = self.init_batch()
+
+		# i keeps track of position in the signal batch
+		i = -1
+		for signal_example, noise_examples in example_iterator:
+
+			# Increment position within the batch
+			i += 1
+
+			# Add the signal example
+			signal_batch[i, :] = signal_example
+
+			# Figure out the position within the noise batch
+			j = i*self.noise_ratio
+
+			# block-assign the noise samples to the noise batch array
+			noise_batch[j:j+self.noise_ratio, :] = noise_examples
+
+			# Once we've finished assembling a minibatch, enqueue it
+			# and start assembling a new minibatch
+			if i == self.batch_size - 1:
+				yield (signal_batch, noise_batch)
+				signal_batch, noise_batch = self.init_batch()
+				i = -1
+
+		# Normally we'll have a partially filled minibatch after processing
+		# the corpus.  The elements in the batch that weren't overwritten
+		# contain UNK tokens, which act as padding.  Yield the partial
+		# minibatch.
+		if i >= 0:
+			yield (signal_batch, noise_batch)
+
+
+	def init_batch(self):
+		# Initialize np.array's to store the minibatch data.  We know
+		# how big the batch is ahead of time.  Initialize by filling
+		# the arrays with UNK tokens.  Doing this means that, at the end
+		# of the corpus, when we don't necessarily have a full minibatch,
+		# the final minibatch is padded with UNK tokens in order to be
+		# of the desired shape.  This has no effect on training, because
+		# we don't care about the embedding of the UNK token
+		signal_batch = np.full(
+			(self.batch_size, 3),
+			UNK,
+			dtype='int32'
+		)
+		noise_batch = np.full(
+			(self.batch_size * self.noise_ratio, 3),
+			UNK,
+			dtype='int32'
+		)
+		return signal_batch, noise_batch
+
+
+	def build_examples(self, parsed):
+
+		'''
+		Assembles bunches of examples from the parsed data coming from
+		files that were read.  Normally, this function might yield 
+		individual examples, however, in this case, we need to maintain
+		a distinction between the noise- and signal-examples, and to
+		keep them in consistent proportions.  So, here, we yield small 
+		bunches that consist of 1 signal example, and X noise examples,
+		where X depends on `self.noise_ratio`.
+		'''
+
+		for line in parsed:
+
+			context_tokens, entity_spans = line
+
+			# Sentences with less than two entities can't be used for 
+			# learning
+			if len(entity_spans) < 2:
+				continue
+
+			token_ids = self.context_dictionary.get_ids(context_tokens)
+
+			# We'll now generate generate signal examples and noise
+			# examples for training.  Iterate over every pairwise 
+			# of entities in this line
+			for e1, e2 in itools.combinations(entity_spans, 2):
+
+				# TODO test this
+				# Get the context tokens minus the entity_spans
+				filtered_token_ids = self.eliminate_spans(
+					token_ids, entity_spans[e1] + entity_spans[e2]
+				)
+
+				# We can't train if there are no context words
+				if len(filtered_token_ids) == 0:
+					break
+
+				# Sample a token from the context
+				context_token_id = np.random.choice(
+					filtered_token_ids, 1)[0]
+
+				# convert entities into ids
+				e1_id, e2_id = self.entity_dictionary.get_ids([e1, e2])
+
+				# Add the signal example
+				signal_example = [e1_id, e2_id, context_token_id]
+
+				# Sample tokens from the noise
+				noise_context_ids = self.context_dictionary.sample(
+					(self.noise_ratio,))
+
+				# block-assign the noise samples to the noise batch array
+				noise_examples = [
+					[e1_id, e2_id, noise_context_id]
+					for noise_context_id in noise_context_ids
+				]
+
+				# Yield the example
+				yield (signal_example, noise_examples)
+
+
+	def eliminate_spans(self, token_ids, spans):
+		'''
+		Return the list of token_ids, but with the tokens that are 
+		part of entity spans removed.  The entity_spans are listed as
+		(start, stop) tuples in spans using coreNLP indexing convention.
+		In that convention, indexing starts from 1, and the tuple
+		(1,2) designates a span including the first and second token  
+		(note that this is different from Python slice indexing in which 
+		the stop token is not actually included).
+		'''
+
+		# Convert spans to Python slice notation, then delegate to 
+		# t4k's skip function.
+		adjusted_spans = []
+		for start, stop in spans:
+			adjusted_spans.append((start-1, stop))
+
+		return t4k.skip(token_ids, adjusted_spans)
 
