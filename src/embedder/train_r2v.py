@@ -141,7 +141,6 @@ def train(iteration_mode):
 			% (epoch, epoch_elapsed)
 		)
 
-	elapsed = time.time() - batching_start
 	print 'Time needed for batching and training:', (
 		time.time() - batching_start)
 	print 'Time needed for training: %f' % (time.time() - training_start)

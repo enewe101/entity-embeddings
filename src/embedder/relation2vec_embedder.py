@@ -5,11 +5,12 @@ from lasagne.init import Normal
 from theano import tensor as T, function
 from word2vec import NoiseContraster, row_dot, sigmoid
 
+
 class Relation2VecEmbedder(object):
 	def __init__(
 		self,
-		input_var,
-		batch_size,
+		input_var=None,
+		batch_size=None,
 		entity_vocab_size=10000,
 		context_vocab_size=1000000,
 		num_embedding_dimensions=500,
@@ -19,15 +20,18 @@ class Relation2VecEmbedder(object):
 
 		# Register most parameters to self namespace
 		self.input_var = input_var
+		if input_var is None:
+			self.input_var = T.imatrix()
+
 		self.batch_size = batch_size
 		self.entity_vocab_size = entity_vocab_size
 		self.context_vocab_size = context_vocab_size
 		self.num_embedding_dimensions = num_embedding_dimensions
 
 		# Slice the input var into relevant aspects
-		self.entity1 = input_var[:,0]
-		self.entity2 = input_var[:,1]
-		self.context = input_var[:,2]
+		self.entity1 = self.input_var[:,0]
+		self.entity2 = self.input_var[:,1]
+		self.context = self.input_var[:,2]
 
 		# Take in and embed entity1
 		self.l_in_entity1 = layers.InputLayer(

@@ -281,6 +281,38 @@ class TestWord2VecMinibatcher(TestCase):
 # have a high probability of arising with the data, following NCE form
 class TestRelation2VecEmbedder(TestCase):
 
+	def test_save_load(self):
+
+		# Make sure that the target directory exists, but delete any model
+		# files left over from a previous test run.
+		if not os.path.exists('test-data/test-embedder'):
+			os.makedirs('test-data/test-embedder')
+		if os.path.exists('test-data/test-embedder/embeddings.npz'):
+			os.remove('test-data/test-embedder/embeddings.npz')
+
+		embedder = Relation2VecEmbedder(
+			entity_vocab_size=10,
+			context_vocab_size=50,
+			num_embedding_dimensions=5
+		)
+		expected_params = embedder.get_param_values()
+		embedder.save('test-data/test-embedder/embeddings.npz')
+
+		new_embedder = Relation2VecEmbedder(
+			entity_vocab_size=10,
+			context_vocab_size=50,
+			num_embedding_dimensions=5
+		)
+		new_embedder.load('test-data/test-embedder/embeddings.npz')
+		found_params = new_embedder.get_param_values()
+
+		for found, expected in zip(found_params, expected_params):
+			self.assertTrue(np.array_equal(found, expected))
+
+		if os.path.exists('test-data/test-embedder/embeddings.npz'):
+			os.remove('test-data/test-embedder/embeddings.npz')
+
+
 	def test_learning(self):
 
 		# Seed randomness for a reproducible test.  Using 2 because
