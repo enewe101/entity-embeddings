@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+
+# TODO: test dict_dir, savedir, and learn_embeddings options
+
 import t4k
 import numpy as np
 from theano import tensor as T
@@ -47,7 +50,7 @@ def prepare():
 	)
 
 
-def train(iteration_mode):
+def train(iteration_mode, learn_embeddings=True):
 
 	if iteration_mode not in ('generate', 'before', 'background'):
 		raise ValueError(
@@ -97,6 +100,12 @@ def train(iteration_mode):
 	# back to the noise_contraster to get the training function
 	combined_output = entity_embedder.get_output()
 	params = entity_embedder.get_params()
+
+	# If embeddings are to be kept fixed, then only keep the parameters
+	# defining how relationships are composed out of embeddings
+	if not learn_embeddings:
+		params = params[2:]
+
 	train = noise_contraster.get_train_func(combined_output, params)
 
 	batching_start = time.time()
@@ -165,7 +174,20 @@ if __name__ == '__main__':
 
 	elif sys.argv[1] == 'train':
 		iteration_mode = sys.argv[2]
-		train(iteration_mode)
+		if sys.argv[3] == 'learn-embeddings':
+			learn_embeddings == True
+		elif sys.argv[3] == 'fix-embeddings':
+			learn_embeddings == False
+		else:
+			raise ValueError(
+				'Third argument must either be "learn-embeddings" or '
+				'"fix-embeddings".'
+			)
+
+		dict_dir = os.path.join(DATA_DIR, sys.argv[4])
+		save_dir = os.path.join(DATA_DIR, sys.argv[5])
+
+		train(iteration_mode, learn_embeddings, dict_dir, save_dir)
 		print 'success'
 
 	else:
