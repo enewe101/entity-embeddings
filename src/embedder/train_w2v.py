@@ -4,15 +4,15 @@ import os
 from theano import tensor as T
 import time
 import sys
-sys.path.append('..')
-from SETTINGS import DATA_DIR, CORPUS_DIR
+sys.path.append('..') # This means that settings is importable
+from SETTINGS import DATA_DIR, COOCCURRENCE_DIR
 import re
 from word2vec import (
     NoiseContraster, Word2VecEmbedder, Word2VecMinibatcher
 )
 
 FILES = [
-	os.path.join(CORPUS_DIR, 'cooccurrence/0/%s.tsv' % file_num)
+	os.path.join(COOCCURRENCE_DIR, '%s.tsv' % file_num)
 	for file_num in [
 		'002', '003', '006', '007', '009', '00d'
 		'00e', '010', '017', '018', '01b', '01d'

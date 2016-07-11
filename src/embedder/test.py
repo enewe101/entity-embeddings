@@ -339,6 +339,8 @@ class TestRelation2VecEmbedder(TestCase):
 		)
 		minibatcher.prepare(savedir=savedir)
 
+		print 'finished making minibatcher'
+
 		# Make signal and noise channels and prepared the noise contraster
 		signal_input = T.imatrix('signal')
 		noise_input = T.imatrix('noise')
@@ -346,6 +348,8 @@ class TestRelation2VecEmbedder(TestCase):
 			signal_input, noise_input, learning_rate=learning_rate
 		)
 		combined_input = noise_contraster.get_combined_input()
+		
+		print 'made noise contraster'
 
 		# We'll make and train an Relation2VecEmbedder in a moment.  However,
 		# first we will get the IDs for the entities that occur together
@@ -360,6 +364,8 @@ class TestRelation2VecEmbedder(TestCase):
 			for e1, e2 in expected_pairs
 		]
 
+		print 'about to start main loop'
+
 		# We will repeatedly make an Relation2VecEmbedder, train it on the 
 		# test corpus, and then find its embedding for the entity-pairs
 		# of interest.  We do it num_replicate # of times to average
@@ -367,6 +373,8 @@ class TestRelation2VecEmbedder(TestCase):
 		# embeddings have roughly the expected properties
 		embedding_dot_products  = []
 		for replicate in range(num_replicates):
+
+			print 'making r2v embedder'
 
 			# Make an Relation2VecEmbedder
 			entity_embedder = Relation2VecEmbedder(
@@ -377,10 +385,14 @@ class TestRelation2VecEmbedder(TestCase):
 				num_embedding_dimensions
 			)
 
+			print 'made r2v embedder'
+
 			# Get its output and make a theano training function
 			output = entity_embedder.get_output()
 			params = entity_embedder.get_params()
 			train = noise_contraster.get_train_func(output, params)
+
+			print 'made training func'
 
 			# Train on the dataset, running through it num_epochs # of times
 			for epoch in range(num_epochs):
@@ -389,6 +401,8 @@ class TestRelation2VecEmbedder(TestCase):
 				for signal_batch, noise_batch in minibatcher:
 					loss = train(signal_batch, noise_batch)
 					#print loss
+
+			print 'Done training in one pass of main loop'
 
 			# Get the parameters out of the trained model
 			W_entity, W_context, W_relation, b_relation = (
