@@ -9,23 +9,22 @@ import time
 import sys
 sys.path.append('..')
 import re
-from minibatch_generator import MinibatchGenerator
-from entity_embedder import EntityEmbedder
+from minibatcher import Relation2VecMinibatcher
+from relation2vec_embedder import Relation2VecEmbedder
 from word2vec import NoiseContraster
 import os
-from SETTINGS import DATA_DIR, CORPUS_DIR
+from SETTINGS import DATA_DIR, COOCCURRENCE_DIR
 
 # Seed randomness for reproducibility
 np.random.seed(0)
 
 DIRECTORIES = [
-	#os.path.join(CORPUS_DIR, 'cooccurrence'),
-	#os.path.join(CORPUS_DIR, 'cooccurrence/0')
+	#os.path.join(COOCCURRENCE_DIR, 'cooccurrence')
 ]
 FILES = [
-	os.path.join(CORPUS_DIR, 'cooccurrence/0/%s.tsv' % file_num)
+	os.path.join(COOCCURRENCE_DIR, '%s.tsv' % file_num)
 	for file_num in 
-	['002', '003', '006', '007', '009', '00d', '00e', '010', '017', '018']
+	['002', '003']#, '006', '007', '009', '00d', '00e', '010', '017', '018']
 ]
 SKIP = [
 	re.compile('README.txt')
@@ -39,13 +38,13 @@ NUM_EPOCHS = 1
 LEARNING_RATE = 0.01
 
 def prepare():
-	minibatch_generator = MinibatchGenerator(
+	minibatcher = Relation2VecMinibatcher(
 		directories=DIRECTORIES,
 		files=FILES,
 		skip=SKIP,
 		batch_size=BATCH_SIZE,
 	)
-	minibatch_generator.prepare(
+	minibatcher.prepare(
 		savedir=SAVEDIR
 	)
 
@@ -71,8 +70,8 @@ def train(iteration_mode, learn_embeddings=True):
 	combined_input = noise_contraster.get_combined_input()
 
 	print 'three'
-	# Make a MinibatchGenerator
-	minibatch_generator = MinibatchGenerator(
+	# Make a Relation2VecMinibatcher
+	minibatcher = Relation2VecMinibatcher(
 		files=FILES, directories=DIRECTORIES, skip=SKIP,
 		noise_ratio=NOISE_RATIO,
 		batch_size=BATCH_SIZE,
@@ -80,18 +79,21 @@ def train(iteration_mode, learn_embeddings=True):
 
 	print 'four'
 	# load the minibatch generator.  Prune very rare tokens.
-	minibatch_generator.load(SAVEDIR)
-	minibatch_generator.prune(min_frequency=MIN_FREQUENCY)
-	print 'entity vocabulary:', len(minibatch_generator.entity_dictionary)
-	print 'context vocabulary:', len(minibatch_generator.context_dictionary)
+	minibatcher.load(SAVEDIR)
+
+	# For debuggin tests, don't prune -- everything is rare!
+	#minibatcher.prune(min_frequency=MIN_FREQUENCY)
+
+	print 'entity vocabulary:', len(minibatcher.entity_dictionary)
+	print 'context vocabulary:', len(minibatcher.context_dictionary)
 
 	print 'five'
-	# Make a EntityEmbedder object, feed it the combined input
-	entity_embedder = EntityEmbedder(
+	# Make a Relation2VecEmbedder object, feed it the combined input
+	entity_embedder = Relation2VecEmbedder(
 		combined_input,
 		batch_size=BATCH_SIZE,
-		entity_vocab_size=len(minibatch_generator.entity_dictionary),
-		context_vocab_size=len(minibatch_generator.context_dictionary),
+		entity_vocab_size=len(minibatcher.entity_dictionary),
+		context_vocab_size=len(minibatcher.context_dictionary),
 		num_embedding_dimensions = NUM_EMBEDDING_DIMENSIONS
 	)
 
@@ -113,17 +115,17 @@ def train(iteration_mode, learn_embeddings=True):
 	# Figure out which iterator to use
 	if iteration_mode == 'generate':
 		print 'Generating minibatches to order'
-		get_minibatch_iterator = minibatch_generator.generate
+		get_minibatch_iterator = minibatcher.generate_minibatches
 
 	elif iteration_mode == 'before':
 		print 'Generating all minibatches upfront (this could take awhile)'
-		minibatches = minibatch_generator.get_minibatches()
+		minibatches = minibatcher.get_minibatches()
 		get_minibatch_iterator = lambda: minibatches
 		print 'Done generating minibatches.'
 
 	elif iteration_mode == 'background':
 		print 'Generating minibatches in the background'
-		get_minibatch_iterator = lambda: minibatch_generator
+		get_minibatch_iterator = lambda: minibatcher
 
 	else:
 		raise ValueError(
