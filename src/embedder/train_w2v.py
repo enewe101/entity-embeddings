@@ -1,23 +1,26 @@
 #!/usr/bin/env python
+import t4k
 import os
 from theano import tensor as T
 import time
 import sys
-sys.path.append('..')
-from SETTINGS import DATA_DIR, CORPUS_DIR
+sys.path.append('..') # This means that settings is importable
+from SETTINGS import DATA_DIR, COOCCURRENCE_DIR
 import re
 from word2vec import (
-    Word2Vec as W, NoiseContraster, Word2VecEmbedder, MinibatchGenerator
+    NoiseContraster, Word2VecEmbedder, Word2VecMinibatcher
 )
 
-
+FILES = [
+	os.path.join(COOCCURRENCE_DIR, '%s.tsv' % file_num)
+	for file_num in [
+		'002', '003', '006', '007', '009', '00d'
+		'00e', '010', '017', '018', '01b', '01d'
+	]
+]
 DIRECTORIES = [
 	#os.path.join(CORPUS_DIR, 'cooccurrence'),
 	#os.path.join(CORPUS_DIR, 'cooccurrence/0')
-]
-FILES = [
-	'test-data/test-corpus/c.tsv'
-	#os.path.join(CORPUS_DIR, 'cooccurrence', '0', '002.tsv')
 ]
 SKIP = [
 	re.compile(r'README\.txt'),
@@ -30,29 +33,26 @@ MIN_FREQUENCY = 20
 NUM_EMBEDDING_DIMENSIONS = 500
 NUM_EPOCHS = 1
 
-def parse(filename):
-
-	tokenized_sentences = []
-	for line in open(filename):
-		tokenized_sentences.append(line.split('\t')[1].split())
-
-	return tokenized_sentences
-
 
 def prepare():
-	minibatch_generator = MinibatchGenerator(
+	minibatcher = Word2VecMinibatcher(
+		files=FILES,
 		directories=DIRECTORIES,
 		skip=SKIP,
 		batch_size=BATCH_SIZE,
 		t=THRESHOLD,
-		parse=parse
 	)
-	minibatch_generator.prepare(
+	minibatcher.prepare(
 		savedir=SAVEDIR
 	)
 
 
-def train():
+def train(iteration_mode):
+
+	if iteration_mode not in ('generate', 'before', 'background'):
+		raise ValueError(
+			'Got unexpected iteration_mode: %s' % iteration_mode
+		)
 
 	# Define the input theano variables
 	print 'Making noise and signal channels'
@@ -64,30 +64,30 @@ def train():
 	noise_contraster = NoiseContraster(signal_input, noise_input)
 	combined_input = noise_contraster.get_combined_input()
 
-	# Make a MinibatchGenerator
-	print 'Making MinibatchGenerator'
-	minibatch_generator = MinibatchGenerator(
+	# Make a Word2VecMinibatcher
+	print 'Making Word2VecMinibatcher'
+	minibatcher = Word2VecMinibatcher(
 		files=FILES,
 		directories=DIRECTORIES,
 		skip=SKIP,
 		noise_ratio=NOISE_RATIO,
 		t=THRESHOLD,
 		batch_size=BATCH_SIZE, 
-		parse=parse,
-		verbose=True
+		verbose=True,
+		num_example_generators=4
 	)
 
 	# load the minibatch generator.  Prune very rare tokens.
 	print 'Loading and pruning dictionaries'
-	minibatch_generator.load(SAVEDIR)
-	minibatch_generator.prune(min_frequency=MIN_FREQUENCY)
+	minibatcher.load(SAVEDIR)
+	minibatcher.prune(min_frequency=MIN_FREQUENCY)
 
 	# Make a Word2VecEmbedder object, feed it the combined input
 	print 'Making Word2VecEmbedder'
 	word2vec_embedder = Word2VecEmbedder(
 		combined_input,
 		batch_size=BATCH_SIZE,
-		vocabulary_size=len(minibatch_generator.unigram_dictionary),
+		vocabulary_size=len(minibatcher.unigram_dictionary),
 		num_embedding_dimensions = NUM_EMBEDDING_DIMENSIONS
 	)
 
@@ -98,6 +98,29 @@ def train():
 	params = word2vec_embedder.get_params()
 	train = noise_contraster.get_train_func(combined_output, params)
 
+	batching_start = time.time()
+	print 'seven'
+	# Figure out which iterator to use
+	if iteration_mode == 'generate':
+		print 'Generating minibatches to order'
+		minibatch_iterator = minibatcher.generate_minibatches()
+
+	elif iteration_mode == 'before':
+		print 'Generating all minibatches upfront (this could take awhile)'
+		minibatches = minibatcher.get_minibatches()
+		minibatch_iterator = minibatches
+		print 'Done generating minibatches.'
+
+	elif iteration_mode == 'background':
+		print 'Generating minibatches in the background'
+		minibatch_iterator = minibatcher
+
+	else:
+		raise ValueError(
+			'Got unexpected iteration_mode: %s' % iteration_mode
+		)
+
+
 	# Iterate over the corpus, training the embeddings
 	print 'Starting training.'
 	training_start = time.time()
@@ -105,8 +128,9 @@ def train():
 		print 'starting epoch %d' % epoch
 		epoch_start = time.time()
 		batch_num = -1
-		for signal_batch, noise_batch in minibatch_generator.generate():
+		for signal_batch, noise_batch in minibatch_iterator:
 			batch_num += 1
+			t4k.out('.')
 			loss = train(signal_batch, noise_batch)
 			if batch_num % 100 == 0:
 				print '\tloss: %f' % loss
@@ -117,14 +141,18 @@ def train():
 			% (epoch, epoch_elapsed)
 		)
 
-	# Save the model (the embeddings) if savedir was provided
-	print 'Saving model...'
-	embeddings_filename = os.path.join(SAVEDIR, 'embeddings.npz')
-	word2vec_embedder.save(embeddings_filename)
+	print 'Time needed for batching and training:', (
+		time.time() - batching_start)
+	print 'Time needed for training: %f' % (time.time() - training_start)
 
-	print 'Total training time: %f' % (time.time() - training_start)
-	# Return the trained word2vec_embedder
-	return word2vec_embedder
+#	# Save the model (the embeddings) if savedir was provided
+#	print 'Saving model...'
+#	embeddings_filename = os.path.join(SAVEDIR, 'embeddings.npz')
+#	word2vec_embedder.save(embeddings_filename)
+#
+#	print 'Total training time: %f' % (time.time() - training_start)
+#	# Return the trained word2vec_embedder
+#	return word2vec_embedder
 
 
 if __name__ == '__main__':
@@ -136,7 +164,8 @@ if __name__ == '__main__':
 		print 'Elapsed:', elapsed
 
 	elif sys.argv[1] == 'train':
-		train()
+		iteration_mode = sys.argv[2]
+		train(iteration_mode)
 		print 'success'
 
 	else:
