@@ -277,8 +277,6 @@ class TestWord2VecMinibatcher(TestCase):
 
 
 
-# TODO: make this test.  It should know what entity pairs and contexts
-# have a high probability of arising with the data, following NCE form
 class TestRelation2VecEmbedder(TestCase):
 
 	def test_save_load(self):
@@ -491,6 +489,69 @@ class TestRelation2VecMinibatcher(TestCase):
 		# Remove test files if they exist
 		if os.path.exists('test-data/test-minibatch-generator'):
 			shutil.rmtree('test-data/test-minibatch-generator')
+
+
+	def test_symbolic_minibatches(self):
+		'''
+		The symbolic minibatching mechanism should yield the exact same
+		set of examples as the non-symbolic mechanism.  Here we compare
+		them to make sure that is the case.  In turn, the non-symbolic
+		minibatching method is tested to ensure it has the expected content
+		as should be produced from the test data.  So this is not a "unit"
+		test in the sense that it has dependency on other tests in this
+		TestCase.
+		'''
+		# Ensure reproducibility in this stochastic test
+		np.random.seed(1)
+
+		# Get the symbolic minibatch
+		batch_spec = self.mini_gen.get_symbolic_minibatch()
+		symbolic_signal, symbolic_noise, updates = batch_spec
+
+		# Make a batching function.  This is a somewhat trivial function:
+		# all it does is pull out the minibatch.  But it simulates 
+		# accessing the minibatch in a theano compiled function which 
+		# incorporates incrementing the minibatch iteration number as an
+		# update
+		get_batch = function(
+			[],[symbolic_signal, symbolic_noise],
+			updates=updates
+		)
+
+		#
+		num_batches = self.mini_gen.load_dataset()
+
+		# Get every signal and noise example, and keep track of them
+		# all.  We'll check that we get the exact same examples from
+		# the symbolic and non-symbolic methods of minibatching
+		symbolic_signal_counter = Counter()
+		symbolic_noise_counter = Counter()
+		for batch_num in range(num_batches):
+			signal, noise = get_batch()
+			for row in signal:
+				symbolic_signal_counter[tuple(row)] += 1
+
+			for row in noise:
+				symbolic_noise_counter[tuple(row)] += 1
+
+		# We will now generate the minibatches, but serve them 
+		# non-symbolically.  Ensure the same randomness seeds this process
+		# so that we can expect the same examples to be chosen.
+		np.random.seed(1)
+
+		# Generate minibatches using the minibatcher's non-symbolic
+		# asynchronous minibatching approach
+		signal_counter = Counter()
+		noise_counter = Counter()
+		for signal_batch, noise_batch in self.mini_gen:
+			for row in signal_batch:
+				signal_counter[tuple(row)] += 1
+			for row in noise_batch:
+				noise_counter[tuple(row)] += 1
+
+		# now check that we have all of the same examples
+		self.assertEqual(symbolic_signal_counter, signal_counter)
+		self.assertEqual(symbolic_noise_counter, noise_counter)
 
 
 	def test_save_load(self):
