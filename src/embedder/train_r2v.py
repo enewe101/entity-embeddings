@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# TODO: test dict_dir, savedir, and learn_embeddings options
+# TODO: test dict_dir, save_dir, and learn_embeddings options
 
 import t4k
 import numpy as np
@@ -9,9 +9,9 @@ import time
 import sys
 sys.path.append('..')
 import re
-from minibatcher import Relation2VecMinibatcher
+from theano_minibatcher import NoiseContrastiveTheanoMinibatcher
 from relation2vec_embedder import Relation2VecEmbedder
-from word2vec import NoiseContraster
+from dataset_reader import Relation2VecDatasetReader
 import os
 from SETTINGS import DATA_DIR, COOCCURRENCE_DIR
 
@@ -31,21 +31,27 @@ SKIP = [
 ]
 BATCH_SIZE=1000
 NOISE_RATIO = 15
-SAVEDIR = os.path.join(DATA_DIR, 'relation2vec')
+SAVE_DIR = os.path.join(DATA_DIR, 'relation2vec')
 MIN_FREQUENCY = 20
 NUM_EMBEDDING_DIMENSIONS = 500
 NUM_EPOCHS = 1
 LEARNING_RATE = 0.01
 
-def prepare():
-	minibatcher = Relation2VecMinibatcher(
+def prepare_dataset():
+
+	minibatcher = Relation2VecDatasetReader(
 		directories=DIRECTORIES,
 		files=FILES,
 		skip=SKIP,
 		batch_size=BATCH_SIZE,
+		noise_ratio=NOISE_RATIO,
+		num_processes=4,
 	)
 	minibatcher.prepare(
-		savedir=SAVEDIR
+		save_dir=SAVE_DIR
+	)
+	minibatcher.generate_dataset_parallel(
+		save_dir=SAVE_DIR
 	)
 
 
@@ -70,8 +76,8 @@ def train(iteration_mode, learn_embeddings=True):
 	combined_input = noise_contraster.get_combined_input()
 
 	print 'three'
-	# Make a Relation2VecMinibatcher
-	minibatcher = Relation2VecMinibatcher(
+	# Make a Relation2VecDatasetReader
+	minibatcher = Relation2VecDatasetReader(
 		files=FILES, directories=DIRECTORIES, skip=SKIP,
 		noise_ratio=NOISE_RATIO,
 		batch_size=BATCH_SIZE,
@@ -79,7 +85,7 @@ def train(iteration_mode, learn_embeddings=True):
 
 	print 'four'
 	# load the minibatch generator.  Prune very rare tokens.
-	minibatcher.load(SAVEDIR)
+	minibatcher.load(SAVE_DIR)
 
 	# For debuggin tests, don't prune -- everything is rare!
 	#minibatcher.prune(min_frequency=MIN_FREQUENCY)
@@ -157,8 +163,8 @@ def train(iteration_mode, learn_embeddings=True):
 	print 'Time needed for training: %f' % (time.time() - training_start)
 
 	print 'Saving the model...'
-	# Save the model (the embeddings) if savedir was provided
-	embeddings_filename = os.path.join(SAVEDIR, 'embeddings.npz')
+	# Save the model (the embeddings) if save_dir was provided
+	embeddings_filename = os.path.join(SAVE_DIR, 'embeddings.npz')
 	entity_embedder.save(embeddings_filename)
 
 	# Return the trained entity_embedder
@@ -167,10 +173,11 @@ def train(iteration_mode, learn_embeddings=True):
 
 
 if __name__ == '__main__':
+
 	if sys.argv[1] == 'prepare':
 
 		start = time.time()
-		prepare()
+		prepare_dataset()
 		elapsed = time.time() - start
 		print 'Elapsed:', elapsed
 

@@ -310,7 +310,11 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		signal_examples = []
 		noise_examples = []
 
+		i = 0
 		for line in parsed:
+			i += 1
+			if i % 100:
+				print i
 
 			context_tokens, entity_spans = line
 
