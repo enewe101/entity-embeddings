@@ -8,3 +8,5 @@ del
 venv
 *.txt
 startenv
+src/embedder/test-data/test-minibatch-generator
+src/embedder/test-data/test-entity-embedder

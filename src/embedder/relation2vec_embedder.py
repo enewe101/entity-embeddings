@@ -3,10 +3,11 @@ from lasagne import layers
 from lasagne.layers import get_output, get_all_params, get_all_param_values
 from lasagne.init import Normal
 from theano import tensor as T, function
-from word2vec import NoiseContraster, row_dot, sigmoid
+from word2vec import get_noise_contrastive_loss, row_dot, sigmoid
 
 
 class Relation2VecEmbedder(object):
+	
 	def __init__(
 		self,
 		input_var=None,
@@ -92,7 +93,7 @@ class Relation2VecEmbedder(object):
 	def _compile_embed_relationship(self):
 		'''
 		Compiles a function that computes the relationship embedding
-		given two entities (i.e. it does a partial forward pass, 
+		given two entities (i.e. it does a partial forward pass,
 		not including the part of the network dedicated to the context
 		'''
 
@@ -105,8 +106,8 @@ class Relation2VecEmbedder(object):
 			shape=(self.batch_size,), input_var=entity1
 		)
 		l_embed_entity1 = layers.EmbeddingLayer(
-			l_in_entity1, 
-			self.entity_vocab_size, 
+			l_in_entity1,
+			self.entity_vocab_size,
 			self.num_embedding_dimensions,
 			W=self.l_embed_entity1.W
 		)
@@ -135,7 +136,7 @@ class Relation2VecEmbedder(object):
 
 		# Compile the function
 		self._embed_relationship = function([input_var], relation_embedding)
-		
+
 
 	def get_params(self):
 		# Note that parameters for l_embed_entity1 are the same as
@@ -178,7 +179,7 @@ class Relation2VecEmbedder(object):
 	def save(self, filename):
 		W_entity,W_context,W_relation,b_relation = self.get_param_values()
 		np.savez(
-			filename, 
+			filename,
 			W_entity=W_entity,
 			W_context=W_context,
 			W_relation=W_relation,
@@ -199,6 +200,3 @@ class Relation2VecEmbedder(object):
 		W_context.set_value(W_context_)
 		W_relation.set_value(W_relation_)
 		b_relation.set_value(b_relation_)
-
-
-

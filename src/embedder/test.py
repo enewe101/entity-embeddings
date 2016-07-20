@@ -4,13 +4,18 @@ import os
 import shutil
 from collections import defaultdict, Counter
 from relation2vec_embedder import Relation2VecEmbedder
-from word2vec import NoiseContraster, Word2VecEmbedder
+from word2vec import get_noise_contrastive_loss, reseed
+from lasagne.updates import nesterov_momentum
 import itertools as itools
 import unittest
-from minibatcher import (
-	Relation2VecMinibatcher, relation2vec_parse, word2vec_parse,
-	Word2VecMinibatcher
-)
+from r2v import relation2vec
+from dataset_reader import Relation2VecDatasetReader, DataSetReaderIllegalStateException
+from theano_minibatcher import NoiseContrastiveTheanoMinibatcher
+
+#from minibatcher import (
+#	Relation2VecMinibatcher, relation2vec_parse, word2vec_parse,
+#	Word2VecMinibatcher
+#)
 from unittest import TestCase, main
 
 @np.vectorize
@@ -27,7 +32,7 @@ class TestParse(TestCase):
 
 class TestWord2VecOnCorpus(TestCase):
 	'''
-	This tests the Word2Vec end-to-end functionality applied to a text 
+	This tests the Word2Vec end-to-end functionality applied to a text
 	corpus.
 	'''
 
@@ -49,7 +54,7 @@ class TestWord2VecOnCorpus(TestCase):
 			verbose=False
 		)
 
-		# Prpare the minibatch generator 
+		# Prpare the minibatch generator
 		# (this produces the counter_sampler stats)
 		minibatcher.prepare()
 
@@ -77,15 +82,14 @@ class TestWord2VecOnCorpus(TestCase):
 
 		# Iterate over the corpus, training the embeddings
 		for epoch in range(num_epochs):
-			# print 'starting epoch %d' % epoch
 			for signal_batch, noise_batch in minibatcher:
 				loss = train(signal_batch, noise_batch)
 
 		W, C = word2vec_embedder.get_param_values()
 		dots = sigma(np.dot(W,C.T))
 
-		# Based on the construction of the corpus, the following 
-		# context embeddings should match the query at right and be 
+		# Based on the construction of the corpus, the following
+		# context embeddings should match the query at right and be
 		# the highest value in the product of the embedding matrices
 		# Note that token 0 is reserved for UNK.  It's embedding stays
 		# near the randomly initialized value, tending to yield of 0.5
@@ -93,17 +97,17 @@ class TestWord2VecOnCorpus(TestCase):
 		# word
 		expected_tops = [
 			[0,2,3], # these contexts are good match to query 1
-			[0,1,3], # these contexts are good match to query 2 
-			[0,1,2], # these contexts are good match to query 3 
-			[0,5,6], # these contexts are good match to query 4 
-			[0,4,6], # these contexts are good match to query 5 
-			[0,4,5], # these contexts are good match to query 6 
-			[0,8,9], # these contexts are good match to query 7 
-			[0,7,9], # these contexts are good match to query 8 
-			[0,7,8], # these contexts are good match to query 9 
+			[0,1,3], # these contexts are good match to query 2
+			[0,1,2], # these contexts are good match to query 3
+			[0,5,6], # these contexts are good match to query 4
+			[0,4,6], # these contexts are good match to query 5
+			[0,4,5], # these contexts are good match to query 6
+			[0,8,9], # these contexts are good match to query 7
+			[0,7,9], # these contexts are good match to query 8
+			[0,7,8], # these contexts are good match to query 9
 			[0,11,12], # these contexts are good match to query 10
-			[0,10,12], # these contexts are good match to query 11 
-			[0,10,11]  # these contexts are good match to query 12 
+			[0,10,12], # these contexts are good match to query 11
+			[0,10,11]  # these contexts are good match to query 12
 		]
 
 		for i in range(1, 3*4+1):
@@ -118,7 +122,7 @@ class TestWord2VecMinibatcher(TestCase):
 
 	def setUp(self):
 
-		# Define some parameters to be used in construction 
+		# Define some parameters to be used in construction
 		# Minibatcher
 		self.files = [
 			'test-data/test-corpus/003-raw.tsv',
@@ -137,7 +141,7 @@ class TestWord2VecMinibatcher(TestCase):
 			verbose=False
 		)
 
-		# Make another Word2VecMinibatcher, and pre-load this one with 
+		# Make another Word2VecMinibatcher, and pre-load this one with
 		# token_map and counter_sampler distribution information.
 		self.preloaded_generator = Word2VecMinibatcher(
 			files=self.files,
@@ -151,13 +155,13 @@ class TestWord2VecMinibatcher(TestCase):
 
 	def test_prepare(self):
 		'''
-		Check that Word2VecMinibatcher.prepare() properly makes a 
+		Check that Word2VecMinibatcher.prepare() properly makes a
 		UnigramDictionary that reflects the corpus.
 		'''
 		self.generator.prepare()
 		d = self.generator.unigram_dictionary
 
-		# Make sure that all of the expected tokens are found in the 
+		# Make sure that all of the expected tokens are found in the
 		# unigram_dictionary, and that their frequency in the is correct.
 		tokens = []
 		for filename in self.files:
@@ -173,14 +177,14 @@ class TestWord2VecMinibatcher(TestCase):
 
 	def test_minibatches(self):
 		'''
-		Make sure that the minibatches are the correct size, that 
+		Make sure that the minibatches are the correct size, that
 		signal query- and contexts-words are always within 5 tokens of
 		one another and come from the same sentence.
 		'''
 		# Ensure reproducibility in this stochastic test
 		np.random.seed(1)
 
-		# Before looking at the minibatches, we need to determine what 
+		# Before looking at the minibatches, we need to determine what
 		# query-context pairs are possible.
 		# To do that, first read in the corpus, and break it into lines
 		# and tokens
@@ -221,6 +225,7 @@ class TestWord2VecMinibatcher(TestCase):
 					context_token_id in legal_pairs[query_token_id]
 				)
 
+
 	def test_token_discarding(self):
 
 		# Ensure reproducibility for the test
@@ -236,8 +241,8 @@ class TestWord2VecMinibatcher(TestCase):
 			for tokens in word2vec_parse(filename):
 				token_ids.extend(d.get_ids(tokens))
 
-		# Run through the tokens, evaluating 
-		# Word2VecMinibatcher.do_discard() on each.  Keep track of all 
+		# Run through the tokens, evaluating
+		# Word2VecMinibatcher.do_discard() on each.  Keep track of all
 		# "discarded" tokens for which do_discard() returns True
 		discarded = []
 		num_replicates = 100
@@ -246,7 +251,7 @@ class TestWord2VecMinibatcher(TestCase):
 				if self.preloaded_generator.do_discard(token_id):
 					discarded.append(token_id)
 
-		# Count the tokens, and the discarded tokens.  
+		# Count the tokens, and the discarded tokens.
 		discarded_counts = Counter(discarded)
 		token_counts = Counter(token_ids)
 
@@ -266,15 +271,13 @@ class TestWord2VecMinibatcher(TestCase):
 		)
 		self.assertEqual(most_discarded_id, the_id)
 
-		# What was the expected frequency with which "the" would be 
+		# What was the expected frequency with which "the" would be
 		# discarded?  Assert it is close to the actual discard rate.
 		expected_frequency = 1 - np.sqrt(self.t / the_frequency)
 		tolerance = 0.015
 		self.assertTrue(
 			abs(expected_frequency - frequency_of_discard) < tolerance
 		)
-
-
 
 
 class TestRelation2VecEmbedder(TestCase):
@@ -311,60 +314,54 @@ class TestRelation2VecEmbedder(TestCase):
 			os.remove('test-data/test-embedder/embeddings.npz')
 
 
+	def prepare_toy_dataset(self, noise_ratio):
+
+		dataset = []
+		dataset_repetitions = 1024 * 2
+		for i in range(dataset_repetitions):
+			signal_minibatch = [
+				[1,2,2],
+				[3,4,5],
+				[5,6,8],
+			]
+			noise_minibatch = (
+				[[1,2,i] for i in np.random.randint(0,10,noise_ratio)]
+				+ [[3,4,i] for i in np.random.randint(0,10,noise_ratio)]
+				+ [[5,6,i] for i in np.random.randint(0,10,noise_ratio)]
+			)
+			minibatch = signal_minibatch + noise_minibatch
+			dataset.append(minibatch)
+
+		return dataset
+
+
 	def test_learning(self):
+
+		np.random.seed(1)
+
+		# Some constants for the test
+		batch_size = 3
+		noise_ratio = 15
+		num_embedding_dimensions = 5
+		num_epochs = 1
+		num_replicates=10
+		learning_rate = 0.01
+		momentum = 0.9
+		tolerance = 0.1
+		save_dir = 'test-data/test-entity-embedder'
 
 		# Seed randomness for a reproducible test.  Using 2 because
 		# 1 was particularly bad by chance
-		np.random.seed(2)
 
-		# Some constants for the test
-		files = ['test-data/test-corpus/c.tsv']
-		batch_size = 50
-		noise_ratio = 15
-		num_embedding_dimensions = 5
-		num_epochs = 5
-		num_replicates=5
-		learning_rate = 0.01
-		tolerance = 0.025
-		savedir = 'test-data/test-entity-embedder'
-
-		# Make a minibatcher to yield training batches from test corpus
-		minibatcher = Relation2VecMinibatcher(
-			files=files,
-			batch_size=batch_size,
-			noise_ratio=noise_ratio,
-			verbose=False
-		)
-		minibatcher.prepare(savedir=savedir)
-
-		print 'finished making minibatcher'
-
-		# Make signal and noise channels and prepared the noise contraster
-		signal_input = T.imatrix('signal')
-		noise_input = T.imatrix('noise')
-		noise_contraster = NoiseContraster(
-			signal_input, noise_input, learning_rate=learning_rate
-		)
-		combined_input = noise_contraster.get_combined_input()
-		
-		print 'made noise contraster'
+		symbolic_batch = T.imatrix()
 
 		# We'll make and train an Relation2VecEmbedder in a moment.  However,
 		# first we will get the IDs for the entities that occur together
-		# within the test corpus.  We'll be interested to see the 
+		# within the test corpus.  We'll be interested to see the
 		# relationship embedding for them that is learnt during training
-		edict = minibatcher.entity_dictionary
-		expected_pairs = [
-			('A','B'), ('C','D'), ('E','F')
-		]
-		expected_pairs_ids = [
-			(edict.get_id(e1), edict.get_id(e2)) 
-			for e1, e2 in expected_pairs
-		]
+		expected_pairs_ids = [[1,2],[3,4],[5,6]]
 
-		print 'about to start main loop'
-
-		# We will repeatedly make an Relation2VecEmbedder, train it on the 
+		# We will repeatedly make a Relation2VecEmbedder, train it on the
 		# test corpus, and then find its embedding for the entity-pairs
 		# of interest.  We do it num_replicate # of times to average
 		# results over enough trials that we can test if the learnt
@@ -372,72 +369,69 @@ class TestRelation2VecEmbedder(TestCase):
 		embedding_dot_products  = []
 		for replicate in range(num_replicates):
 
-			print 'making r2v embedder'
+			dataset = self.prepare_toy_dataset(noise_ratio)
 
-			# Make an Relation2VecEmbedder
-			entity_embedder = Relation2VecEmbedder(
-				combined_input,
-				batch_size,
-				minibatcher.entity_vocab_size(),
-				minibatcher.context_vocab_size(),
-				num_embedding_dimensions
+			# Make a Word2VecEmbedder object, feed it the combined input
+			embedder = Relation2VecEmbedder(
+				input_var=symbolic_batch,
+				batch_size=batch_size,
+				entity_vocab_size=7,
+				context_vocab_size=10,
+				num_embedding_dimensions=num_embedding_dimensions,
+			)
+			# Get the parameters out of the trained model
+			W_entity, W_context, W_relation, b_relation = (
+				embedder.get_param_values()
 			)
 
-			print 'made r2v embedder'
-
-			# Get its output and make a theano training function
-			output = entity_embedder.get_output()
-			params = entity_embedder.get_params()
-			train = noise_contraster.get_train_func(output, params)
-
-			print 'made training func'
+			# Architectue is ready.  Make the loss function, and use it to create the
+			# parameter updates responsible for learning
+			loss = get_noise_contrastive_loss(embedder.get_output(), batch_size)
+			updates = nesterov_momentum(
+				loss, embedder.get_params(), learning_rate, momentum
+			)
+			train = function([symbolic_batch], loss, updates=updates)
 
 			# Train on the dataset, running through it num_epochs # of times
 			for epoch in range(num_epochs):
-				#print 'Epoch %d' % epoch
 
-				for signal_batch, noise_batch in minibatcher:
-					loss = train(signal_batch, noise_batch)
-					#print loss
-
-			print 'Done training in one pass of main loop'
+				for minibatch in dataset:
+					loss = train(minibatch)
 
 			# Get the parameters out of the trained model
 			W_entity, W_context, W_relation, b_relation = (
-				entity_embedder.get_param_values()
+				embedder.get_param_values()
 			)
 
-			# Get the embeddings for the entity-pairs ("relationships") 
+			# Get the embeddings for the entity-pairs ("relationships")
 			# occuring in the test corpus
-			embedded_relationships = entity_embedder.embed_relationship(
+			embedded_relationships = embedder.embed_relationship(
 				expected_pairs_ids
 			)
 
 			# Take the dot product of the relationship embeddings
 			# with the context-word embeddings, and then process this
-			# through the sigmoid function.  This yields a 
-			# relationship-context "fit-score", being larger if they 
+			# through the sigmoid function.  This yields a
+			# relationship-context "fit-score", being larger if they
 			# have better fit according to the model.  The score has
-			# an interpretation as a probablity, see "Noise-Contrastive 
-			# Estimation of Unnormalized Statistical Models, with 
+			# an interpretation as a probablity, see "Noise-Contrastive
+			# Estimation of Unnormalized Statistical Models, with
 			# Applications to Natural Image Statistics".
 			embedding_dot_product = np.round(sigma(np.dot(
 				embedded_relationships, W_context.T
 			)),2)
-			#print embedding_dot_product
 
 			# Accumulate fit scores over the replicates
 			embedding_dot_products.append(embedding_dot_product)
 
 		# Average the fit-scores over the replicates
 		avg_embedding_product = np.mean(embedding_dot_products, axis=0)
-		#print avg_embedding_product
 
 		# Find the context words that fit best with each entity-pair.
 		# These should be equal to the ids for the contexts actually
 		# occuring along with those entity pairs in the coropus.  To see
 		# where these numbers come from, compare the contexts cooccurring
-		# with entity pairs in the test-corpus with their ids in the 
+		# with entity pairs in the test-corpus with their ids in the
 		# token_map saved at <savedir>
 		expected_best_fitting_context_ids = [2,5,8]
 		best_fitting_context_ids = np.argmax(avg_embedding_product, axis=1)
@@ -445,16 +439,16 @@ class TestRelation2VecEmbedder(TestCase):
 			best_fitting_context_ids, expected_best_fitting_context_ids
 		))
 
-		# Get the probability accorded to each entity pair and the 
+		# Get the probability accorded to each entity pair and the
 		# context that they fit best with
 		predicted_fit = np.max(avg_embedding_product, axis=1)
 
 		# The optimal probability accorded to entity_pairs and contexts
-		# should be 0.375 for the entity pairs with their best fitting 
+		# should be 0.375 for the entity pairs with their best fitting
 		# contexts (this is according to the
 		# formulation of the loss function as part of Noise Contrastive
 		# Estimation, specifically, this is p(C=1 | (e1,e2,c)),
-		# see "Noise-Contrastive Estimation of Unnormalized Statistical 
+		# see "Noise-Contrastive Estimation of Unnormalized Statistical
 		# Models, with Applications to Natural Image Statistics".
 		expected_fit = 0.375
 
@@ -466,30 +460,255 @@ class TestRelation2VecEmbedder(TestCase):
 		self.assertTrue(all([diff < tolerance for diff in differences]))
 
 
+	def test_run_e2e(self):
 
-class TestRelation2VecMinibatcher(TestCase):
+		# Seed randomness for a reproducible test.  Using 2 because
+		# 1 was particularly bad by chance
+		np.random.seed(1)
 
-	def setUp(self):
-		'''
-		Prepare a Relation2VecMinibatcher so it is available in tests.
-		'''
-		self.files = ['test-data/test-corpus/a.tsv']
-		self.batch_size = 5
-		self.noise_ratio = 15
-		self.mini_gen = Relation2VecMinibatcher(
-			files=self.files,
-			batch_size=self.batch_size, 
-			noise_ratio=self.noise_ratio,
+		# Some constants for the test
+		files = ['test-data/test-corpus/c.tsv']
+		batch_size = 3
+		noise_ratio = 15
+		num_embedding_dimensions = 5
+		num_epochs = 1
+		num_replicates=10
+		learning_rate = 0.01
+		momentum = 0.9
+		tolerance = 0.25
+		save_dir = 'test-data/test-entity-embedder'
+
+		# Make a minibatcher to yield training batches from test corpus
+		reader = Relation2VecDatasetReader(
+			files=files,
+			batch_size=batch_size,
+			noise_ratio=noise_ratio,
 			verbose=False
 		)
-		self.mini_gen.prepare()
+		reader.prepare(save_dir=save_dir)
+
+		# We'll make and train an Relation2VecEmbedder in a moment.  However,
+		# first we will get the IDs for the entities that occur together
+		# within the test corpus.  We'll be interested to see the
+		# relationship embedding for them that is learnt during training
+		edict = reader.entity_dictionary
+		expected_pairs = [
+			('A','B'), ('C','D'), ('E','F')
+		]
+		expected_pairs_ids = [
+			(edict.get_id(e1), edict.get_id(e2))
+			for e1, e2 in expected_pairs
+		]
+
+		# We will repeatedly make a Relation2VecEmbedder, train it on the
+		# test corpus, and then find its embedding for the entity-pairs
+		# of interest.  We do it num_replicate # of times to average
+		# results over enough trials that we can test if the learnt
+		# embeddings have roughly the expected properties
+		embedding_dot_products  = []
+
+		# Make a symbolic minibatcher
+		# Note that the full batch includes noise_ratio number of noise examples
+		# for every signal example, and the parameter "batch_size" here is interpreted
+		# as just the number of signal examples per batch; the full batch size is:
+		minibatcher = NoiseContrastiveTheanoMinibatcher(
+			batch_size=batch_size,
+			noise_ratio=noise_ratio,
+			dtype="int32",
+			num_dims=2
+		)
+
+		signal_data, noise_data = reader.generate_dataset_parallel()
+		num_batches = minibatcher.load_dataset(signal_data, noise_data)
+
+		symbolic_minibatch = T.imatrix()
+
+		for replicate in range(num_replicates):
+
+			# Make a Word2VecEmbedder object, feed it the combined input
+			embedder = Relation2VecEmbedder(
+				input_var=minibatcher.get_batch(),
+				batch_size=batch_size,
+				entity_vocab_size=reader.entity_vocab_size(),
+				context_vocab_size=reader.context_vocab_size(),
+				num_embedding_dimensions=num_embedding_dimensions,
+			)
+
+			# Architectue is ready.  Make the loss function, and use it to create the
+			# parameter updates responsible for learning
+			loss = get_noise_contrastive_loss(embedder.get_output(), batch_size)
+			updates = nesterov_momentum(
+				loss, embedder.get_params(), learning_rate, momentum
+			)
+			# Include minibatcher updates, which cause the symbolic batch to move
+			# through the dataset like a sliding window
+			updates.update(minibatcher.get_updates())
+
+			# Use the loss function and the updates to compile a training function.
+			# Note that it takes no inputs because the dataset is fully loaded using
+			# theano shared variables
+			train = function([], loss, updates=updates)
+			dataset = self.prepare_toy_dataset(noise_ratio)
+
+			# Train on the dataset, running through it num_epochs # of times
+			for epoch in range(num_epochs):
+				minibatcher.reset()
+				for batch_num in range(num_batches):
+					loss = train()
+
+			# Get the parameters out of the trained model
+			W_entity, W_context, W_relation, b_relation = (
+				embedder.get_param_values()
+			)
+
+			# Get the embeddings for the entity-pairs ("relationships")
+			# occuring in the test corpus
+			embedded_relationships = embedder.embed_relationship(
+				expected_pairs_ids
+			)
+
+			# Take the dot product of the relationship embeddings
+			# with the context-word embeddings, and then process this
+			# through the sigmoid function.  This yields a
+			# relationship-context "fit-score", being larger if they
+			# have better fit according to the model.  The score has
+			# an interpretation as a probablity, see "Noise-Contrastive
+			# Estimation of Unnormalized Statistical Models, with
+			# Applications to Natural Image Statistics".
+			embedding_dot_product = np.round(sigma(np.dot(
+				embedded_relationships, W_context.T
+			)),2)
+
+			# Accumulate fit scores over the replicates
+			embedding_dot_products.append(embedding_dot_product)
+
+		# Average the fit-scores over the replicates
+		avg_embedding_product = np.mean(embedding_dot_products, axis=0)
+
+		# Find the context words that fit best with each entity-pair.
+		# These should be equal to the ids for the contexts actually
+		# occuring along with those entity pairs in the coropus.  To see
+		# where these numbers come from, compare the contexts cooccurring
+		# with entity pairs in the test-corpus with their ids in the
+		# token_map saved at <savedir>
+		expected_best_fitting_context_ids = [2,5,8]
+
+		# The UNK token generally has high affinity for every relation embedding
+		# because there is no strong gradient affecting it.  We will mask the UNK
+		# before looking for best-fitting learned context for each relationship.
+		avg_embedding_product[:,0] = 0
+		best_fitting_context_ids = np.argmax(avg_embedding_product, axis=1)
+		self.assertTrue(np.array_equal(
+			best_fitting_context_ids, expected_best_fitting_context_ids
+		))
+
+		# Get the probability accorded to each entity pair and the
+		# context that they fit best with
+		predicted_fit = np.max(avg_embedding_product, axis=1)
+
+		# The optimal probability accorded to entity_pairs and contexts
+		# should be 0.375 for the entity pairs with their best fitting
+		# contexts (this is according to the
+		# formulation of the loss function as part of Noise Contrastive
+		# Estimation, specifically, this is p(C=1 | (e1,e2,c)),
+		# see "Noise-Contrastive Estimation of Unnormalized Statistical
+		# Models, with Applications to Natural Image Statistics".
+		expected_fit = 0.375
+
+		# The predictions should be "close" to the expected values
+		differences = [
+			abs(predicted - expected_fit)
+			for predicted in predicted_fit
+		]
+		self.assertTrue(all([diff < tolerance for diff in differences]))
 
 
-	def tearDown(self):
-		# Remove test files if they exist
-		if os.path.exists('test-data/test-minibatch-generator'):
-			shutil.rmtree('test-data/test-minibatch-generator')
+	def test_learning_function(self):
 
+		# Seed randomness for a reproducible test.  Using 2 because
+		# 1 was particularly bad by chance
+		np.random.seed(2)
+
+		# Some constants for the test
+		files = ['test-data/test-corpus/c.tsv']
+		batch_size = 3
+		noise_ratio = 15
+		num_embedding_dimensions = 5
+		num_epochs = 2
+		num_replicates = 5
+		learning_rate = 0.01
+		momentum = 0.9
+		tolerance = 0.25
+		save_dir = 'test-data/test-entity-embedder'
+
+		# Train the embedder using the convenience function
+		embedder, reader = relation2vec(
+			files=files,
+			save_dir=save_dir,
+			num_epochs=num_epochs,
+			noise_ratio=noise_ratio,
+			batch_size = batch_size,
+			num_embedding_dimensions=num_embedding_dimensions,
+			learning_rate=learning_rate,
+			momentum=momentum,
+			verbose=False
+		)
+
+		# We'll make and train an Relation2VecEmbedder in a moment.  However,
+		# first we will get the IDs for the entities that occur together
+		# within the test corpus.  We'll be interested to see the
+		# relationship embedding for them that is learnt during training
+		edict = reader.entity_dictionary
+		expected_pairs = [
+			('A','B'), ('C','D'), ('E','F')
+		]
+		expected_pairs_ids = [
+			(edict.get_id(e1), edict.get_id(e2))
+			for e1, e2 in expected_pairs
+		]
+
+		# Get the parameters out of the trained model
+		W_entity, W_context, W_relation, b_relation = (
+			embedder.get_param_values()
+		)
+
+		# Get the embeddings for the entity-pairs ("relationships")
+		# occuring in the test corpus
+		embedded_relationships = embedder.embed_relationship(
+			expected_pairs_ids
+		)
+
+		# Take the dot product of the relationship embeddings
+		# with the context-word embeddings, and then process this
+		# through the sigmoid function.  This yields a
+		# relationship-context "fit-score", being larger if they
+		# have better fit according to the model.  The score has
+		# an interpretation as a probablity, see "Noise-Contrastive
+		# Estimation of Unnormalized Statistical Models, with
+		# Applications to Natural Image Statistics".
+		embedding_product = np.round(sigma(np.dot(
+			embedded_relationships, W_context.T
+		)),2)
+
+		# Find the context words that fit best with each entity-pair.
+		# These should be equal to the ids for the contexts actually
+		# occuring along with those entity pairs in the coropus.  To see
+		# where these numbers come from, compare the contexts cooccurring
+		# with entity pairs in the test-corpus with their ids in the
+		# token_map saved at <savedir>
+		expected_best_fitting_context_ids = [2,5,8]
+		# The UNK token generally has high affinity for every relation embedding
+		# because there is no strong gradient affecting it.  We will mask the UNK
+		# before looking for best-fitting learned context for each relationship.
+		embedding_product[:,0] = 0
+		print embedding_product
+		best_fitting_context_ids = np.argmax(embedding_product, axis=1)
+		self.assertTrue(np.array_equal(
+			best_fitting_context_ids, expected_best_fitting_context_ids
+		))
+
+
+class TestNoiseContrastiveTheanoMinibatcher(TestCase):
 
 	def test_symbolic_minibatches(self):
 		'''
@@ -504,258 +723,296 @@ class TestRelation2VecMinibatcher(TestCase):
 		# Ensure reproducibility in this stochastic test
 		np.random.seed(1)
 
-		# Get the symbolic minibatch
-		batch_spec = self.mini_gen.get_symbolic_minibatch()
-		symbolic_signal, symbolic_noise, updates = batch_spec
-
-		# Make a batching function.  This is a somewhat trivial function:
-		# all it does is pull out the minibatch.  But it simulates 
-		# accessing the minibatch in a theano compiled function which 
-		# incorporates incrementing the minibatch iteration number as an
-		# update
-		get_batch = function(
-			[],[symbolic_signal, symbolic_noise],
-			updates=updates
+		# Make a minibatcher
+		batch_size = 5
+		noise_ratio = 9
+		minibatcher = NoiseContrastiveTheanoMinibatcher(
+			batch_size=batch_size,
+			noise_ratio=noise_ratio,
+			pad=lambda part,idx:1,
+			dtype="int32",
+			num_dims=2
 		)
 
-		#
-		num_batches = self.mini_gen.load_dataset()
+		# mock a dataset
+		num_signal_examples = 50
+		signal_examples = np.array([
+			[i,i,i] for i in range(num_signal_examples)
+		], dtype='int32')
+		noise_examples = np.array([
+			[j,j,j] for j in range(num_signal_examples * noise_ratio)
+		], dtype='int32')
 
-		# Get every signal and noise example, and keep track of them
-		# all.  We'll check that we get the exact same examples from
-		# the symbolic and non-symbolic methods of minibatching
-		symbolic_signal_counter = Counter()
-		symbolic_noise_counter = Counter()
+		# Get the symbolic minibatch
+		num_batches = minibatcher.load_dataset(signal_examples, noise_examples)
+		minibatch = minibatcher.get_batch()
+		updates = minibatcher.get_updates()
+
+		self.assertEqual(num_batches, num_signal_examples / batch_size)
+
+		f = function([], minibatch, updates=updates)
 		for batch_num in range(num_batches):
-			signal, noise = get_batch()
-			for row in signal:
-				symbolic_signal_counter[tuple(row)] += 1
+			expected_batch = np.array(
+				[[j,j,j] for j in range(batch_num*batch_size, (batch_num+1) * batch_size)]
+				+ [[j,j,j] for j in range(batch_num*batch_size*noise_ratio, (batch_num+1)*batch_size*noise_ratio)]
+				, dtype='int32'
+			)
+			found_batch = f()
+			self.assertTrue(np.array_equal(found_batch, expected_batch))
 
-			for row in noise:
-				symbolic_noise_counter[tuple(row)] += 1
 
-		# We will now generate the minibatches, but serve them 
-		# non-symbolically.  Ensure the same randomness seeds this process
-		# so that we can expect the same examples to be chosen.
+
+	def test_minibatches_from_corpus(self):
+		'''
+		Test that the symbolic minibatching mechanism, used in tandem with the
+		DatsetReader, produces the expected training examples in its
+		minibatches.
+		'''
+		# Ensure reproducibility in this stochastic test
 		np.random.seed(1)
 
-		# Generate minibatches using the minibatcher's non-symbolic
-		# asynchronous minibatching approach
-		signal_counter = Counter()
-		noise_counter = Counter()
-		for signal_batch, noise_batch in self.mini_gen:
-			for row in signal_batch:
-				signal_counter[tuple(row)] += 1
-			for row in noise_batch:
-				noise_counter[tuple(row)] += 1
-
-		# now check that we have all of the same examples
-		self.assertEqual(symbolic_signal_counter, signal_counter)
-		self.assertEqual(symbolic_noise_counter, noise_counter)
-
-
-	def test_save_load(self):
-		'''
-		Try saving and reloading a Relation2VecMinibatcher
-		'''
-		if os.path.exists('test-data/test-minibatch-generator'):
-			shutil.rmtree('test-data/test-minibatch-generator')
-		
+		# Make a DatasetReader
 		files = ['test-data/test-corpus/a.tsv']
 		batch_size = 5
-		noise_ratio = 15
-		mini_gen = Relation2VecMinibatcher(
-			files=self.files,
-			batch_size=self.batch_size, 
-			noise_ratio=self.noise_ratio,
+		noise_ratio = 9
+		reader = Relation2VecDatasetReader(
+			files=files,
+			batch_size = batch_size,
+			noise_ratio=noise_ratio,
 			verbose=False
 		)
-		mini_gen.prepare(savedir='test-data/test-minibatch-generator')
+		reader.prepare()
 
-		new_mini_gen = Relation2VecMinibatcher(
-			files=self.files,
-			batch_size=self.batch_size, 
-			noise_ratio=self.noise_ratio,
-			verbose=False
-		)
-		new_mini_gen.load('test-data/test-minibatch-generator')
-
-		# check that the underlying data in the dictionaries and unigram
-		# are the same
-		self.assertEqual(
-			mini_gen.entity_dictionary.token_map.tokens,
-			new_mini_gen.entity_dictionary.token_map.tokens
-		)
-		self.assertEqual(
-			mini_gen.context_dictionary.token_map.tokens,
-			new_mini_gen.context_dictionary.token_map.tokens
-		)
-		self.assertEqual(
-			mini_gen.entity_dictionary.counter_sampler.counts,
-			new_mini_gen.entity_dictionary.counter_sampler.counts
-		)
-		self.assertEqual(
-			mini_gen.context_dictionary.counter_sampler.counts,
-			new_mini_gen.context_dictionary.counter_sampler.counts
-		)
-
-		# Now we'll try using the component save and load functions
-		# First remove the saved files
-		shutil.rmtree('test-data/test-minibatch-generator')
-
-		# These functions don't automatically make the parent directory
-		# if it doesn't exist, so we need to make it
-		os.mkdir('test-data/test-minibatch-generator')
-		mini_gen.save_entity_dictionary(
-			'test-data/test-minibatch-generator/entity-dictionary'
-		)
-		mini_gen.save_context_dictionary(
-			'test-data/test-minibatch-generator/context-dictionary'
-		)
-
-		new_new_mini_gen = Relation2VecMinibatcher(
-			files=self.files,
-			batch_size=self.batch_size, 
-			noise_ratio=self.noise_ratio,
-			verbose=False
-		)
-
-		new_new_mini_gen.load_entity_dictionary(
-			'test-data/test-minibatch-generator/entity-dictionary'
-		)
-		new_new_mini_gen.load_context_dictionary(
-			'test-data/test-minibatch-generator/context-dictionary'
-		)
-
-		# check that the underlying data in the dictionaries and unigram
-		# are the same
-		self.assertEqual(
-			mini_gen.entity_dictionary.token_map.tokens,
-			new_new_mini_gen.entity_dictionary.token_map.tokens
-		)
-		self.assertEqual(
-			mini_gen.context_dictionary.token_map.tokens,
-			new_new_mini_gen.context_dictionary.token_map.tokens
-		)
-		self.assertEqual(
-			mini_gen.entity_dictionary.counter_sampler.counts,
-			new_new_mini_gen.entity_dictionary.counter_sampler.counts
-		)
-		self.assertEqual(
-			mini_gen.context_dictionary.counter_sampler.counts,
-			new_new_mini_gen.context_dictionary.counter_sampler.counts
-		)
-
-
-	def test_generate_async_batch(self):
-		'''
-		Relation2VecMinibatcher can produce minibatches asynchronously (meaning
-		that it generates future minibatches before they are requested and
-		stores them in a queue) or like an ordinary generator as the consumer 
-		requests them.  Both methods should give the same results.
-		'''
-
-		generator_batches = []
-		async_batches = []
-
-		# We will generate the minibatches using three alternative methods
-		# provided by the minibatch generator.  Provided we seed numpy's 
-		# randomness before generating, each should yield exactly the
-		# same minibatches.
-
-		# Collect the minibatches by treating the Relation2VecMinibatcher
-		# as an iterator.  This leads to "asynchronous" multiprocessing
-		# batch generation
-		np.random.seed(1)
-		for minibatch in self.mini_gen:
-			async_batches.append(minibatch)
-
-		# Collect the minibatches by calling 
-		# `Relation2VecMinibatcher.generate()`, which produces minibatches
-		# using the "generator" construct, without any multiprocessing
-		np.random.seed(1)
-		for minibatch in self.mini_gen.generate_minibatches():
-			generator_batches.append(minibatch)
-
-		# Collect the minibatches by calling 
-		# `Relation2VecMinibatcher.get_minibatches()`, which returns a simple
-		# list of all minibatches, all generated "upfront"
-		np.random.seed(1)
-		upfront_batches = self.mini_gen.get_minibatches()
-
-		# Test that async and generate are the same
-		zipped_batches = zip(generator_batches, async_batches)
-		for (gen_batch, async_batch) in zipped_batches:
-			async_sig, async_noise = async_batch
-			gen_sig, gen_noise = gen_batch
-			self.assertTrue(np.equal(async_sig, gen_sig).all())
-			self.assertTrue(np.equal(async_noise, gen_noise).all())
-
-		# Test that generate and upfront are the same
-		zipped_batches = zip(generator_batches, upfront_batches)
-		for (gen_batch, upfront_batch) in zipped_batches:
-			upfront_sig, upfront_noise = upfront_batch
-			gen_sig, gen_noise = gen_batch
-			self.assertTrue(np.equal(upfront_sig, gen_sig).all())
-			self.assertTrue(np.equal(upfront_noise, gen_noise).all())
-
-
-	def test_batch_contents(self):
-		'''
-		Make sure that the correct entities and contexts are found
-		together in batches
-		'''
-		valid_tokens = defaultdict(set)
+		# Read through the file and determine all of the entity pairs that
+		# should be found, and the valid context tokens that go with them
+		valid_contexts = defaultdict(set)
 		filename='test-data/test-corpus/a.tsv'
-
-		for line in relation2vec_parse(filename):
+		for line in reader.parse(filename):
 			context_tokens, entity_spans = line
 
-			context_ids = self.mini_gen.context_dictionary.get_ids(
+			context_ids = reader.context_dictionary.get_ids(
 				context_tokens
 			)
 
 			for e1, e2 in itools.combinations(entity_spans, 2):
 
 				# Give a strict order to make assertions easier
-				e1_id, e2_id = self.mini_gen.entity_dictionary.get_ids(
+				e1_id, e2_id = reader.entity_dictionary.get_ids(
 					[e1,e2])
 
-				filtered_context_ids = self.mini_gen.eliminate_spans(
+				filtered_context_ids = reader.eliminate_spans(
 					context_ids, entity_spans[e1]+entity_spans[e2]
 				)
 
+				# Adopt ordering convention of entities in entity pairs when using
+				# them as dictionary keys.  (Makes it easier to write assertions.)
 				if e1_id > e2_id:
 					e1, e2 = e2, e1
 					e1_id, e2_id = e2_id, e1_id
 
-				valid_tokens[(e1_id, e2_id)].update(filtered_context_ids)
+				valid_contexts[(e1_id, e2_id)].update(filtered_context_ids)
 
-		seen_entity_pairs = []
- 		for signal_batch, noise_batch in self.mini_gen:
-			for e1_id, e2_id, context_id in signal_batch:
+		seen_contexts = defaultdict(set)
+		signal_examples, noise_examples = reader.generate_dataset_serial()
 
+		# Make a minibatcher
+		batch_size = 5
+		noise_ratio = 9
+		minibatcher = NoiseContrastiveTheanoMinibatcher(
+			batch_size=batch_size,
+			noise_ratio=noise_ratio,
+			pad=lambda part,idx:1,
+			dtype="int32",
+			num_dims=2
+		)
+
+		# Get the symbolic minibatch
+		num_batches = minibatcher.load_dataset(signal_examples, noise_examples)
+		minibatch = minibatcher.get_batch()
+		updates = minibatcher.get_updates()
+
+		# Define a theano function that simply extracts the minibatch and
+		# advances the minibatch pointer
+		f = function([], minibatch, updates=updates)
+
+		self.assertEqual(len(noise_examples), len(signal_examples) * noise_ratio)
+		for batch_num in range(num_batches):
+			minibatch = f()
+			signal_minibatch = minibatch[:batch_size,]
+			for e1_id, e2_id, context_id in signal_minibatch:
+
+				# Adopt ordering convention of entities in entity pairs when using
+				# them as dictionary keys.  (Makes it easier to write assertions.)
 				if e1_id > e2_id:
 					e1_id, e2_id = e2_id, e1_id
 
-				self.assertTrue(context_id in valid_tokens[e1_id, e2_id])
-				seen_entity_pairs.append((e1_id, e2_id))
+				seen_contexts[(e1_id, e2_id)].add(context_id)
 
-		self.assertItemsEqual(seen_entity_pairs, valid_tokens.keys())
-		
+		self.assertEqual(seen_contexts, valid_contexts)
 
-	def test_batch_shape(self):
-		count_batches = 0
-		for signal_batch, noise_batch in self.mini_gen:
-			self.assertEqual(len(signal_batch), self.batch_size)
-			self.assertEqual(
-				len(noise_batch), self.batch_size * self.noise_ratio
+
+
+class TestDatasetReader(TestCase):
+
+	def test_raises_not_implemented(self):
+		'''
+		Ensure that the reader raises an error if `get_vocab_size()` is called.'
+		'''
+
+		# Some constants for the test
+		files = ['test-data/test-corpus/c.tsv']
+		batch_size = 3
+		noise_ratio = 15
+
+		# Make a minibatcher to yield training batches from test corpus
+		reader = Relation2VecDatasetReader(
+			files=files,
+			batch_size=batch_size,
+			noise_ratio=noise_ratio,
+			verbose=False
+		)
+		reader.prepare()
+
+		# Ensure that the reader raises an error if `get_vocab_size() is called`
+		with self.assertRaises(NotImplementedError):
+			reader.get_vocab_size()
+
+
+	def test_generate_dataset_serial(self):
+		'''
+		Make sure that the correct entities and contexts are found
+		together in batches
+		'''
+
+		# Ensure reproducibility in this stochastic test
+		np.random.seed(1)
+
+		# Make a DatasetReader
+		files = ['test-data/test-corpus/a.tsv']
+		batch_size = 5
+		noise_ratio = 9
+		reader = Relation2VecDatasetReader(
+			files=files,
+			batch_size = batch_size,
+			noise_ratio=noise_ratio,
+			verbose=False
+		)
+		reader.prepare()
+
+		# Read through the file and determine all of the entity pairs that
+		# should be found, and the valid context tokens that go with them
+		valid_contexts = defaultdict(set)
+		filename='test-data/test-corpus/a.tsv'
+		for line in reader.parse(filename):
+			context_tokens, entity_spans = line
+
+			context_ids = reader.context_dictionary.get_ids(
+				context_tokens
 			)
-			count_batches += 1
 
-		expected_number_of_batches = (4*3/2 + 3*2/2 + 2*1/2 + 0 + 0) / 5
+			for e1, e2 in itools.combinations(entity_spans, 2):
 
-		self.assertEqual(count_batches, expected_number_of_batches)
+				# Give a strict order to make assertions easier
+				e1_id, e2_id = reader.entity_dictionary.get_ids(
+					[e1,e2])
+
+				filtered_context_ids = reader.eliminate_spans(
+					context_ids, entity_spans[e1]+entity_spans[e2]
+				)
+
+				# Adopt ordering convention of entities in entity pairs when using
+				# them as dictionary keys.  (Makes it easier to write assertions.)
+				if e1_id > e2_id:
+					e1, e2 = e2, e1
+					e1_id, e2_id = e2_id, e1_id
+
+				valid_contexts[(e1_id, e2_id)].update(filtered_context_ids)
+
+		seen_contexts = defaultdict(set)
+		signal_examples, noise_examples = reader.generate_dataset_serial()
+		self.assertEqual(len(noise_examples), len(signal_examples) * noise_ratio)
+		for e1_id, e2_id, context_id in signal_examples:
+
+			# Adopt ordering convention of entities in entity pairs when using
+			# them as dictionary keys.  (Makes it easier to write assertions.)
+			if e1_id > e2_id:
+				e1_id, e2_id = e2_id, e1_id
+
+			seen_contexts[(e1_id, e2_id)].add(context_id)
+
+		self.assertEqual(seen_contexts, valid_contexts)
+
+
+	def test_generate_dataset_parallel(self):
+		'''
+		Relation2VecMinibatcher can produce minibatches asynchronously (meaning
+		that it generates future minibatches before they are requested and
+		stores them in a queue) or like an ordinary generator as the consumer
+		requests them.  Both methods should give the same results.
+		'''
+
+		# Ensure reproducibility in this stochastic test
+		np.random.seed(1)
+
+		# Make a DatasetReader
+		files = [
+			'test-data/test-corpus/a1.tsv',
+			'test-data/test-corpus/a2.tsv',
+			'test-data/test-corpus/a3.tsv'
+		]
+		batch_size = 5
+		noise_ratio = 9
+		reader = Relation2VecDatasetReader(
+			files=files,
+			batch_size = batch_size,
+			noise_ratio=noise_ratio,
+			verbose=False
+		)
+		reader.prepare()
+
+		# Read through the file and determine all of the entity pairs that
+		# should be found, and the valid context tokens that go with them
+		valid_contexts = defaultdict(set)
+		for fname in files:
+			for line in reader.parse(fname):
+				context_tokens, entity_spans = line
+
+				context_ids = reader.context_dictionary.get_ids(
+					context_tokens
+				)
+
+				for e1, e2 in itools.combinations(entity_spans, 2):
+
+					# Give a strict order to make assertions easier
+					e1_id, e2_id = reader.entity_dictionary.get_ids(
+						[e1,e2])
+
+					filtered_context_ids = reader.eliminate_spans(
+						context_ids, entity_spans[e1]+entity_spans[e2]
+					)
+
+					# Adopt ordering convention of entities in entity pairs when using
+					# them as dictionary keys.  (Makes it easier to write assertions.)
+					if e1_id > e2_id:
+						e1, e2 = e2, e1
+						e1_id, e2_id = e2_id, e1_id
+
+					valid_contexts[(e1_id, e2_id)].update(filtered_context_ids)
+
+		seen_contexts = defaultdict(set)
+		signal_examples, noise_examples = reader.generate_dataset_parallel()
+		self.assertEqual(len(noise_examples), len(signal_examples) * noise_ratio)
+		for e1_id, e2_id, context_id in signal_examples:
+
+			# Adopt ordering convention of entities in entity pairs when using
+			# them as dictionary keys.  (Makes it easier to write assertions.)
+			if e1_id > e2_id:
+				e1_id, e2_id = e2_id, e1_id
+
+			seen_contexts[(e1_id, e2_id)].add(context_id)
+
+		self.assertEqual(seen_contexts, valid_contexts)
+
 
 
 	def test_entity_span_skip(self):
@@ -763,6 +1020,18 @@ class TestRelation2VecMinibatcher(TestCase):
 		Tests the function that returns the sentence tokens after
 		removing the spans belonging to entities.
 		'''
+
+		files = ['test-data/test-corpus/a.tsv']
+		batch_size = 5
+		noise_ratio = 9
+		reader = Relation2VecDatasetReader(
+			files=files,
+			batch_size = batch_size,
+			noise_ratio=noise_ratio,
+			verbose=False
+		)
+		reader.prepare()
+
 		sentence = (
 			"China and United States draw 1-1 BEIJING , Feb 1 ( AFP ) - "
 			"China and the United States drew 1-1 in a soccer friendly at "
@@ -770,7 +1039,7 @@ class TestRelation2VecMinibatcher(TestCase):
 			"Xinhua news agency reported ."
 		).split()
 		entity_spans = {
-			'YAGO:United_States':[(15,19), (1,4)],  
+			'YAGO:United_States':[(15,19), (1,4)],
 			'YAGO:Xinhua_News_Agency':[(38,38)],
 			'YAGO:Beijing':[(7,7)],
 			'YAGO:Guangzhou':[(27,27)]
@@ -824,13 +1093,210 @@ class TestRelation2VecMinibatcher(TestCase):
 			if e1 > e2:
 				e1, e2 = e2, e1
 
-			found_tokens_no_spans = self.mini_gen.eliminate_spans(
+			found_tokens_no_spans = reader.eliminate_spans(
 				sentence, entity_spans[e1] + entity_spans[e2]
 			)
 			self.assertEqual(found_tokens_no_spans, expected_tokens[e1,e2])
 
 
-		
+	def test_save_load_dictionaries(self):
+		'''
+		Try saving and reloading a Relation2VecMinibatcher
+		'''
+		save_dir = 'test-data/test-dataset-reader'
+		if os.path.exists(save_dir):
+			shutil.rmtree(save_dir)
+
+		files = ['test-data/test-corpus/a.tsv']
+		batch_size = 5
+		noise_ratio = 15
+		reader = Relation2VecDatasetReader(
+			files=files,
+			batch_size = batch_size,
+			noise_ratio=noise_ratio,
+			verbose=False
+		)
+
+		reader.prepare(save_dir='test-data/test-minibatch-generator')
+
+		new_reader = Relation2VecDatasetReader(
+			files=files,
+			batch_size = batch_size,
+			noise_ratio=noise_ratio,
+			verbose=False
+		)
+		new_reader.load_dictionary('test-data/test-minibatch-generator')
+
+		# check that the underlying data in the dictionaries and unigram
+		# are the same
+		self.assertEqual(
+			reader.entity_dictionary.token_map.tokens,
+			new_reader.entity_dictionary.token_map.tokens
+		)
+		self.assertEqual(
+			reader.context_dictionary.token_map.tokens,
+			new_reader.context_dictionary.token_map.tokens
+		)
+		self.assertEqual(
+			reader.entity_dictionary.counter_sampler.counts,
+			new_reader.entity_dictionary.counter_sampler.counts
+		)
+		self.assertEqual(
+			reader.context_dictionary.counter_sampler.counts,
+			new_reader.context_dictionary.counter_sampler.counts
+		)
+
+		# Now we'll try using the manual call to save
+		shutil.rmtree('test-data/test-minibatch-generator')
+
+		# These functions don't automatically make the parent directory
+		# if it doesn't exist, so we need to make it
+		reader.save_dictionary('test-data/test-minibatch-generator')
+		new_reader = Relation2VecDatasetReader(
+			files=files,
+			batch_size=batch_size,
+			noise_ratio=noise_ratio,
+			verbose=False
+		)
+
+		new_reader.load_dictionary('test-data/test-minibatch-generator')
+
+		# check that the underlying data in the dictionaries and unigram
+		# are the same
+		self.assertEqual(
+			reader.entity_dictionary.token_map.tokens,
+			new_reader.entity_dictionary.token_map.tokens
+		)
+		self.assertEqual(
+			reader.context_dictionary.token_map.tokens,
+			new_reader.context_dictionary.token_map.tokens
+		)
+		self.assertEqual(
+			reader.entity_dictionary.counter_sampler.counts,
+			new_reader.entity_dictionary.counter_sampler.counts
+		)
+		self.assertEqual(
+			reader.context_dictionary.counter_sampler.counts,
+			new_reader.context_dictionary.counter_sampler.counts
+		)
+
+
+	def test_save_load_examples_serial(self):
+		'''
+		Try saving and reloading a Relation2VecDatasetReader
+		'''
+		save_dir = 'test-data/test-dataset-reader'
+		if os.path.exists(save_dir):
+			shutil.rmtree(save_dir)
+
+		files = ['test-data/test-corpus/a.tsv']
+		batch_size = 5
+		noise_ratio = 15
+		reader = Relation2VecDatasetReader(
+			files=files,
+			batch_size = batch_size,
+			noise_ratio=noise_ratio,
+			verbose=False
+		)
+		reader.prepare()
+		reader.generate_dataset_serial(save_dir)
+
+		new_reader = Relation2VecDatasetReader(
+			files=files,
+			batch_size = batch_size,
+			noise_ratio=noise_ratio,
+			verbose=False
+		)
+		new_reader.load_data(save_dir)
+
+		# check that the underlying data in the dictionaries and unigram
+		# are the same
+		self.assertTrue(np.array_equal(new_reader.signal_examples, reader.signal_examples))
+		self.assertTrue(np.array_equal(new_reader.noise_examples, reader.noise_examples))
+
+		# Next, test manually calling the save function.  Clear the data from disk.
+		shutil.rmtree(save_dir)
+
+		# Call the save function on the existing reader
+		reader.save_data(save_dir)
+
+		# Make a fresh reader in which we will load the data just saved.
+		new_reader = Relation2VecDatasetReader(
+			files=files,
+			batch_size=batch_size,
+			noise_ratio=noise_ratio,
+			verbose=False
+		)
+		new_reader.load_data(save_dir)
+
+		# check that the underlying data in the dictionaries and unigram
+		# are the same
+		self.assertTrue(np.array_equal(new_reader.signal_examples, reader.signal_examples))
+		self.assertTrue(np.array_equal(new_reader.noise_examples, reader.noise_examples))
+
+		# Now we'll try using the manual call to save
+		shutil.rmtree(save_dir)
+
+
+	def test_save_load_examples_parallel(self):
+		'''
+		Try saving and reloading a Relation2VecDatasetReader
+		'''
+		save_dir = 'test-data/test-dataset-reader'
+		if os.path.exists(save_dir):
+			shutil.rmtree(save_dir)
+
+		files = ['test-data/test-corpus/a.tsv']
+		batch_size = 5
+		noise_ratio = 15
+		reader = Relation2VecDatasetReader(
+			files=files,
+			batch_size = batch_size,
+			noise_ratio=noise_ratio,
+			verbose=False
+		)
+		reader.prepare()
+		reader.generate_dataset_parallel(save_dir)
+
+		new_reader = Relation2VecDatasetReader(
+			files=files,
+			batch_size = batch_size,
+			noise_ratio=noise_ratio,
+			verbose=False
+		)
+		new_reader.load_data(save_dir)
+
+		# check that the underlying data in the dictionaries and unigram
+		# are the same
+		self.assertTrue(np.array_equal(new_reader.signal_examples, reader.signal_examples))
+		self.assertTrue(np.array_equal(new_reader.noise_examples, reader.noise_examples))
+
+		# Next, test manually calling the save function.  Clear the data from disk.
+		shutil.rmtree(save_dir)
+
+		# Call the save function on the existing reader
+		reader.save_data(save_dir)
+
+		# Make a fresh reader in which we will load the data just saved.
+		new_reader = Relation2VecDatasetReader(
+			files=files,
+			batch_size=batch_size,
+			noise_ratio=noise_ratio,
+			verbose=False
+		)
+		new_reader.load_data(save_dir)
+
+		# check that the underlying data in the dictionaries and unigram
+		# are the same
+		self.assertTrue(np.array_equal(new_reader.signal_examples, reader.signal_examples))
+		self.assertTrue(np.array_equal(new_reader.noise_examples, reader.noise_examples))
+
+		# Now we'll try using the manual call to save
+		shutil.rmtree(save_dir)
+
+
+
+
 
 
 if __name__ == '__main__':
