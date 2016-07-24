@@ -1,3 +1,4 @@
+import numpy as np
 from word2vec import get_noise_contrastive_loss
 from dataset_reader import Relation2VecDatasetReader as DatasetReader
 from relation2vec_embedder import Relation2VecEmbedder
@@ -15,8 +16,12 @@ def relation2vec(
 	num_epochs=5,
 	entity_dictionary=None,
 	context_dictionary=None,
+	load_dictionary_dir=None,
+	min_frequency=10,
 	noise_ratio=15,
 	batch_size = 1000,  # Number of *signal* examples per batch
+	macrobatch_size = 100000,
+	max_queue_size=0,
 	num_embedding_dimensions=500,
 	word_embedding_init=Normal(),
 	context_embedding_init=Normal(),
@@ -36,27 +41,38 @@ def relation2vec(
 	point for you.
 	'''
 
-	# Make a Relation2VecDatasetReader, pass through parameters sent by caller
+	# Make a Relation2VecDatasetReader, pass through parameters sent by 
+	# caller
 	reader = DatasetReader(
 		files=files,
 		directories=directories,
 		skip=skip,
-		batch_size=batch_size, # number of *signal_examples* per batch
+		macrobatch_size = macrobatch_size,
+		max_queue_size = max_queue_size,
 		noise_ratio=noise_ratio,
 		num_processes=num_processes,
-		entity_dictionary=None,
-		context_dictionary=None,
+		entity_dictionary=entity_dictionary,
+		context_dictionary=context_dictionary,
+		load_dictionary_dir=load_dictionary_dir,
 		verbose=verbose
 	)
 
-	# Prpare the minibatch generator
+	# Prepare the minibatch generator
 	# (this produces the counter_sampler stats)
-	reader.prepare(save_dir=save_dir)
+	both_dictionaries_supplied = context_dictionary and entity_dictionary
+	if load_dictionary_dir is None and not both_dictionaries_supplied:
+		print 'preparing dictionaries...'
+		reader.prepare(save_dir=save_dir)
 
-	# Make a symbolic minibatcher
-	# Note that the full batch includes noise_ratio number of noise examples#
-	# for every signal example, and the parameter "batch_size" here is interpreted
-	# as just the number of signal examples per batch; the full batch size is:
+	# If min_frequency was specified, prune the dictionaries
+	if min_frequency is not None:
+		print 'prunning dictionaries...'
+		reader.prune(min_frequency)
+
+	# Make a symbolic minibatcher Note that the full batch includes 
+	# noise_ratio number of noise examples for every signal example, and 
+	# the parameter "batch_size" here is interpreted as just the number of 
+	# signal examples per batch; the full batch size is:
 	minibatcher = NoiseContrastiveTheanoMinibatcher(
 		batch_size=batch_size,
 		noise_ratio=noise_ratio,
@@ -75,8 +91,8 @@ def relation2vec(
 		context_embedding_init=context_embedding_init
 	)
 
-	# Architectue is ready.  Make the loss function, and use it to create the
-	# parameter updates responsible for learning
+	# Architectue is ready.  Make the loss function, and use it to create 
+	# the parameter updates responsible for learning
 	loss = get_noise_contrastive_loss(embedder.get_output(), batch_size)
 	updates = nesterov_momentum(
 		loss, embedder.get_params(), learning_rate, momentum
@@ -91,26 +107,34 @@ def relation2vec(
 	# theano shared variables
 	train = function([], loss, updates=updates)
 
-	# Generate the full dataset, and load it onto the GPU
-	dataset = reader.generate_dataset_parallel(save_dir=save_dir)
-	minibatcher.load_dataset(*dataset)
-
 	# Iterate through the dataset, training the embeddings
 	for epoch in range(num_epochs):
+
 		if verbose:
 			print 'starting epoch %d' % epoch
-		losses = []
-		minibatcher.reset()
-		for batch_num in range(minibatcher.get_num_batches()):
-			losses.append(train())
-		if verbose:
-			print '\tAverage loss: %f' % np.mean(losses)
+
+		macrobatches = reader.generate_dataset_serial()
+		macrobatch_num = 0
+		for signal_macrobatch, noise_macrobatch in macrobatches:
+
+			macrobatch_num += 1
+			if verbose:
+				print 'running macrobatch %d' % (macrobatch_num - 1)
+
+			minibatcher.load_dataset(signal_macrobatch, noise_macrobatch)
+			losses = []
+			for batch_num in range(minibatcher.get_num_batches()):
+				if verbose:
+					print 'running minibatch', batch_num
+					losses.append(train())
+			if verbose:
+				print '\taverage loss: %f' % np.mean(losses)
 
 	# Save the model (the embeddings) if save_dir was provided
-	# TODO: this should save to a subdir and should make save_dir if necessary
+	# TODO: this should save to a subdir and should make save_dir if 
+	# necessary
 	if save_dir is not None:
-		embeddings_filename = os.path.join(save_dir, 'embeddings.npz')
-		embedder.save(embeddings_filename)
+		embedder.save(save_dir)
 
 	# Return the trained embedder and the dictionary mapping tokens
 	# to ids

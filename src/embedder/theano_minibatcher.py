@@ -68,6 +68,9 @@ class NoiseContrastiveTheanoMinibatcher(TheanoMinibatcher):
 		minibatches.
 		'''
 
+		# Reset the internal pointer
+		self.reset()
+
 		# Determine the total number of minibatches
 		self.num_batches = int(np.ceil(len(signal_examples) / float(self.batch_size)))
 
@@ -89,21 +92,6 @@ class NoiseContrastiveTheanoMinibatcher(TheanoMinibatcher):
 			# It is actually up to the caller to only use self.batch_num
 			# minibatches.
 			self.num_batches -= 1
-
-		## Pad the signal dataset, if needed, so that there is no incomplete
-		## minibatch at the end
-		#expected_len_signal = self.num_batches * self.batch_size
-		#signal_examples.extend([
-		#	self.pad('signal', i)
-		#	for i in range(len(signal_examples), expected_len_signal)
-		#])
-
-		## Pad the noise dataset, if needed.
-		#expected_len_noise = self.num_batches * self.batch_size * self.noise_ratio
-		#noise_examples.extend([
-		#	self.pad('noise', i)
-		#	for i in range(len(noise_examples), expected_len_noise)
-		#])
 
 		# Load the dataset onto the gpu
 		self.signal_examples.set_value(signal_examples)
