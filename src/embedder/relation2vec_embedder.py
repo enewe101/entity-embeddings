@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from lasagne import layers
 from lasagne.layers import get_output, get_all_params, get_all_param_values
@@ -176,10 +177,23 @@ class Relation2VecEmbedder(object):
 
 
 	#TODO: test
-	def save(self, filename):
+	def save(self, directory):
+		'''
+		Saves the model parameters (embeddings) to disk, in a file called
+		"embeddings.npz" under the directory given.
+		'''
+
+		# We are willing to create the directory given if it doesn't exist
+		if not os.path.exists(directory):
+			os.mkdir(directory)
+
+		# Save under the directory given in a file called "embeddings.npz'
+		save_path = os.path.join(directory, "embeddings.npz")
+
+		# Get the parameters and save them to disk
 		W_entity,W_context,W_relation,b_relation = self.get_param_values()
 		np.savez(
-			filename,
+			save_path,
 			W_entity=W_entity,
 			W_context=W_context,
 			W_relation=W_relation,
@@ -188,15 +202,28 @@ class Relation2VecEmbedder(object):
 
 
 	#TODO: test
-	def load(self, filename):
-		npfile = np.load(filename)
+	def load(self, directory):
+		'''
+		Loads the model parameter values (embeddings) stored in the
+		directory given.  Expects to find the parameters in a file called
+		"embeddings.npz" within the directory given.
+		'''
+
+		# By default, we save to a file called "embeddings.npz" within the
+		# directory given to the save function.
+		save_path = os.path.join(directory, "embeddings.npz")
+
+		# Load the parameters
+		npfile = np.load(save_path)
 		W_entity_ = npfile['W_entity']
 		W_context_ = npfile['W_context']
 		W_relation_ = npfile['W_relation']
 		b_relation_ = npfile['b_relation']
 
+		# Set the shared variables of the model (which reside on GPU)
 		W_entity, W_context, W_relation, b_relation = self.get_params()
 		W_entity.set_value(W_entity_)
 		W_context.set_value(W_context_)
 		W_relation.set_value(W_relation_)
 		b_relation.set_value(b_relation_)
+

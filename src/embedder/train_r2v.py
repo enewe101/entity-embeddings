@@ -1,197 +1,226 @@
 #!/usr/bin/env python
 
-# TODO: test dict_dir, savedir, and learn_embeddings options
 
+# Import external libraries
+import json
 import t4k
-import numpy as np
-from theano import tensor as T
 import time
 import sys
-sys.path.append('..')
 import re
-from minibatcher import Relation2VecMinibatcher
-from relation2vec_embedder import Relation2VecEmbedder
-from word2vec import NoiseContraster
 import os
-from SETTINGS import DATA_DIR, COOCCURRENCE_DIR
+import numpy as np
+from theano import tensor as T
+from r2v import relation2vec
+
+
+# Import internal libraries
+sys.path.append('..')
+from theano_minibatcher import NoiseContrastiveTheanoMinibatcher
+from relation2vec_embedder import Relation2VecEmbedder
+from dataset_reader import Relation2VecDatasetReader as DatasetReader
+from SETTINGS import DATA_DIR, COOCCURRENCE_DIR, SRC_DIR
+
 
 # Seed randomness for reproducibility
 np.random.seed(0)
 
-DIRECTORIES = [
-	#os.path.join(COOCCURRENCE_DIR, 'cooccurrence')
-]
+
+# Set defaults and constants
+USAGE = (
+	'Usage: run-r2v \'command="command"\' \'save_dir="save/dir"\''
+	' [optional_key=val ...]'
+)
+DIRECTORIES = [COOCCURRENCE_DIR]
 FILES = [
-	os.path.join(COOCCURRENCE_DIR, '%s.tsv' % file_num)
-	for file_num in 
-	['002', '003']#, '006', '007', '009', '00d', '00e', '010', '017', '018']
+	#os.path.join(COOCCURRENCE_DIR, '%s.tsv' % hex(i)[2:].zfill(3))
+	#for i in range(2)
 ]
-SKIP = [
-	re.compile('README.txt')
-]
-BATCH_SIZE=1000
+SKIP = [re.compile('README.txt')]
+BATCH_SIZE=int(1e4)
+MACROBATCH_SIZE=int(1e6)
 NOISE_RATIO = 15
-SAVEDIR = os.path.join(DATA_DIR, 'relation2vec')
-MIN_FREQUENCY = 20
+MIN_FREQUENCY = 10
 NUM_EMBEDDING_DIMENSIONS = 500
 NUM_EPOCHS = 1
-LEARNING_RATE = 0.01
-
-def prepare():
-	minibatcher = Relation2VecMinibatcher(
-		directories=DIRECTORIES,
-		files=FILES,
-		skip=SKIP,
-		batch_size=BATCH_SIZE,
-	)
-	minibatcher.prepare(
-		savedir=SAVEDIR
-	)
+LEARNING_RATE = 0.002
+NUM_PROCESSES = 1
+MOMENTUM = 0.9
+MAX_QUEUE_SIZE = 2
+VERBOSE = True
+LOAD_DICT_DIR = os.path.join(DATA_DIR, 'dictionaries')
 
 
-def train(iteration_mode, learn_embeddings=True):
+def prepare_dataset(params):
 
-	if iteration_mode not in ('generate', 'before', 'background'):
-		raise ValueError(
-			'Got unexpected iteration_mode: %s' % iteration_mode
-		)
+	# Make a Relation2VecDatasetReader, pass through parameters sent by 
+	# caller
 
-	print 'one'
 
-	# Define the input theano variables
-	signal_input = T.imatrix('query_input')
-	noise_input = T.imatrix('noise_input')
+#	reader = DatasetReader(
+#		files=FILES,
+#		directories=DIRECTORIES,
+#		skip=SKIP,
+#		batch_size=BATCH_SIZE, # number of *signal_examples* per batch
+#		macrobatch_size = MACROBATCH_SIZE,
+#		max_queue_size = MAX_QUEUE_SIZE,
+#		noise_ratio=NOISE_RATIO,
+#		num_processes=NUM_PROCESSES,
+#		entity_dictionary=None,
+#		context_dictionary=None,
+#		load_dictionary_dir=None,
+#		verbose=VERBOSE
+#	)
+	save_dir = params.pop('save_dir')
+	reader = DatasetReader(**params)
 
-	print 'two'
-	# Make a NoiseContraster, and get the combined input
-	noise_contraster = NoiseContraster(
-		signal_input, noise_input, learning_rate=LEARNING_RATE
-	)
-	combined_input = noise_contraster.get_combined_input()
+	# Prepare the minibatch generator
+	# (this produces the counter_sampler stats)
+	reader.prepare(save_dir=save_dir)
 
-	print 'three'
-	# Make a Relation2VecMinibatcher
-	minibatcher = Relation2VecMinibatcher(
-		files=FILES, directories=DIRECTORIES, skip=SKIP,
-		noise_ratio=NOISE_RATIO,
-		batch_size=BATCH_SIZE,
-	)
 
-	print 'four'
-	# load the minibatch generator.  Prune very rare tokens.
-	minibatcher.load(SAVEDIR)
+def train(params):
+	relation2vec(**params)
+#	embedder, reader = relation2vec(
+#		files=FILES,
+#		directories=DIRECTORIES,
+#		skip=SKIP,
+#		save_dir=save_dir,
+#		num_epochs=NUM_EPOCHS,
+#		load_dictionary_dir=LOAD_DICT_DIR,
+#		min_frequency=MIN_FREQUENCY,
+#		noise_ratio=NOISE_RATIO,
+#		batch_size=BATCH_SIZE,
+#		macrobatch_size=MACROBATCH_SIZE,
+#		max_queue_size=MAX_QUEUE_SIZE,
+#		num_embedding_dimensions=NUM_EMBEDDING_DIMENSIONS,
+#		learning_rate=LEARNING_RATE,
+#		momentum=MOMENTUM,
+#		verbose=VERBOSE,
+#		num_processes=NUM_PROCESSES,
+#	)
 
-	# For debuggin tests, don't prune -- everything is rare!
-	#minibatcher.prune(min_frequency=MIN_FREQUENCY)
 
-	print 'entity vocabulary:', len(minibatcher.entity_dictionary)
-	print 'context vocabulary:', len(minibatcher.context_dictionary)
+def commandline2dict():
+	properties = {}
+	for arg in sys.argv[1:]:
+		key, val = arg.split('=')
 
-	print 'five'
-	# Make a Relation2VecEmbedder object, feed it the combined input
-	entity_embedder = Relation2VecEmbedder(
-		combined_input,
-		batch_size=BATCH_SIZE,
-		entity_vocab_size=len(minibatcher.entity_dictionary),
-		context_vocab_size=len(minibatcher.context_dictionary),
-		num_embedding_dimensions = NUM_EMBEDDING_DIMENSIONS
-	)
+		# Interpret numeric, list, and dictionary values properly, as
+		# well as strings enquoted in properly escaped quotes
+		try:
+			properties[key] = json.loads(val)
 
-	print 'six'
-	# Get the params and output from the word2vec embedder, feed that
-	# back to the noise_contraster to get the training function
-	combined_output = entity_embedder.get_output()
-	params = entity_embedder.get_params()
+		# It's cumbersome to always have to escape quotes around strings.
+		# This caught exception interprets unenquoted tokens as strings
+		except ValueError:
+			properties[key] = val
 
-	# If embeddings are to be kept fixed, then only keep the parameters
-	# defining how relationships are composed out of embeddings
-	if not learn_embeddings:
-		params = params[2:]
+	return properties
 
-	train = noise_contraster.get_train_func(combined_output, params)
 
-	batching_start = time.time()
-	print 'seven'
-	# Figure out which iterator to use
-	if iteration_mode == 'generate':
-		print 'Generating minibatches to order'
-		get_minibatch_iterator = minibatcher.generate_minibatches
+def print_params(params):
 
-	elif iteration_mode == 'before':
-		print 'Generating all minibatches upfront (this could take awhile)'
-		minibatches = minibatcher.get_minibatches()
-		get_minibatch_iterator = lambda: minibatches
-		print 'Done generating minibatches.'
-
-	elif iteration_mode == 'background':
-		print 'Generating minibatches in the background'
-		get_minibatch_iterator = lambda: minibatcher
-
-	else:
-		raise ValueError(
-			'Got unexpected iteration_mode: %s' % iteration_mode
-		)
-
-	# Iterate over the corpus, training the embeddings
-	training_start = time.time()
-	for epoch in range(NUM_EPOCHS):
-
-		print 'starting epoch %d' % epoch
-		epoch_start = time.time()
-		batch_num = -1
-		for signal_batch, noise_batch in get_minibatch_iterator():
-			t4k.out('.')
-			batch_num += 1
-			loss = train(signal_batch, noise_batch)
-			if batch_num % 100 == 0:
-				print '\tloss: %f' % loss
-
-		epoch_elapsed = time.time() - epoch_start
-		print (
-			'\tFinished epoch %d.  Time for epoch was %2.1f.' 
-			% (epoch, epoch_elapsed)
-		)
-
-	print 'Time needed for batching and training:', (
-		time.time() - batching_start)
-	print 'Time needed for training: %f' % (time.time() - training_start)
-
-	print 'Saving the model...'
-	# Save the model (the embeddings) if savedir was provided
-	embeddings_filename = os.path.join(SAVEDIR, 'embeddings.npz')
-	entity_embedder.save(embeddings_filename)
-
-	# Return the trained entity_embedder
-	return entity_embedder
-
+	# Print to stdout the set of parameters defining this run in a 
+	# json-like format, but with keys sorted lexicographically
+	params_to_print = dict(params)
+	params_to_print['skip'] = [r.pattern for r in params['skip']]
+	for key in sorted(params_to_print.keys()):
+		print key, '=', params_to_print[key]
 
 
 if __name__ == '__main__':
-	if sys.argv[1] == 'prepare':
 
+	commandline_params = commandline2dict()
+	try:
+		command = commandline_params.pop('command')
+		save_dir = commandline_params.pop('save_dir')
+	except KeyError:
+		raise ValueError(USAGE)
+
+	# This is just included to test argument parsing
+	if command == 'args':
+		print json.dumps(commandline_params)
+
+	# Run over the entire dataset, prepare and save the entity and context 
+	# dictionaries.  No training is done.  This only has to be done once,
+	# subsequent calls to the training subcommand will use the dictionaries
+	# saved by this method
+	elif command == 'prepare':
+
+		# Setup default params for this command
+		params = {
+			# Note we override the global default here
+			'load_dictionary_dir': None,
+
+			# Take these relevant settings from global defaults
+			'files': FILES,
+			'directories': DIRECTORIES,
+			'skip': SKIP,
+			'save_dir': save_dir,
+			'noise_ratio': NOISE_RATIO,
+			'macrobatch_size': MACROBATCH_SIZE,
+			'max_queue_size': MAX_QUEUE_SIZE,
+			'verbose': VERBOSE,
+			'num_processes': NUM_PROCESSES,
+		}
+
+		# Merge in command line params (which override the defaults) 
+		params.update(commandline_params)
+
+		# Record params to stdout
+		print
+		print 'command:', command
+		print_params(params)
+		print
+
+		# Run the dictionary preparation, recording total elapsed time
 		start = time.time()
-		prepare()
+		prepare_dataset(params)
 		elapsed = time.time() - start
-		print 'Elapsed:', elapsed
+		print '\nelapsed:', elapsed
 
-	elif sys.argv[1] == 'train':
-		iteration_mode = sys.argv[2]
-		if sys.argv[3] == 'learn-embeddings':
-			learn_embeddings == True
-		elif sys.argv[3] == 'fix-embeddings':
-			learn_embeddings == False
-		else:
-			raise ValueError(
-				'Third argument must either be "learn-embeddings" or '
-				'"fix-embeddings".'
-			)
 
-		dict_dir = os.path.join(DATA_DIR, sys.argv[4])
-		save_dir = os.path.join(DATA_DIR, sys.argv[5])
+	elif command == 'train':
 
-		train(iteration_mode, learn_embeddings, dict_dir, save_dir)
-		print 'success'
+		params = {
+			'files': FILES,
+			'directories': DIRECTORIES,
+			'skip': SKIP,
+			'save_dir': save_dir,
+			'num_epochs': NUM_EPOCHS,
+			'load_dictionary_dir': LOAD_DICT_DIR,
+			'min_frequency': MIN_FREQUENCY,
+			'noise_ratio': NOISE_RATIO,
+			'batch_size': BATCH_SIZE,
+			'macrobatch_size': MACROBATCH_SIZE,
+			'max_queue_size': MAX_QUEUE_SIZE,
+			'num_embedding_dimensions': NUM_EMBEDDING_DIMENSIONS,
+			'learning_rate': LEARNING_RATE,
+			'momentum': MOMENTUM,
+			'verbose': VERBOSE,
+			'num_processes': NUM_PROCESSES,
+		}
+
+		# get command-line overrides of property values
+		params.update(commandline_params)
+
+		# Record params to stdout
+		print
+		print 'command:', command
+		print_params(params)
+		print
+
+		# Run the dictionary preparation, recording total elapsed time
+		start = time.time()
+		train(params)
+		elapsed = time.time() - start
+		print '\nelapsed:', elapsed
+
 
 	else:
-		print 'usage: ./train_w2v.py [ prepare | train ]'
+		raise ValueError(
+			'got unexpected subcommand: %s\n' % command 
+			+ USAGE
+		)
+
 

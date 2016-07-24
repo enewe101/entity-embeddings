@@ -5,7 +5,7 @@ SETTINGS.py
 data
 .DS_Store
 del
-venv
+env
 *.txt
 startenv
 src/embedder/test-data/test-minibatch-generator

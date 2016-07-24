@@ -39,9 +39,11 @@ def word2vec_parse(filename):
 	return tokenized_sentences
 
 
-def relation2vec_parse(filename):
+def relation2vec_parse(filename, verbose=True):
 
 	tokenized_sentences = []
+	num_skipped = 0
+	num_lines = 0
 	for line in open(filename):
 
 		# skip empty lines
@@ -52,9 +54,18 @@ def relation2vec_parse(filename):
 		# two tab delimiters in a row.  This tab splitter will consider
 		# any number of consecutive tabs as a single delimiter
 		fields = TAB_SPLITTER.split(line.strip())
-		num_unique, tokens = fields[0], fields[1]
+		num_unique, tokens = int(fields[0]), fields[1]
 		entity_spans, fname = fields[2:-1], fields[-1]
 		tokens = tokens.split()
+
+		# in some cases, due to unexpected text structure, we will have
+		# a very long uninterpretable sentence with too many entities.
+		# Skip anything with more than 10 unique entities, or more than 
+		# 80 words
+		num_lines += 1
+		if num_unique > 10 or len(tokens) > 80:
+			num_skipped += 1
+			continue
 
 		# We'll parse out the entity spans.  They consist of an entity id
 		# followed by the start and stop index of the span.  A given
@@ -62,15 +73,14 @@ def relation2vec_parse(filename):
 		# so for each entity we store a list of span tuples
 		parsed_spans = defaultdict(list)
 		for entity_span in entity_spans:
-			try:
-				entity_id, start, stop = entity_span.rsplit(',', 2)
-			except ValueError:
-				print line
-				print 'num entity spans:', len(entity_spans)
+			entity_id, start, stop = entity_span.rsplit(',', 2)
 			span = (int(start), int(stop))
 			parsed_spans[entity_id].append(span)
 
 		tokenized_sentences.append((tokens, parsed_spans))
+
+	if verbose:
+		print 'num_lines,num_skipped', '=', (num_lines, num_skipped)
 
 	return tokenized_sentences
 
@@ -92,17 +102,22 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		files=[],
 		directories=[],
 		skip=[],
-		batch_size = 1000,
 		noise_ratio=15,
 		num_processes=3,
 		entity_dictionary=None,
 		context_dictionary=None,
+		load_dictionary_dir=None,
+		max_queue_size=0,
+		macrobatch_size=20000,
 		verbose=True,
+
 	):
 
 		# TODO: test that no discarding is occurring
-		# TODO: ensure that kernel is not being used to sample signal context
-		# TODO: what is hapening with unigram_dictionary -- we don't want to use it
+		# TODO: ensure that kernel is not being used to sample signal 
+		# context 
+		# TODO: what is hapening with unigram_dictionary -- we don't want 
+		#	to use it
 		unigram_dictionary=None,
 		kernel=None
 		verbose=True
@@ -112,7 +127,6 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 			files=files,
 			directories=directories,
 			skip=skip,
-			batch_size=batch_size,
 			noise_ratio=noise_ratio,
 			t=t,
 			num_processes=num_processes,
@@ -121,17 +135,38 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 			verbose=verbose
 		)
 
-		# Load the dictionary, if supplied
-		if entity_dictionary is not None:
-			self.entity_dictionary = entity_dictionary
-		else:
-			self.entity_dictionary = UnigramDictionary()
+		self.max_queue_size = max_queue_size
+		self.macrobatch_size = macrobatch_size
 
-		# Load the context dictionary, if supplied
+		# Usually the dictionaries are made from scratch
+		self.entity_dictionary = UnigramDictionary()
+		self.context_dictionary = UnigramDictionary()
+
+		# But if a dictionary dir was given, load from there
+		if load_dictionary_dir is not None:
+			if verbose:
+				print 'Loading dictionary from: %s...' % load_dictionary_dir
+				self.load_dictionary(load_dictionary_dir)
+
+		# Or, if an existing dictionary was passed in, use it
+		if entity_dictionary is not None:
+			if verbose:
+				print 'An entity dictionary was supplied.'
+				self.entity_dictionary = entity_dictionary
+
+		# (same but for context dictionary)
 		if context_dictionary:
-			self.context_dictionary = context_dictionary
-		else:
-			self.context_dictionary = UnigramDictionary()
+			if verbose:
+				print 'A context dictionary was supplied.'
+				self.context_dictionary = context_dictionary
+
+		# Keep track of whether the dictionaries have been prepared
+		self.prepared = False
+		if load_dictionary_dir is not None:
+			self.prepared = True
+		elif context_dictionary and entity_dictionary:
+			self.prepared = True
+
 
 	def get_vocab_size(self):
 		raise NotImplementedError(
@@ -140,7 +175,7 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		)
 
 	def parse(self, filename):
-		return relation2vec_parse(filename)
+		return relation2vec_parse(filename, self.verbose)
 
 
 	def entity_vocab_size(self):
@@ -276,7 +311,8 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 
 
 	# Integrate into dataset generation pipeline
-	def produce_examples(self, filename_iterator):
+	# TODO: this should be called 'produce macrobatches'
+	def generate_macrobatches(self, filename_iterator):
 
 		'''
 		Assembles bunches of examples from the parsed data coming from
@@ -288,75 +324,106 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		where X depends on `self.noise_ratio`.
 		'''
 
+		mcbatch_size = self.macrobatch_size
+		noise_ratio = self.noise_ratio
 		signal_examples = []
 		noise_examples = []
+
+		for signal_chunk, noise_chunk in self.generate_examples(filename_iterator):
+
+			signal_examples.extend(signal_chunk)
+			noise_examples.extend(noise_chunk)
+
+			while len(signal_examples) > mcbatch_size:
+				if self.verbose:
+					print 'numpyifying'
+				signal_macrobatch = self.numpyify(
+					signal_examples[:mcbatch_size])
+				noise_macrobatch = self.numpyify(
+					noise_examples[:mcbatch_size * noise_ratio])
+
+				entities = signal_macrobatch[0][:2]
+				context = signal_macrobatch[0][2:]
+				entities = self.entity_dictionary.get_tokens(entities)
+				context = self.context_dictionary.get_tokens(context)
+				if self.verbose:
+					print 'no-padding:', len(signal_macrobatch)
+				yield signal_macrobatch, noise_macrobatch
+
+				signal_examples = signal_examples[mcbatch_size:]
+				noise_examples = noise_examples[mcbatch_size*noise_ratio:]
+
+		if len(signal_examples) > 0:
+			signal_remaining = mcbatch_size - len(signal_examples)
+			noise_remaining = (
+				mcbatch_size * noise_ratio - len(noise_examples))
+
+			if self.verbose:
+				print 'padding and numpyifying'
+
+			signal_macrobatch = self.numpyify(
+				signal_examples + [[0,0,0]] * signal_remaining)
+			noise_macrobatch = self.numpyify(
+				noise_examples + [[0,0,0]] * noise_remaining)
+
+			if self.verbose:
+				print 'padded to length:', len(signal_macrobatch)
+			yield signal_macrobatch, noise_macrobatch
+
+
+	def generate_examples(self, filename_iterator):
+
+		num_examples = 0
 		for fname in filename_iterator:
-
 			parsed = self.parse(fname)
-			add_signal_examples, add_noise_examples = self.build_examples(parsed)
+			for line in parsed:
 
-			signal_examples.extend(add_signal_examples)
-			noise_examples.extend(add_noise_examples)
+				context_tokens, entity_spans = line
 
-		# Numpyify the dataset
-		signal_examples = self.numpyify(signal_examples)
-		noise_examples = self.numpyify(noise_examples)
+				# Sentences with less than two entities can't be used for
+				# learning
+				if len(entity_spans) < 2:
+					continue
 
-		return signal_examples, noise_examples
+				token_ids = self.context_dictionary.get_ids(context_tokens)
 
+				# We'll now generate signal examples and noise
+				# examples for training.  Iterate over every pair
+				# of entities in this line
+				for e1, e2 in itools.combinations(entity_spans, 2):
 
-	def build_examples(self, parsed):
+					# convert entities into ids
+					e1_id, e2_id = self.entity_dictionary.get_ids([e1, e2])
 
-		signal_examples = []
-		noise_examples = []
+					# TODO test this
+					# Get the context tokens minus the entity_spans
+					filtered_context_tokens = self.eliminate_spans(
+						token_ids, entity_spans[e1] + entity_spans[e2]
+					)
 
-		for line in parsed:
+					# We can't train if there are no context words
+					if len(filtered_context_tokens) == 0:
+						break
 
-			context_tokens, entity_spans = line
+					# Add the signal examples.  Take either a single
+					# context token, or all of them
+					context = np.random.choice(filtered_context_tokens)
+					signal_examples = [[e1_id, e2_id, context]]
+					num_examples += 1
 
-			# Sentences with less than two entities can't be used for
-			# learning
-			if len(entity_spans) < 2:
-				continue
+					# Sample tokens from the noise
+					noise_context_ids = self.context_dictionary.sample(
+						(self.noise_ratio * len(signal_examples),))
+					noise_examples = [
+						[e1_id, e2_id, noise_context_id]
+						for noise_context_id in noise_context_ids
+					]
+					num_examples += len(noise_examples)
 
-			token_ids = self.context_dictionary.get_ids(context_tokens)
+					yield (signal_examples, noise_examples)
 
-			# We'll now generate signal examples and noise
-			# examples for training.  Iterate over every pair
-			# of entities in this line
-			for e1, e2 in itools.combinations(entity_spans, 2):
-
-				# convert entities into ids
-				e1_id, e2_id = self.entity_dictionary.get_ids([e1, e2])
-
-				# TODO test this
-				# Get the context tokens minus the entity_spans
-				filtere_context_tokens = self.eliminate_spans(
-					token_ids, entity_spans[e1] + entity_spans[e2]
-				)
-
-				# We can't train if there are no context words
-				if len(filtere_context_tokens) == 0:
-					break
-
-				# Add the signal examples.  Note that we sample all context
-				# rather than just one word as would be done in word2vec
-				add_signal_examples = [
-					[e1_id, e2_id, context_token_id]
-					for context_token_id in filtere_context_tokens
-				]
-				signal_examples.extend(add_signal_examples)
-
-				# Sample tokens from the noise
-				noise_context_ids = self.context_dictionary.sample(
-					(self.noise_ratio * len(add_signal_examples),))
-				add_noise_examples = [
-					[e1_id, e2_id, noise_context_id]
-					for noise_context_id in noise_context_ids
-				]
-				noise_examples.extend(add_noise_examples)
-
-		return signal_examples, noise_examples
+		if self.verbose:
+			print 'num_examples', num_examples
 
 
 	def generate_dataset_serial(self, save_dir=None):
@@ -391,41 +458,46 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 
 		# Generate the data for each file
 		file_iterator = self.generate_filenames()
-		self.signal_examples, self.noise_examples = self.produce_examples(file_iterator)
-		self.data_loaded = True
+		macrobatches = self.generate_macrobatches(file_iterator)
+		for signal_examples, noise_examples in macrobatches:
 
-		# Save the data
-		if examples_dir is not None:
-			save_path = os.path.join(examples_dir, '0.npz')
-			np.savez(
-				save_path,
-				signal_examples=self.signal_examples,
-				noise_examples=self.noise_examples
-			)
+			## Save the data
+			#if examples_dir is not None:
+			#	save_path = os.path.join(examples_dir, '0.npz')
+			#	np.savez(
+			#		save_path,
+			#		signal_examples=self.signal_examples,
+			#		noise_examples=self.noise_examples
+			#	)
 
-		# Return it
-		return self.signal_examples, self.noise_examples
+			yield signal_examples, noise_examples
 
 
 	def generate_dataset_worker(self, file_iterator, macrobatch_queue):
-		macrobatch = self.produce_examples(file_iterator)
-		macrobatch_queue.put(macrobatch)
+		macrobatches = self.generate_macrobatches(file_iterator)
+		for signal_examples, noise_examples in macrobatches:
+			if self.verbose:
+				print 'sending macrobatch to parent process'
+			macrobatch_queue.put((signal_examples, noise_examples))
+
 		macrobatch_queue.close()
 
 
 	def generate_dataset_parallel(self, save_dir=None):
 		'''
-		Parallel version of generate_dataset_serial.  Each worker is responsible
-		for saving its own part of the dataset to disk, called a macrobatch.
-		the files are saved at 'save_dir/examples/<batch-num>.npz'.
+		Parallel version of generate_dataset_serial.  Each worker is 
+		responsible for saving its own part of the dataset to disk, called 
+		a macrobatch.  the files are saved at 
+		'save_dir/examples/<batch-num>.npz'.
 		'''
 		# This cannot be called before calling prepare(), unless a prepared
 		# UnigramDictionary was passed to the self's constructor
 		if not self.prepared:
 			raise DataSetReaderIllegalStateException(
-				"DatasetReader: generate_examples() cannot be called before "
-				"prepare() is called unless a prepared UnigramDictionary has "
-				"was passed into the DatasetReader's constructor."
+				"DatasetReader: generate_examples() cannot be called "
+				"before prepare() is called unless a prepared "
+				"UnigramDictionary has was passed into the DatasetReader's "
+				"constructor."
 			)
 
 		# We save dataset in the "examples" subdir of the model_dir
@@ -441,7 +513,7 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 			examples_dir = None
 
 		file_queue = IterableQueue()
-		macrobatch_queue = IterableQueue()
+		macrobatch_queue = IterableQueue(self.max_queue_size)
 
 		# Put all the filenames on a producer queue
 		file_producer = file_queue.get_producer()
@@ -471,21 +543,27 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		signal_macrobatches = []
 		noise_macrobatches = []
 		for macrobatch_num, (signal_macrobatch, noise_macrobatch) in enumerate(macrobatch_consumer):
+			if self.verbose:
+				print 'receiving macrobatch from child process'
 			if examples_dir is not None:
 				save_path = os.path.join(examples_dir, '%d.npz' % macrobatch_num)
-				np.savez(
-					save_path,
-					signal_examples=signal_macrobatch,
-					noise_examples=noise_macrobatch
-				)
-			signal_macrobatches.append(signal_macrobatch)
-			noise_macrobatches.append(noise_macrobatch)
+				#np.savez(
+				#	save_path,
+				#	signal_examples=signal_macrobatch,
+				#	noise_examples=noise_macrobatch
+				#)
+
+			yield signal_macrobatch, noise_macrobatch
+			#signal_macrobatches.append(signal_macrobatch)
+			#noise_macrobatches.append(noise_macrobatch)
 
 		# Concatenate the macrobatches, and return the dataset
-		self.signal_examples = np.concatenate(signal_macrobatches)
-		self.noise_examples = np.concatenate(noise_macrobatches)
-		self.data_loaded = True
-		return self.signal_examples, self.noise_examples
+		#print 'amalgamating macrobatches'
+		#self.signal_examples = np.concatenate(signal_macrobatches)
+		#self.noise_examples = np.concatenate(noise_macrobatches)
+		#self.data_loaded = True
+		#print 'returning dataset'
+		#return self.signal_examples, self.noise_examples
 
 
 	def numpyify(self, examples):
