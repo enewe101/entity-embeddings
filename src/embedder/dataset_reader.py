@@ -186,7 +186,6 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		return len(self.context_dictionary)
 
 
-	# TODO: harmonize this with the two-level loading of DatasetReader (examples and dictionaries)
 	def load_dictionary(self, load_dir):
 		'''
 		Load both the dictionary and context_dictionary, assuming default
@@ -254,7 +253,8 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 
 		if len(signal_macrobatches) < 1 or len(noise_macrobatches) < 1:
 			raise IOError(
-				'DatasetReader: no example data files found in %s.' % examples_dir
+				'DatasetReader: no example data files found in %s.' 
+				% examples_dir
 			)
 
 		self.signal_examples = np.concatenate(signal_macrobatches)
@@ -263,7 +263,6 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		return self.signal_examples, self.noise_examples
 
 
-	# TODO: harmonize this with the two-level saving / loading of DatasetReader (examples and dictionaries)
 	def save_dictionary(self, save_dir):
 		'''
 		Save both the dictionary and context_dictionary, using default
@@ -329,7 +328,8 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		signal_examples = []
 		noise_examples = []
 
-		for signal_chunk, noise_chunk in self.generate_examples(filename_iterator):
+		examples = self.generate_examples(filename_iterator)
+		for signal_chunk, noise_chunk in examples:
 
 			signal_examples.extend(signal_chunk)
 			noise_examples.extend(noise_chunk)
@@ -362,9 +362,9 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 				print 'padding and numpyifying'
 
 			signal_macrobatch = self.numpyify(
-				signal_examples + [[0,0,0]] * signal_remaining)
+				signal_examples + [[UNK,UNK,UNK]] * signal_remaining)
 			noise_macrobatch = self.numpyify(
-				noise_examples + [[0,0,0]] * noise_remaining)
+				noise_examples + [[UNK,UNK,UNK]] * noise_remaining)
 
 			if self.verbose:
 				print 'padded to length:', len(signal_macrobatch)
@@ -405,8 +405,7 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 					if len(filtered_context_tokens) == 0:
 						break
 
-					# Add the signal examples.  Take either a single
-					# context token, or all of them
+					# Add a signal example.
 					context = np.random.choice(filtered_context_tokens)
 					signal_examples = [[e1_id, e2_id, context]]
 					num_examples += 1
