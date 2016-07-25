@@ -306,8 +306,21 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		Exposes the prune function for the underlying UnigramDictionary
 		used for the context_dictionary.
 		'''
+		if self.verbose:
+			print 'prunning dictionaries...'
+			print (
+				'\t...original vocabularies: entity, context = %d, %d'
+				% (len(self.context_dictionary), len(self.entity_dictionary)
+			))
+
 		self.context_dictionary.prune(min_frequency)
 		self.entity_dictionary.prune(min_frequency)
+
+		if self.verbose:
+			print (
+				'\t...pruned vocabularies: entity, context = %d, %d'
+				% (len(self.context_dictionary), len(self.entity_dictionary)
+			))
 
 
 	# Integrate into dataset generation pipeline

@@ -58,8 +58,6 @@ def average_pairwise_match(examples1, examples2):
 	return np.mean(cosines)
 
 
-
-
 def read_pairs(fname):
 	pairs = []
 	for line in open(fname):
@@ -72,6 +70,7 @@ def read_pairs(fname):
 		pairs.append((source, target))
 
 	return pairs
+
 
 def cosine(embedding1, embedding2):
 	dot = np.dot(embedding1, embedding2)

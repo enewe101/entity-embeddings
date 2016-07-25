@@ -28,6 +28,7 @@ def relation2vec(
 	learning_rate=0.1,
 	momentum=0.9,
 	verbose=True,
+	read_data_async=True,
 	num_processes=3
 ):
 	'''
@@ -66,7 +67,6 @@ def relation2vec(
 
 	# If min_frequency was specified, prune the dictionaries
 	if min_frequency is not None:
-		print 'prunning dictionaries...'
 		reader.prune(min_frequency)
 
 	# Make a symbolic minibatcher Note that the full batch includes 
@@ -113,7 +113,11 @@ def relation2vec(
 		if verbose:
 			print 'starting epoch %d' % epoch
 
-		macrobatches = reader.generate_dataset_serial()
+		if read_data_async:
+			macrobatches = reader.generate_dataset_parallel()
+		else:
+			macrobatches = reader.generate_dataset_serial()
+
 		macrobatch_num = 0
 		for signal_macrobatch, noise_macrobatch in macrobatches:
 
