@@ -48,56 +48,16 @@ MOMENTUM = 0.9
 MAX_QUEUE_SIZE = 2
 VERBOSE = True
 LOAD_DICT_DIR = os.path.join(DATA_DIR, 'dictionaries')
-
+READ_DATA_ASYNC = True
 
 def prepare_dataset(params):
-
-	# Make a Relation2VecDatasetReader, pass through parameters sent by 
-	# caller
-
-
-#	reader = DatasetReader(
-#		files=FILES,
-#		directories=DIRECTORIES,
-#		skip=SKIP,
-#		batch_size=BATCH_SIZE, # number of *signal_examples* per batch
-#		macrobatch_size = MACROBATCH_SIZE,
-#		max_queue_size = MAX_QUEUE_SIZE,
-#		noise_ratio=NOISE_RATIO,
-#		num_processes=NUM_PROCESSES,
-#		entity_dictionary=None,
-#		context_dictionary=None,
-#		load_dictionary_dir=None,
-#		verbose=VERBOSE
-#	)
 	save_dir = params.pop('save_dir')
 	reader = DatasetReader(**params)
-
-	# Prepare the minibatch generator
-	# (this produces the counter_sampler stats)
 	reader.prepare(save_dir=save_dir)
 
 
 def train(params):
 	relation2vec(**params)
-#	embedder, reader = relation2vec(
-#		files=FILES,
-#		directories=DIRECTORIES,
-#		skip=SKIP,
-#		save_dir=save_dir,
-#		num_epochs=NUM_EPOCHS,
-#		load_dictionary_dir=LOAD_DICT_DIR,
-#		min_frequency=MIN_FREQUENCY,
-#		noise_ratio=NOISE_RATIO,
-#		batch_size=BATCH_SIZE,
-#		macrobatch_size=MACROBATCH_SIZE,
-#		max_queue_size=MAX_QUEUE_SIZE,
-#		num_embedding_dimensions=NUM_EMBEDDING_DIMENSIONS,
-#		learning_rate=LEARNING_RATE,
-#		momentum=MOMENTUM,
-#		verbose=VERBOSE,
-#		num_processes=NUM_PROCESSES,
-#	)
 
 
 def commandline2dict():
@@ -199,6 +159,7 @@ if __name__ == '__main__':
 			'momentum': MOMENTUM,
 			'verbose': VERBOSE,
 			'num_processes': NUM_PROCESSES,
+			'read_data_async': READ_DATA_ASYNC
 		}
 
 		# get command-line overrides of property values
