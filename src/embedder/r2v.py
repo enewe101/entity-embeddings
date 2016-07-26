@@ -70,10 +70,7 @@ def relation2vec(
 	if min_frequency is not None:
 		reader.prune(min_frequency)
 
-	# Make a symbolic minibatcher Note that the full batch includes 
-	# noise_ratio number of noise examples for every signal example, and 
-	# the parameter "batch_size" here is interpreted as just the number of 
-	# signal examples per batch; the full batch size is:
+	# Make a symbolic minibatcher 
 	minibatcher = NoiseContrastiveTheanoMinibatcher(
 		batch_size=batch_size,
 		noise_ratio=noise_ratio,
@@ -81,10 +78,14 @@ def relation2vec(
 		num_dims=2
 	)
 
-	# Make a Word2VecEmbedder object, feed it the combined input
+	# Make a Word2VecEmbedder object, feed it the combined input.
+	# Note that the full batch includes noise examples and signal_examples
+	# so is larger than batch_size, which is the number of signal_examples
+	# only per batch.
+	full_batch_size = batch_size * (1 + noise_ratio)
 	embedder = Relation2VecEmbedder(
 		input_var=minibatcher.get_batch(),
-		batch_size=batch_size,
+		batch_size=full_batch_size,
 		entity_vocab_size=reader.entity_vocab_size(),
 		context_vocab_size=reader.context_vocab_size(),
 		num_embedding_dimensions=num_embedding_dimensions,
@@ -138,8 +139,6 @@ def relation2vec(
 				print '\taverage loss: %f' % np.mean(losses)
 
 	# Save the model (the embeddings) if save_dir was provided
-	# TODO: this should save to a subdir and should make save_dir if 
-	# necessary
 	if save_dir is not None:
 		embedder.save(save_dir)
 
