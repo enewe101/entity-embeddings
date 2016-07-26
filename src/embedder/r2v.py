@@ -63,7 +63,8 @@ def relation2vec(
 	# (this produces the counter_sampler stats)
 	both_dictionaries_supplied = context_dictionary and entity_dictionary
 	if load_dictionary_dir is None and not both_dictionaries_supplied:
-		print 'preparing dictionaries...'
+		if verbose:
+			print 'preparing dictionaries...'
 		reader.prepare(save_dir=save_dir)
 
 	# If min_frequency was specified, prune the dictionaries
@@ -109,8 +110,6 @@ def relation2vec(
 	# theano shared variables
 	train = function([], loss, updates=updates)
 
-	
-
 	# Iterate through the dataset, training the embeddings
 	for epoch in range(num_epochs):
 
@@ -134,7 +133,7 @@ def relation2vec(
 			for batch_num in range(minibatcher.get_num_batches()):
 				if verbose:
 					print 'running minibatch', batch_num
-					losses.append(train())
+				losses.append(train())
 			if verbose:
 				print '\taverage loss: %f' % np.mean(losses)
 
@@ -171,14 +170,9 @@ def show_computation_graph(
 	num_processes=3
 ):
 	'''
-	Helper function that handles all concerns involved in training
-	A word2vec model using the approach of Mikolov et al.  It surfaces
-	all of the options.
-
-	For customizations going beyond simply tweeking existing options and
-	hyperparameters, substitute this function by writing your own training
-	routine using the provided classes.  This function would be a starting
-	point for you.
+	Builds the same architecture as `relation2vec()`, but does no training,
+	instead, it just prints the theano computation graph of the 
+	architecture.  This is to help with debugging and optimization.
 	'''
 
 	# Make a Relation2VecDatasetReader, pass through parameters sent by 
@@ -196,17 +190,6 @@ def show_computation_graph(
 		load_dictionary_dir=load_dictionary_dir,
 		verbose=verbose
 	)
-
-	## Prepare the minibatch generator
-	## (this produces the counter_sampler stats)
-	#both_dictionaries_supplied = context_dictionary and entity_dictionary
-	#if load_dictionary_dir is None and not both_dictionaries_supplied:
-	#	print 'preparing dictionaries...'
-	#	reader.prepare(save_dir=save_dir)
-
-	## If min_frequency was specified, prune the dictionaries
-	#if min_frequency is not None:
-	#	reader.prune(min_frequency)
 
 	# Make a symbolic minibatcher Note that the full batch includes 
 	# noise_ratio number of noise examples for every signal example, and 

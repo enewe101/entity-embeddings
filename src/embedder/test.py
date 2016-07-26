@@ -10,7 +10,10 @@ from lasagne.updates import nesterov_momentum
 import itertools as itools
 import unittest
 from r2v import relation2vec
-from dataset_reader import Relation2VecDatasetReader, DataSetReaderIllegalStateException
+from dataset_reader import (
+	Relation2VecDatasetReader, DataSetReaderIllegalStateException,
+	FULL_CONTEXT
+)
 from theano_minibatcher import NoiseContrastiveTheanoMinibatcher
 
 #from minibatcher import (
@@ -288,7 +291,7 @@ class TestRelation2VecEmbedder(TestCase):
 		# Make sure that the target directory exists, but delete any model
 		# files left over from a previous test run.
 		save_dir = 'test-data/test-embedder'
-		if not os.path.exists(save_dir):
+		if os.path.exists(save_dir):
 			shutil.rmtree(save_dir)
 
 		embedder = Relation2VecEmbedder(
@@ -630,7 +633,7 @@ class TestRelation2VecEmbedder(TestCase):
 
 		# Seed randomness for a reproducible test.  Using 2 because
 		# 1 was particularly bad by chance
-		np.random.seed(2)
+		np.random.seed(3)
 
 		# Some constants for the test
 		files = ['test-data/test-corpus/c.tsv']
@@ -651,6 +654,7 @@ class TestRelation2VecEmbedder(TestCase):
 			save_dir=save_dir,
 			num_epochs=num_epochs,
 			noise_ratio=noise_ratio,
+			batch_size = batch_size,
 			macrobatch_size = macrobatch_size,
 			num_embedding_dimensions=num_embedding_dimensions,
 			learning_rate=learning_rate,
@@ -705,7 +709,6 @@ class TestRelation2VecEmbedder(TestCase):
 		# will mask the UNK before looking for best-fitting learned context
 		# for each relationship.
 		embedding_product[:,0] = 0
-		print embedding_product
 		best_fitting_context_ids = np.argmax(embedding_product, axis=1)
 		self.assertTrue(np.array_equal(
 			best_fitting_context_ids, expected_best_fitting_context_ids
@@ -782,6 +785,7 @@ class TestNoiseContrastiveTheanoMinibatcher(TestCase):
 			files=files,
 			macrobatch_size = 140,
 			noise_ratio=noise_ratio,
+			signal_sample_mode=FULL_CONTEXT,
 			verbose=False
 		)
 		reader.prepare()
@@ -907,6 +911,7 @@ class TestDatasetReader(TestCase):
 			files=files,
 			macrobatch_size = 350,
 			noise_ratio=noise_ratio,
+			signal_sample_mode=FULL_CONTEXT,
 			verbose=False
 		)
 		reader.prepare()
@@ -984,6 +989,7 @@ class TestDatasetReader(TestCase):
 			files=files,
 			macrobatch_size = 350,
 			noise_ratio=noise_ratio,
+			signal_sample_mode = FULL_CONTEXT,
 			verbose=False
 		)
 		reader.prepare()

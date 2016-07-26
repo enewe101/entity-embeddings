@@ -17,6 +17,8 @@ import os
 from word2vec.token_map import UNK
 
 TAB_SPLITTER = re.compile(r'\t+')
+RANDOM_SINGLE_CHOICE = 0
+FULL_CONTEXT = 1
 
 def word2vec_parse(filename):
 
@@ -110,6 +112,7 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		load_dictionary_dir=None,
 		max_queue_size=0,
 		macrobatch_size=20000,
+		signal_sample_mode=RANDOM_SINGLE_CHOICE,
 		verbose=True,
 
 	):
@@ -117,11 +120,8 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		# TODO: test that no discarding is occurring
 		# TODO: ensure that kernel is not being used to sample signal 
 		# context 
-		# TODO: what is hapening with unigram_dictionary -- we don't want 
-		#	to use it
 		unigram_dictionary=None,
 		kernel=None
-		verbose=True
 		t = 1.0
 
 		super(Relation2VecDatasetReader, self).__init__(
@@ -139,6 +139,7 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		self.entity_noise_ratio = entity_noise_ratio
 		self.max_queue_size = max_queue_size
 		self.macrobatch_size = macrobatch_size
+		self.signal_sample_mode=signal_sample_mode
 
 		# Usually the dictionaries are made from scratch
 		self.entity_dictionary = UnigramDictionary()
@@ -408,23 +409,15 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 				# of entities in this line
 				for e1, e2 in itools.combinations(entity_spans, 2):
 
-					# convert entities into ids
-					e1_id, e2_id = self.entity_dictionary.get_ids([e1, e2])
+					# Generate signal examples
+					signal_examples = self.generate_signal_examples(
+						e1, e2, token_ids, entity_spans)
+					num_examples += len(signal_examples)
 
-					# TODO test this
-					# Get the context tokens minus the entity_spans
-					filtered_context_tokens = self.eliminate_spans(
-						token_ids, entity_spans[e1] + entity_spans[e2]
-					)
-
-					# We can't train if there are no context words
-					if len(filtered_context_tokens) == 0:
-						break
-
-					# Add a signal example.
-					context = np.random.choice(filtered_context_tokens)
-					signal_examples = [[e1_id, e2_id, context]]
-					num_examples += 1
+					# Continue if we couldn't pull out any signal examples.
+					# This can happen if there aren't enough context tokens.
+					if len(signal_examples) == 0:
+						continue
 
 					# Generate the noise examples by replacing an entity
 					# or the context by random entity or context
@@ -439,6 +432,37 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 			print 'num_examples', num_examples
 
 
+	def generate_signal_examples(self, e1, e2, token_ids, entity_spans):
+
+		# convert entities into ids
+		e1_id, e2_id = self.entity_dictionary.get_ids([e1, e2])
+
+		# Get the context tokens minus the entity_spans
+		filtered_context_tokens = self.eliminate_spans(
+			token_ids, entity_spans[e1] + entity_spans[e2]
+		)
+
+		# We can't train if there are no context words
+		if len(filtered_context_tokens) == 0:
+			return []
+
+		# Add a signal example.  We generate a singal example from a 
+		# randomly chosen token:
+		if self.signal_sample_mode == RANDOM_SINGLE_CHOICE:
+			context = np.random.choice(filtered_context_tokens)
+			signal_examples = [[e1_id, e2_id, context]]
+
+		# Or generate many examples by including all context tokens.
+		elif self.signal_sample_mode == FULL_CONTEXT:
+			signal_examples = [
+				[e1_id, e2_id, context] 
+				for context in filtered_context_tokens
+			]
+
+		return signal_examples
+			
+
+
 	def generate_noise_examples(self, signal_examples):
 		'''
 		Generate the noise examples by replacing an entity or the context 
@@ -451,12 +475,8 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 			# Determine how many noise examples of each type to generate
 			num_noise_entities = int(np.round(
 				self.noise_ratio * self.entity_noise_ratio
-				* len(signal_examples)
 			))
-			num_noise_contexts = int(np.round(
-				self.noise_ratio * (1 - self.entity_noise_ratio)
-				* len(signal_examples)
-			))
+			num_noise_contexts = self.noise_ratio - num_noise_entities
 
 			# Sample random entities and context tokens
 			noise_contexts = self.context_dictionary.sample(

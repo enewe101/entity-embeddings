@@ -13,6 +13,7 @@ import os
 from word2vec.token_map import UNK
 from theano import shared, function, tensor as T
 
+
 class NoiseContrastiveTheanoMinibatcher(TheanoMinibatcher):
 
 	def __init__(
@@ -72,11 +73,14 @@ class NoiseContrastiveTheanoMinibatcher(TheanoMinibatcher):
 		self.reset()
 
 		# Determine the total number of minibatches
-		self.num_batches = int(np.ceil(len(signal_examples) / float(self.batch_size)))
+		self.num_batches = int(np.ceil(
+			len(signal_examples) / float(self.batch_size)
+		))
 
 		# Check if the dataset divides evenly into batches
 		warn_last_batch = False
 		expected_len_signal = self.num_batches * self.batch_size
+
 		if expected_len_signal > len(signal_examples):
 			warn_last_batch = True
 
