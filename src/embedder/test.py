@@ -872,7 +872,8 @@ class TestDatasetReader(TestCase):
 
 	def test_raises_not_implemented(self):
 		'''
-		Ensure that the reader raises an error if `get_vocab_size()` is called.'
+		Ensure that the reader raises an error if `get_vocab_size()` is 
+		called.'
 		'''
 
 		# Some constants for the test
@@ -889,9 +890,253 @@ class TestDatasetReader(TestCase):
 		)
 		reader.prepare()
 
-		# Ensure that the reader raises an error if `get_vocab_size() is called`
+		# Ensure that the reader raises an error if `get_vocab_size() is 
+		# called`
 		with self.assertRaises(NotImplementedError):
 			reader.get_vocab_size()
+
+
+	def test_generate_entity_noise_from_corpus(self):
+		'''
+		Test that the noise generated from signal examples introduces
+		random entities, in addition to random context tokens, when 
+		the DatasetReader is configured to do so by constructor arg
+		'''
+		np.random.seed(1)
+		tolerance = 0.1
+		noise_ratio = 20
+		entity_noise_ratio = 0.5
+		files = ['test-data/test-corpus/c.tsv']
+		reader = Relation2VecDatasetReader(
+			files=files,
+			noise_ratio=noise_ratio,
+			entity_noise_ratio=entity_noise_ratio,
+			verbose=False
+		)
+
+
+		# We need the reader to have dictionaries before we can generate
+		# noise.
+		reader.prepare()
+
+		# Get the size of the vocabularies.  We are testing for the fact
+		# that noise examples have random selections of entities and
+		# contexts, and this lets us know how prevalent any given choice
+		# should be
+		entity_vocab_size = reader.entity_vocab_size()
+		context_vocab_size = reader.context_vocab_size()
+
+		num_contexts_differ = 0
+		num_e1_differ = 0
+		num_e2_differ = 0
+		num_signal_examples = 0
+		for macrobatch in reader.generate_dataset_serial():
+			signal_macrobatch, noise_macrobatch = macrobatch
+			chunked_by_signal_example = [
+				noise_macrobatch[i:i+noise_ratio] 
+				for i in range(0, len(noise_macrobatch), noise_ratio)
+			]
+
+			# Go through all the generated noise examples.  See how much 
+			# they # differ from signal examples from which they were 
+			# generated. Noise examples should only differ in one of either
+			# entity1, entity2, or context (verify that this is the case). 
+			# Keep track of how often each of these has been substituted by
+			# a random choice, and check that it is close to the expected 
+			# num.
+			for i in range(len(signal_macrobatch)):
+
+				signal_example = signal_macrobatch[i]
+				noise_examples = chunked_by_signal_example[i]
+
+				# Skip examples added to bad macrobatch
+				if np.array_equal(signal_example, [UNK,UNK,UNK]):
+					continue
+
+				num_signal_examples += 1
+
+				for noise_example in noise_examples:
+
+					# Check if entity 1 was changed
+					e1_diff = False
+					if noise_example[0] != signal_example[0]:
+						e1_diff = True
+						num_e1_differ += 1
+
+					# Check if entity 2 was changed
+					e2_diff = False
+					if noise_example[1] != signal_example[1]:
+						e2_diff = True
+						num_e2_differ += 1
+
+					# Check if the context token was changed
+					context_diff = False
+					if noise_example[2] != signal_example[2]:
+						context_diff = True
+						num_contexts_differ += 1
+
+					# Verify that only one of the entities or context is 
+					# different from the signal example
+					num_different = sum([e1_diff, e2_diff, context_diff])
+					self.assertTrue(num_different < 2)
+
+		# The number of contexts that should differ is almost equal to the
+		# number of contexts that get randomly selected
+		expected_num_contexts_differ = (
+			num_signal_examples * noise_ratio * (1-entity_noise_ratio) 
+		)
+		# but is slightly smaller because the original context gets chosen
+		# by chance sometimes
+		expected_num_contexts_differ = (
+			expected_num_contexts_differ 
+			* (1 - 1 / float(context_vocab_size))
+		)
+
+		# Similarly for expected num of entities that differ, but 
+		# the number of times entities differ is divided between the 
+		# two possible choices for entity
+		expected_num_entities_differ = (
+			num_signal_examples * noise_ratio * entity_noise_ratio
+			* (1 - 1 / float(context_vocab_size)) * 0.5
+		)
+
+		# Verify that close to the expected number of contexts got 
+		# replaced by random contexts
+		contexts_diff = abs(
+			num_contexts_differ - expected_num_contexts_differ
+		) / expected_num_contexts_differ
+		self.assertTrue(contexts_diff < tolerance)
+
+		# Verify that close to the expected number of first-entities got
+		# replaced by random contexts
+		entities_1_diff = abs(
+			num_e1_differ - expected_num_entities_differ
+		) / expected_num_entities_differ
+		self.assertTrue(entities_1_diff < tolerance)
+
+		# Verify that close to the expected number of first-entities got
+		# replaced by random contexts
+		entities_2_diff = abs(
+			num_e2_differ - expected_num_entities_differ
+		) / expected_num_entities_differ
+		self.assertTrue(entities_2_diff < tolerance)
+
+
+	def test_generate_entity_noise(self):
+		'''
+		Test that the noise generated from signal examples introduces
+		random entities, in addition to random context tokens, when 
+		the DatasetReader is configured to do so by constructor arg
+		'''
+		np.random.seed(1)
+		tolerance = 0.1
+		noise_ratio = 2000
+		entity_noise_ratio = 0.5
+		files = ['test-data/test-corpus/c.tsv']
+		signal_examples = [[1,1,1],[2,2,2],[3,3,3],[4,4,4],[5,5,5]]
+		reader = Relation2VecDatasetReader(
+			files=files,
+			noise_ratio=noise_ratio,
+			entity_noise_ratio=entity_noise_ratio,
+			verbose=False
+		)
+
+		# We need the reader to have dictionaries before we can generate
+		# noise.
+		reader.prepare()
+
+		# Get the size of the vocabularies.  We are testing for the fact
+		# that noise examples have random selections of entities and
+		# contexts, and this lets us know how prevalent any given choice
+		# should be
+		entity_vocab_size = reader.entity_vocab_size()
+		context_vocab_size = reader.context_vocab_size()
+
+		# Generate noise examples.  Chunk them according to the signal
+		# example that they were generated from
+		noise_examples = reader.generate_noise_examples(signal_examples)
+		chunked_by_signal_example = [
+			noise_examples[i:i+noise_ratio] 
+			for i in range(0,len(noise_examples),noise_ratio)
+		]
+
+		# The number of contexts that should differ is almost equal to the
+		# number of contexts that get randomly selected
+		expected_num_contexts_differ = (
+			len(signal_examples) * noise_ratio * (1-entity_noise_ratio) 
+		)
+		# but is slightly smaller because the original context gets chosen
+		# by chance sometimes
+		expected_num_contexts_differ = (
+			expected_num_contexts_differ 
+			* (1 - 1 / float(context_vocab_size))
+		)
+
+		# Similarly for expected num of entities that differ, but 
+		# the number of times entities differ is divided between the 
+		# two possible choices for entity
+		expected_num_entities_differ = (
+			len(signal_examples) * noise_ratio * entity_noise_ratio
+			* (1 - 1 / float(context_vocab_size)) * 0.5
+		)
+
+		# Go through all the generated noise examples.  See how much they
+		# differ from signal examples from which they were generated.
+		# Noise examples should only differ in one of either entity1, 
+		# entity2, or context (verify that this is the case).  Keep
+		# track of how often each of these has been substituted by
+		# a random choice, and check that it is close to the expected num.
+		num_contexts_differ = 0
+		num_e1_differ = 0
+		num_e2_differ = 0
+		for i in range(len(signal_examples)):
+			signal_example = signal_examples[i]
+			noise_examples = chunked_by_signal_example[i]
+			for noise_example in noise_examples:
+
+				# Check if entity 1 was changed
+				e1_diff = False
+				if noise_example[0] != signal_example[0]:
+					e1_diff = True
+					num_e1_differ += 1
+
+				# Check if entity 2 was changed
+				e2_diff = False
+				if noise_example[1] != signal_example[1]:
+					e2_diff = True
+					num_e2_differ += 1
+
+				# Check if the context token was changed
+				context_diff = False
+				if noise_example[2] != signal_example[2]:
+					context_diff = True
+					num_contexts_differ += 1
+
+				# Verify that only one of the entities or context is 
+				# different from the signal example
+				num_different = sum([e1_diff, e2_diff, context_diff])
+				self.assertTrue(num_different < 2)
+
+		# Verify that close to the expected number of contexts got 
+		# replaced by random contexts
+		contexts_diff = abs(
+			num_contexts_differ - expected_num_contexts_differ
+		) / expected_num_contexts_differ
+		self.assertTrue(contexts_diff < tolerance)
+
+		# Verify that close to the expected number of first-entities got
+		# replaced by random contexts
+		entities_1_diff = abs(
+			num_e1_differ - expected_num_entities_differ
+		) / expected_num_entities_differ
+		self.assertTrue(entities_1_diff < tolerance)
+
+		# Verify that close to the expected number of first-entities got
+		# replaced by random contexts
+		entities_2_diff = abs(
+			num_e2_differ - expected_num_entities_differ
+		) / expected_num_entities_differ
+		self.assertTrue(entities_2_diff < tolerance)
 
 
 	def test_generate_dataset_serial(self):

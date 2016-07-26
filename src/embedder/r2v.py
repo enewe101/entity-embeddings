@@ -20,6 +20,7 @@ def relation2vec(
 	load_dictionary_dir=None,
 	min_frequency=10,
 	noise_ratio=15,
+	entity_noise_ratio=0.0,
 	batch_size = 1000,  # Number of *signal* examples per batch
 	macrobatch_size = 100000,
 	max_queue_size=0,
@@ -52,6 +53,7 @@ def relation2vec(
 		macrobatch_size = macrobatch_size,
 		max_queue_size = max_queue_size,
 		noise_ratio=noise_ratio,
+		entity_noise_ratio=entity_noise_ratio,
 		num_processes=num_processes,
 		entity_dictionary=entity_dictionary,
 		context_dictionary=context_dictionary,

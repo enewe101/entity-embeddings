@@ -105,7 +105,7 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		directories=[],
 		skip=[],
 		noise_ratio=15,
-		entity_noise_ratio=0.5,
+		entity_noise_ratio=0.0,
 		num_processes=3,
 		entity_dictionary=None,
 		context_dictionary=None,
@@ -493,7 +493,7 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 			# Generate noise examples by inserting random entity.
 			# Randomly choose which entity in the pair to replace
 			for noise_entity in noise_entities:
-				if np.random.uniform < 0.5:
+				if np.random.uniform() < 0.5:
 					noise_examples.append([
 						noise_entity, e2_id, context_id])
 				else:
