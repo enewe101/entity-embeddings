@@ -1,11 +1,12 @@
 import os
 import numpy as np
 from relation2vec_embedder import Relation2VecEmbedder
-from minibatcher import Relation2VecMinibatcher
+from dataset_reader import Relation2VecDatasetReader as DatasetReader
 from SETTINGS import DATA_DIR, CORPUS_DIR
-SAVEDIR = os.path.join(DATA_DIR, 'relation2vec')
-MIN_FREQUENCY = 20
+
 RELATION_FILES = ['senators-states.txt', 'countries-capitals.txt']
+LOAD_DICTIONARY_DIR = os.path.join(DATA_DIR, 'dictionaries')
+MIN_FREQUENCY = 20
 
 
 def get_types():
@@ -30,17 +31,36 @@ def get_types():
 	]
 
 
-def test_type_pairings(named_types, minibatcher, embedder):
 
+def test_type_pairings(named_types, reader, embedder):
+	'''
+	Compares the entity embeddings of different entity types.  For example
+	compares the embeddings of senators to embeddings of states.  Also
+	compares embeddings among the same entity types (so compares embeddings
+	of senators to senators).
+	
+	Embeddings of the same type should be more similar if the entity
+	embeddings are encoding information that characterizes the entity types
+	'''
+
+	# Get the entity embeddings out of the embedder
 	embeddings = embedder.get_param_values()[0]
 
+	# Iterate over entity types
 	for i in range(len(named_types)):
+
+		# Iterate over entity types
 		for j in range(i, len(named_types)):
+
+			# unpack the type name and list of examples for each type.
+			# Examples are listed as plain tokens
 			types1, examples1 = named_types[i]
 			types2, examples2 = named_types[j]
 
-			example_ids1 = minibatcher.entity_dictionary.get_ids(examples1)
-			example_ids2 = minibatcher.entity_dictionary.get_ids(examples2)
+			# Convert examples to ids, which serve as indices into the 
+			# embeddings parameters
+			example_ids1 = reader.entity_dictionary.get_ids(examples1)
+			example_ids2 = reader.entity_dictionary.get_ids(examples2)
 
 			example_emb1 = [embeddings[e] for e in example_ids1]
 			example_emb2 = [embeddings[e] for e in example_ids2]
@@ -81,24 +101,27 @@ def cosine(embedding1, embedding2):
 	return cos
 
 
-def load():
+def load(load_dictionary_dir, min_frequency, embeddings_dir):
+
 	# load the minibatch generator.  Prune very rare tokens.
 	print 'Loading and pruning dictionaries'
-	minibatcher = Relation2VecMinibatcher()
-	minibatcher.load(SAVEDIR)
-	minibatcher.prune(min_frequency=MIN_FREQUENCY)
+	reader = DatasetReader(
+		load_dictionary_dir=load_dictionary_dir
+	)
+
+	if min_frequency is not None:
+		reader.prune(min_frequency)
 
 	# Make an embedder with the correct sizes
 	print 'Making the embedder'
 	embedder = Relation2VecEmbedder(
-		entity_vocab_size=len(minibatcher.entity_dictionary),
-		context_vocab_size=len(minibatcher.context_dictionary),
+		entity_vocab_size=reader.get_entity_vocab(),
+		context_vocab_size=reader.get_contexgt_vocab(),
 	)
 	print 'Loading previously trained embeddings'
-	embeddings_filename = os.path.join(SAVEDIR, 'embeddings.npz')
-	embedder.load(embeddings_filename)
+	embedder.load(embeddings_dir)
 
-	return embedder, minibatcher
+	return embedder, reader
 
 
 def read_entities(minibatcher):
@@ -147,4 +170,61 @@ def compare_embeddings(embedder, entities, lengths):
 
 	return cosines
 
+
+def run_tests(props):
+
+	# Unpack arguments
+	load_dictionary_dir = props['load_dictionary_dir']
+	min_frequency = props['min_frequency']
+	embeddings_dir = props['embeddings_dir']
+
+	# Load the embedder and dataset reader
+	embedder, reader = load(
+		load_dictionary_dir, min_frequency, embeddings_dir
+	)
+
+	# Get a set of test entities from a curated set
+	entity_types = get_types()
+
+	# Look for regularity in the entity embeddings
+	test_type_pairings(entity_types, reader, embedder)
+
+
+def commandline2dict():
+	properties = {}
+	for arg in sys.argv[1:]:
+		key, val = arg.split('=')
+
+		# Interpret numeric, list, and dictionary values properly, as
+		# well as strings enquoted in properly escaped quotes
+		try:
+			properties[key] = json.loads(val)
+
+		# It's cumbersome to always have to escape quotes around strings.
+		# This caught exception interprets unenquoted tokens as strings
+		except ValueError:
+			properties[key] = val
+
+	return properties
+
+
+if __name__ == '__main__':
+
+	# Merge default properties with properties specified on command line
+	properties = {
+		'load_dictionary_dir': LOAD_DICTIONARY_DIR,
+		'min_frequency': MIN_FREQUENCY
+	}
+	command_line_properties = commandline2dict()
+	properties.update(command_line_properties)
+
+	# Verify that the embeddings dir is set
+	if 'embeddings_dir' not in command_line_properties:
+		raise ValueError(
+			'You must specify a directory containing the embeddings to be '
+			'analyzed'
+		)
+
+	# Run the tests on the embeddings
+	run_tests(properties)
 
