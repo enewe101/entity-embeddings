@@ -287,10 +287,9 @@ class TestRelation2VecEmbedder(TestCase):
 
 		# Make sure that the target directory exists, but delete any model
 		# files left over from a previous test run.
-		if not os.path.exists('test-data/test-embedder'):
-			os.makedirs('test-data/test-embedder')
-		if os.path.exists('test-data/test-embedder/embeddings.npz'):
-			os.remove('test-data/test-embedder/embeddings.npz')
+		save_dir = 'test-data/test-embedder'
+		if not os.path.exists(save_dir):
+			shutil.rmtree(save_dir)
 
 		embedder = Relation2VecEmbedder(
 			entity_vocab_size=10,
@@ -298,21 +297,21 @@ class TestRelation2VecEmbedder(TestCase):
 			num_embedding_dimensions=5
 		)
 		expected_params = embedder.get_param_values()
-		embedder.save('test-data/test-embedder/embeddings.npz')
+		embedder.save(save_dir)
 
 		new_embedder = Relation2VecEmbedder(
 			entity_vocab_size=10,
 			context_vocab_size=50,
 			num_embedding_dimensions=5
 		)
-		new_embedder.load('test-data/test-embedder/embeddings.npz')
+		new_embedder.load(save_dir)
 		found_params = new_embedder.get_param_values()
 
 		for found, expected in zip(found_params, expected_params):
 			self.assertTrue(np.array_equal(found, expected))
 
-		if os.path.exists('test-data/test-embedder/embeddings.npz'):
-			os.remove('test-data/test-embedder/embeddings.npz')
+		if os.path.exists(save_dir):
+			shutil.rmtree(save_dir)
 
 
 	def prepare_toy_dataset(self, noise_ratio):
@@ -483,7 +482,6 @@ class TestRelation2VecEmbedder(TestCase):
 		# Make a minibatcher to yield training batches from test corpus
 		reader = Relation2VecDatasetReader(
 			files=files,
-			batch_size=batch_size,
 			macrobatch_size=macrobatch_size,
 			noise_ratio=noise_ratio,
 			verbose=False
@@ -653,7 +651,6 @@ class TestRelation2VecEmbedder(TestCase):
 			save_dir=save_dir,
 			num_epochs=num_epochs,
 			noise_ratio=noise_ratio,
-			batch_size = batch_size,
 			macrobatch_size = macrobatch_size,
 			num_embedding_dimensions=num_embedding_dimensions,
 			learning_rate=learning_rate,
@@ -783,7 +780,6 @@ class TestNoiseContrastiveTheanoMinibatcher(TestCase):
 		noise_ratio = 9
 		reader = Relation2VecDatasetReader(
 			files=files,
-			batch_size = batch_size,
 			macrobatch_size = 140,
 			noise_ratio=noise_ratio,
 			verbose=False
@@ -883,7 +879,7 @@ class TestDatasetReader(TestCase):
 		# Make a minibatcher to yield training batches from test corpus
 		reader = Relation2VecDatasetReader(
 			files=files,
-			batch_size=batch_size,
+			macrobatch_size=batch_size,
 			noise_ratio=noise_ratio,
 			verbose=False
 		)
@@ -909,7 +905,6 @@ class TestDatasetReader(TestCase):
 		noise_ratio = 9
 		reader = Relation2VecDatasetReader(
 			files=files,
-			batch_size = batch_size,
 			macrobatch_size = 350,
 			noise_ratio=noise_ratio,
 			verbose=False
@@ -987,7 +982,6 @@ class TestDatasetReader(TestCase):
 		noise_ratio = 9
 		reader = Relation2VecDatasetReader(
 			files=files,
-			batch_size = batch_size,
 			macrobatch_size = 350,
 			noise_ratio=noise_ratio,
 			verbose=False
@@ -1059,7 +1053,7 @@ class TestDatasetReader(TestCase):
 		noise_ratio = 9
 		reader = Relation2VecDatasetReader(
 			files=files,
-			batch_size = batch_size,
+			macrobatch_size = batch_size,
 			noise_ratio=noise_ratio,
 			verbose=False
 		)
@@ -1146,7 +1140,7 @@ class TestDatasetReader(TestCase):
 		noise_ratio = 15
 		reader = Relation2VecDatasetReader(
 			files=files,
-			batch_size = batch_size,
+			macrobatch_size = batch_size,
 			noise_ratio=noise_ratio,
 			verbose=False
 		)
@@ -1155,7 +1149,7 @@ class TestDatasetReader(TestCase):
 
 		new_reader = Relation2VecDatasetReader(
 			files=files,
-			batch_size = batch_size,
+			macrobatch_size = batch_size,
 			noise_ratio=noise_ratio,
 			verbose=False
 		)
@@ -1188,7 +1182,7 @@ class TestDatasetReader(TestCase):
 		reader.save_dictionary('test-data/test-minibatch-generator')
 		new_reader = Relation2VecDatasetReader(
 			files=files,
-			batch_size=batch_size,
+			macrobatch_size=batch_size,
 			noise_ratio=noise_ratio,
 			verbose=False
 		)
@@ -1232,7 +1226,7 @@ class TestDatasetReader(TestCase):
 		noise_ratio = 15
 		reader = Relation2VecDatasetReader(
 			files=files,
-			batch_size = batch_size,
+			macrobatch_size = batch_size,
 			noise_ratio=noise_ratio,
 			verbose=False
 		)
@@ -1241,7 +1235,7 @@ class TestDatasetReader(TestCase):
 
 		new_reader = Relation2VecDatasetReader(
 			files=files,
-			batch_size = batch_size,
+			macrobatch_size = batch_size,
 			noise_ratio=noise_ratio,
 			verbose=False
 		)
@@ -1261,7 +1255,7 @@ class TestDatasetReader(TestCase):
 		# Make a fresh reader in which we will load the data just saved.
 		new_reader = Relation2VecDatasetReader(
 			files=files,
-			batch_size=batch_size,
+			macrobatch_size=batch_size,
 			noise_ratio=noise_ratio,
 			verbose=False
 		)
@@ -1289,7 +1283,7 @@ class TestDatasetReader(TestCase):
 		noise_ratio = 15
 		reader = Relation2VecDatasetReader(
 			files=files,
-			batch_size = batch_size,
+			macrobatch_size = batch_size,
 			noise_ratio=noise_ratio,
 			verbose=False
 		)
@@ -1298,7 +1292,7 @@ class TestDatasetReader(TestCase):
 
 		new_reader = Relation2VecDatasetReader(
 			files=files,
-			batch_size = batch_size,
+			macrobatch_size = batch_size,
 			noise_ratio=noise_ratio,
 			verbose=False
 		)
@@ -1318,7 +1312,7 @@ class TestDatasetReader(TestCase):
 		# Make a fresh reader in which we will load the data just saved.
 		new_reader = Relation2VecDatasetReader(
 			files=files,
-			batch_size=batch_size,
+			macrobatch_size=batch_size,
 			noise_ratio=noise_ratio,
 			verbose=False
 		)
