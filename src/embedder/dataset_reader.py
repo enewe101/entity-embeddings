@@ -103,6 +103,7 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		directories=[],
 		skip=[],
 		noise_ratio=15,
+		entity_noise_ratio=0.5,
 		num_processes=3,
 		entity_dictionary=None,
 		context_dictionary=None,
@@ -135,6 +136,7 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 			verbose=verbose
 		)
 
+		self.entity_noise_ratio = entity_noise_ratio
 		self.max_queue_size = max_queue_size
 		self.macrobatch_size = macrobatch_size
 
@@ -170,8 +172,9 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 
 	def get_vocab_size(self):
 		raise NotImplementedError(
-			'Relation2VecDatasetReader: does not support `get_vocab_size()`. '
-			'use `entity_vocab_size()` or `context_vocab_size()`.'
+			'Relation2VecDatasetReader: does not support '
+			'`get_vocab_size()`. use `entity_vocab_size()` or '
+			'`context_vocab_size()`.'
 		)
 
 	def parse(self, filename):
@@ -423,19 +426,61 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 					signal_examples = [[e1_id, e2_id, context]]
 					num_examples += 1
 
-					# Sample tokens from the noise
-					noise_context_ids = self.context_dictionary.sample(
-						(self.noise_ratio * len(signal_examples),))
-					noise_examples = [
-						[e1_id, e2_id, noise_context_id]
-						for noise_context_id in noise_context_ids
-					]
+					# Generate the noise examples by replacing an entity
+					# or the context by random entity or context
+					noise_examples = self.generate_noise_examples(
+						signal_examples)
+
 					num_examples += len(noise_examples)
 
 					yield (signal_examples, noise_examples)
 
 		if self.verbose:
 			print 'num_examples', num_examples
+
+
+	def generate_noise_examples(self, signal_examples):
+		'''
+		Generate the noise examples by replacing an entity or the context 
+		by random entity or context.
+		'''
+
+		noise_examples = []
+		for e1_id, e2_id, context_id in signal_examples:
+
+			# Determine how many noise examples of each type to generate
+			num_noise_entities = int(np.round(
+				self.noise_ratio * self.entity_noise_ratio
+				* len(signal_examples)
+			))
+			num_noise_contexts = int(np.round(
+				self.noise_ratio * (1 - self.entity_noise_ratio)
+				* len(signal_examples)
+			))
+
+			# Sample random entities and context tokens
+			noise_contexts = self.context_dictionary.sample(
+				(num_noise_contexts,))
+			noise_entities = self.entity_dictionary.sample(
+				(num_noise_entities,))
+
+			# Generate noise examples by inserting random context
+			noise_examples.extend([
+				[e1_id, e2_id, noise_context_id]
+				for noise_context_id in noise_contexts
+			])
+
+			# Generate noise examples by inserting random entity.
+			# Randomly choose which entity in the pair to replace
+			for noise_entity in noise_entities:
+				if np.random.uniform < 0.5:
+					noise_examples.append([
+						noise_entity, e2_id, context_id])
+				else:
+					noise_examples.append([
+						e1_id, noise_entity, context_id])
+
+		return noise_examples
 
 
 	def generate_dataset_serial(self, save_dir=None):
