@@ -1,0 +1,200 @@
+Elemwise{Composite{(Cast{float64}(i0) / i1)}} [@A] ''   69
+ |HostFromGpu [@B] ''   67
+ | |GpuElemwise{Composite{(-(i0 + i1))}}[(0, 0)] [@C] ''   65
+ |   |GpuCAReduce{add}{1} [@D] ''   60
+ |   | |GpuElemwise{log,no_inplace} [@E] ''   57
+ |   |   |GpuSubtensor{int64:int64:} [@F] ''   54
+ |   |     |GpuElemwise{scalar_sigmoid,no_inplace} [@G] ''   51
+ |   |     | |GpuCAReduce{add}{0,1} [@H] ''   50
+ |   |     |   |GpuElemwise{Composite{((i0 * i1) * i2)},no_inplace} [@I] ''   49
+ |   |     |     |CudaNdarrayConstant{[[ 0.5]]} [@J]
+ |   |     |     |GpuElemwise{Composite{(i0 + Abs(i0))},no_inplace} [@K] ''   48
+ |   |     |     | |GpuElemwise{Add}[(0, 0)] [@L] ''   47
+ |   |     |     |   |GpuDot22 [@M] ''   45
+ |   |     |     |   | |GpuJoin [@N] ''   44
+ |   |     |     |   | | |TensorConstant{1} [@O]
+ |   |     |     |   | | |GpuAdvancedSubtensor1 [@P] ''   41
+ |   |     |     |   | | | |W [@Q]
+ |   |     |     |   | | | |Elemwise{Cast{int64}} [@R] ''   35
+ |   |     |     |   | | |   |Subtensor{::, int64} [@S] ''   31
+ |   |     |     |   | | |     |Join [@T] ''   27
+ |   |     |     |   | | |     | |TensorConstant{0} [@U]
+ |   |     |     |   | | |     | |Subtensor{int32:int32:} [@V] ''   23
+ |   |     |     |   | | |     | | |<TensorType(int32, matrix)> [@W]
+ |   |     |     |   | | |     | | |ScalarFromTensor [@X] ''   13
+ |   |     |     |   | | |     | | | |Elemwise{mul,no_inplace} [@Y] ''   1
+ |   |     |     |   | | |     | | |   |TensorConstant{1000} [@Z]
+ |   |     |     |   | | |     | | |   |<TensorType(int32, scalar)> [@BA]
+ |   |     |     |   | | |     | | |ScalarFromTensor [@BB] ''   20
+ |   |     |     |   | | |     | |   |Elemwise{add,no_inplace} [@BC] ''   12
+ |   |     |     |   | | |     | |     |TensorConstant{1000} [@Z]
+ |   |     |     |   | | |     | |     |Elemwise{mul,no_inplace} [@Y] ''   1
+ |   |     |     |   | | |     | |Subtensor{int32:int32:} [@BD] ''   24
+ |   |     |     |   | | |     |   |<TensorType(int32, matrix)> [@BE]
+ |   |     |     |   | | |     |   |ScalarFromTensor [@BF] ''   19
+ |   |     |     |   | | |     |   | |Elemwise{Mul}[(0, 1)] [@BG] ''   11
+ |   |     |     |   | | |     |   |   |TensorConstant{15000} [@BH]
+ |   |     |     |   | | |     |   |   |<TensorType(int32, scalar)> [@BA]
+ |   |     |     |   | | |     |   |ScalarFromTensor [@BI] ''   21
+ |   |     |     |   | | |     |     |Elemwise{add,no_inplace} [@BJ] ''   18
+ |   |     |     |   | | |     |       |TensorConstant{15000} [@BH]
+ |   |     |     |   | | |     |       |Elemwise{Mul}[(0, 1)] [@BG] ''   11
+ |   |     |     |   | | |     |Constant{0} [@BK]
+ |   |     |     |   | | |GpuAdvancedSubtensor1 [@BL] ''   39
+ |   |     |     |   | |   |W [@Q]
+ |   |     |     |   | |   |Elemwise{Cast{int64}} [@BM] ''   34
+ |   |     |     |   | |     |Subtensor{::, int64} [@BN] ''   30
+ |   |     |     |   | |       |Join [@T] ''   27
+ |   |     |     |   | |       |Constant{1} [@BO]
+ |   |     |     |   | |W [@BP]
+ |   |     |     |   |GpuDimShuffle{x,0} [@BQ] ''   6
+ |   |     |     |     |b [@BR]
+ |   |     |     |GpuAdvancedSubtensor1 [@BS] ''   37
+ |   |     |       |W [@BT]
+ |   |     |       |Elemwise{Cast{int64}} [@BU] ''   33
+ |   |     |         |Subtensor{::, int64} [@BV] ''   29
+ |   |     |           |Join [@T] ''   27
+ |   |     |           |Constant{2} [@BW]
+ |   |     |Constant{0} [@BK]
+ |   |     |Constant{1000} [@BX]
+ |   |GpuCAReduce{add}{1} [@BY] ''   63
+ |     |GpuElemwise{log,no_inplace} [@BZ] ''   59
+ |       |GpuElemwise{sub,no_inplace} [@CA] ''   56
+ |         |CudaNdarrayConstant{[ 1.]} [@CB]
+ |         |GpuSubtensor{int64::} [@CC] ''   53
+ |           |GpuElemwise{scalar_sigmoid,no_inplace} [@G] ''   51
+ |           |Constant{1000} [@BX]
+ |Elemwise{Composite{Switch(LT(i0, i1), i0, i1)}}[(0, 1)] [@CD] ''   26
+   |TensorConstant{1000} [@CE]
+   |Elemwise{Composite{((Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(GE(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), i2, i0)}(Composite{Switch(LT(i0, i1), (i2 + i3 + i4), i0)}(i0, i1, i2, i3, i4), i1, i5), i4), i1) - Switch(LT(Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(GE(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), (i0 + i2), i0)}(i3, i1, i4), i1), i4), i1), Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(GE(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), i2, i0)}(Composite{Switch(LT(i0, i1), (i2 + i3 + i4), i0)}(i0, i1, i2, i3, i4), i1, i5), i4), i1)), Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(GE(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), (i0 + i2), i0)}(i3, i1, i4), i1), i4), i1), Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(GE(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), i2, i0)}(Composite{Switch(LT(i0, i1), (i2 + i3 + i4), i0)}(i0, i1, i2, i3, i4), i1, i5), i4), i1))) + (Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(GE(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), i2, i0)}(Composite{Switch(LT(i0, i1), (i2 + i3 + i4), i0)}(i6, i1, i7, i8, i9), i1, i5), i9), i1) - Switch(LT(Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(GE(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), (i0 + i2), i0)}(i8, i1, i9), i1), i9), i1), Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(GE(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), i2, i0)}(Composite{Switch(LT(i0, i1), (i2 + i3 + i4), i0)}(i6, i1, i7, i8, i9), i1, i5), i9), i1)), Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(GE(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), (i0 + i2), i0)}(i8, i1, i9), i1), i9), i1), Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(GE(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), i2, i0)}(Composite{Switch(LT(i0, i1), (i2 + i3 + i4), i0)}(i6, i1, i7, i8, i9), i1, i5), i9), i1))))}}[(0, 4)] [@CF] ''   22
+     |Elemwise{add,no_inplace} [@BC] ''   12
+     |TensorConstant{0} [@U]
+     |TensorConstant{1000} [@CE]
+     |Elemwise{mul,no_inplace} [@Y] ''   1
+     |Shape_i{0} [@CG] ''   3
+     | |<TensorType(int32, matrix)> [@W]
+     |TensorConstant{-1} [@CH]
+     |Elemwise{add,no_inplace} [@BJ] ''   18
+     |TensorConstant{15000} [@CI]
+     |Elemwise{Mul}[(0, 1)] [@BG] ''   11
+     |Shape_i{0} [@CJ] ''   2
+       |<TensorType(int32, matrix)> [@BE]
+GpuElemwise{Composite{((i0 * i1) + (i2 - i3))}}[(0, 2)] [@CK] ''   91
+ |CudaNdarrayConstant{[[ 0.89999998]]} [@CL]
+ |GpuElemwise{Composite{((i0 * i1) - i2)}}[(0, 1)] [@CM] ''   90
+ | |CudaNdarrayConstant{[[ 0.89999998]]} [@CL]
+ | |<CudaNdarrayType(float32, matrix)> [@CN]
+ | |GpuElemwise{Mul}[(0, 1)] [@CO] ''   89
+ |   |CudaNdarrayConstant{[[ 0.1]]} [@CP]
+ |   |GpuAdvancedIncSubtensor1_dev20{inplace,inc} [@CQ] ''   88
+ |     |GpuAdvancedIncSubtensor1_dev20{inplace,inc} [@CR] ''   86
+ |     | |GpuAlloc{memset_0=True} [@CS] ''   17
+ |     | | |CudaNdarrayConstant{[[ 0.]]} [@CT]
+ |     | | |Shape_i{0} [@CU] ''   10
+ |     | | | |W [@Q]
+ |     | | |Shape_i{1} [@CV] ''   9
+ |     | |   |W [@Q]
+ |     | |GpuSplit{2}.0 [@CW] ''   82
+ |     | | |GpuDot22 [@CX] ''   78
+ |     | | | |GpuElemwise{Composite{((i0 * i1 * i2) + (i0 * i1 * i2 * sgn(i3)))}}[(0, 2)] [@CY] ''   74
+ |     | | | | |CudaNdarrayConstant{[[ 0.5]]} [@J]
+ |     | | | | |GpuElemwise{Composite{((i0 * i1) / i2)}}[(0, 0)] [@CZ] ''   72
+ |     | | | | | |GpuDimShuffle{0,x} [@DA] ''   70
+ |     | | | | | | |GpuIncSubtensor{InplaceInc;int64::} [@DB] ''   68
+ |     | | | | | |   |GpuIncSubtensor{InplaceInc;int64:int64:} [@DC] ''   66
+ |     | | | | | |   | |GpuAlloc{memset_0=True} [@DD] ''   25
+ |     | | | | | |   | | |CudaNdarrayConstant{[ 0.]} [@DE]
+ |     | | | | | |   | | |Elemwise{Composite{((Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(GE(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), i2, i0)}(Composite{Switch(LT(i0, i1), (i2 + i3 + i4), i0)}(i0, i1, i2, i3, i4), i1, i5), i4), i1) - Switch(LT(Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(GE(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), (i0 + i2), i0)}(i3, i1, i4), i1), i4), i1), Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(GE(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), i2, i0)}(Composite{Switch(LT(i0, i1), (i2 + i3 + i4), i0)}(i0, i1, i2, i3, i4), i1, i5), i4), i1)), Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(GE(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), (i0 + i2), i0)}(i3, i1, i4), i1), i4), i1), Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(GE(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), i2, i0)}(Composite{Switch(LT(i0, i1), (i2 + i3 + i4), i0)}(i0, i1, i2, i3, i4), i1, i5), i4), i1))) + (Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(GE(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), i2, i0)}(Composite{Switch(LT(i0, i1), (i2 + i3 + i4), i0)}(i6, i1, i7, i8, i9), i1, i5), i9), i1) - Switch(LT(Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(GE(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), (i0 + i2), i0)}(i8, i1, i9), i1), i9), i1), Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(GE(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), i2, i0)}(Composite{Switch(LT(i0, i1), (i2 + i3 + i4), i0)}(i6, i1, i7, i8, i9), i1, i5), i9), i1)), Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(GE(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), (i0 + i2), i0)}(i8, i1, i9), i1), i9), i1), Composite{Switch(LT(i0, i1), i1, i0)}(Composite{Switch(GE(i0, i1), i1, i0)}(Composite{Switch(LT(i0, i1), i2, i0)}(Composite{Switch(LT(i0, i1), (i2 + i3 + i4), i0)}(i6, i1, i7, i8, i9), i1, i5), i9), i1))))}}[(0, 4)] [@CF] ''   22
+ |     | | | | | |   | |GpuElemwise{TrueDiv}[(0, 1)] [@DF] ''   64
+ |     | | | | | |   | | |GpuElemwise{Neg}[(0, 0)] [@DG] ''   62
+ |     | | | | | |   | | | |GpuFromHost [@DH] ''   36
+ |     | | | | | |   | | |   |Elemwise{Composite{Cast{float32}(inv(i0))}} [@DI] ''   32
+ |     | | | | | |   | | |     |InplaceDimShuffle{x} [@DJ] ''   28
+ |     | | | | | |   | | |       |Elemwise{Composite{Switch(LT(i0, i1), i0, i1)}}[(0, 1)] [@CD] ''   26
+ |     | | | | | |   | | |GpuSubtensor{int64:int64:} [@F] ''   54
+ |     | | | | | |   | |Constant{0} [@BK]
+ |     | | | | | |   | |Constant{1000} [@BX]
+ |     | | | | | |   |GpuElemwise{TrueDiv}[(0, 1)] [@DK] ''   61
+ |     | | | | | |   | |GpuFromHost [@DH] ''   36
+ |     | | | | | |   | |GpuElemwise{sub,no_inplace} [@CA] ''   56
+ |     | | | | | |   |Constant{1000} [@BX]
+ |     | | | | | |GpuDimShuffle{0,x} [@DL] ''   55
+ |     | | | | | | |GpuElemwise{Composite{exp((-i0))}}[(0, 0)] [@DM] ''   52
+ |     | | | | | |   |GpuCAReduce{add}{0,1} [@H] ''   50
+ |     | | | | | |GpuElemwise{Composite{sqr((i0 + i1))},no_inplace} [@DN] ''   58
+ |     | | | | |   |CudaNdarrayConstant{[[ 1.]]} [@DO]
+ |     | | | | |   |GpuDimShuffle{0,x} [@DL] ''   55
+ |     | | | | |Assert{msg='Theano Assert failed!'} [@DP] ''   43
+ |     | | | | | |GpuAdvancedSubtensor1 [@BS] ''   37
+ |     | | | | | |Elemwise{eq,no_inplace} [@DQ] ''   15
+ |     | | | | |   |Shape_i{1} [@DR] ''   7
+ |     | | | | |   | |W [@BP]
+ |     | | | | |   |Shape_i{1} [@DS] ''   4
+ |     | | | | |     |W [@BT]
+ |     | | | | |GpuElemwise{Add}[(0, 0)] [@L] ''   47
+ |     | | | |GpuDimShuffle{1,0} [@DT] ''   8
+ |     | | |   |W [@BP]
+ |     | | |TensorConstant{1} [@O]
+ |     | | |MakeVector{dtype='int64'} [@DU] ''   16
+ |     | |   |Shape_i{1} [@CV] ''   9
+ |     | |   |Shape_i{1} [@CV] ''   9
+ |     | |Elemwise{Cast{int64}} [@DV] ''   42
+ |     |   |Elemwise{Cast{int64}} [@R] ''   35
+ |     |GpuSplit{2}.1 [@CW] ''   82
+ |     |Elemwise{Cast{int64}} [@DW] ''   40
+ |       |Elemwise{Cast{int64}} [@BM] ''   34
+ |W [@Q]
+ |GpuElemwise{Mul}[(0, 1)] [@CO] ''   89
+Elemwise{add,no_inplace} [@DX] ''   0
+ |TensorConstant{1} [@DY]
+ |<TensorType(int32, scalar)> [@BA]
+GpuElemwise{Composite{((i0 * i1) + (i2 - i3))}}[(0, 2)] [@DZ] ''   85
+ |CudaNdarrayConstant{[[ 0.89999998]]} [@CL]
+ |GpuElemwise{Composite{((i0 * i1) - i2)}}[(0, 1)] [@EA] ''   81
+ | |CudaNdarrayConstant{[[ 0.89999998]]} [@CL]
+ | |<CudaNdarrayType(float32, matrix)> [@EB]
+ | |GpuDot22Scalar [@EC] ''   77
+ |   |GpuDimShuffle{1,0} [@ED] ''   46
+ |   | |GpuJoin [@N] ''   44
+ |   |GpuElemwise{Composite{((i0 * i1 * i2) + (i0 * i1 * i2 * sgn(i3)))}}[(0, 2)] [@CY] ''   74
+ |   |TensorConstant{0.10000000149} [@EE]
+ |W [@BP]
+ |GpuDot22Scalar [@EC] ''   77
+GpuElemwise{Composite{((i0 * i1) + (i2 - i3))}}[(0, 2)] [@EF] ''   87
+ |CudaNdarrayConstant{[ 0.89999998]} [@EG]
+ |GpuElemwise{Composite{((i0 * i1) - i2)}}[(0, 1)] [@EH] ''   84
+ | |CudaNdarrayConstant{[ 0.89999998]} [@EG]
+ | |<CudaNdarrayType(float32, vector)> [@EI]
+ | |GpuElemwise{Mul}[(0, 1)] [@EJ] ''   80
+ |   |CudaNdarrayConstant{[ 0.1]} [@EK]
+ |   |GpuCAReduce{add}{1,0} [@EL] ''   76
+ |     |GpuElemwise{Composite{((i0 * i1 * i2) + (i0 * i1 * i2 * sgn(i3)))}}[(0, 2)] [@CY] ''   74
+ |b [@BR]
+ |GpuElemwise{Mul}[(0, 1)] [@EJ] ''   80
+GpuElemwise{Composite{((i0 * i1) + (i2 - i3))}}[(0, 2)] [@EM] ''   83
+ |CudaNdarrayConstant{[[ 0.89999998]]} [@CL]
+ |GpuElemwise{Composite{((i0 * i1) - i2)}}[(0, 1)] [@EN] ''   79
+ | |CudaNdarrayConstant{[[ 0.89999998]]} [@CL]
+ | |<CudaNdarrayType(float32, matrix)> [@EO]
+ | |GpuElemwise{Mul}[(0, 1)] [@EP] ''   75
+ |   |CudaNdarrayConstant{[[ 0.1]]} [@CP]
+ |   |GpuAdvancedIncSubtensor1_dev20{inplace,inc} [@EQ] ''   73
+ |     |GpuAlloc{memset_0=True} [@ER] ''   14
+ |     | |CudaNdarrayConstant{[[ 0.]]} [@CT]
+ |     | |Shape_i{0} [@ES] ''   5
+ |     | | |W [@BT]
+ |     | |Shape_i{1} [@DS] ''   4
+ |     |GpuElemwise{Composite{((i0 * i1 * i2 * i3) / i4)}}[(0, 3)] [@ET] ''   71
+ |     | |CudaNdarrayConstant{[[ 0.5]]} [@J]
+ |     | |GpuDimShuffle{0,x} [@DA] ''   70
+ |     | |GpuDimShuffle{0,x} [@DL] ''   55
+ |     | |GpuElemwise{Composite{(i0 + Abs(i0))},no_inplace} [@K] ''   48
+ |     | |GpuElemwise{Composite{sqr((i0 + i1))},no_inplace} [@DN] ''   58
+ |     |Elemwise{Cast{int64}} [@EU] ''   38
+ |       |Elemwise{Cast{int64}} [@BU] ''   33
+ |W [@BT]
+ |GpuElemwise{Mul}[(0, 1)] [@EP] ''   75
+GpuElemwise{Composite{((i0 * i1) - i2)}}[(0, 1)] [@CM] ''   90
+GpuElemwise{Composite{((i0 * i1) - i2)}}[(0, 1)] [@EN] ''   79
+GpuElemwise{Composite{((i0 * i1) - i2)}}[(0, 1)] [@EA] ''   81
+GpuElemwise{Composite{((i0 * i1) - i2)}}[(0, 1)] [@EH] ''   84
