@@ -17,7 +17,10 @@ from r2v import relation2vec
 sys.path.append('..')
 from theano_minibatcher import NoiseContrastiveTheanoMinibatcher
 from relation2vec_embedder import Relation2VecEmbedder
-from dataset_reader import Relation2VecDatasetReader as DatasetReader
+from dataset_reader import (
+	Relation2VecDatasetReader as DatasetReader,
+	FULL_CONTEXT, RANDOM_SINGLE_CHOICE
+)
 from SETTINGS import DATA_DIR, COOCCURRENCE_DIR 
 
 
@@ -51,7 +54,8 @@ LOAD_DICT_DIR = os.path.join(DATA_DIR, 'dictionaries')
 READ_DATA_ASYNC = True
 CONTEXT_EMBEDDINGS_FNAME = os.path.join(
 	DATA_DIR, 'google-vectors-negative-300.txt')
-
+ENTITY_NOISE_RATIO = 0.0
+SIGNAL_SAMPLE_MODE = RANDOM_SINGLE_CHOICE
 
 def prepare_dataset(params):
 	save_dir = params.pop('save_dir')
@@ -68,7 +72,8 @@ legal_params = {
 	'min_frequency', 'noise_ratio', 'batch_size', 'macrobatch_size',
 	'max_queue_size', 'num_embedding_dimensions', 'learning_rate',
 	'momentum', 'verbose', 'num_processes', 'read_data_async',
-	'context_embeddings_fname', 'load_dictionary_dir'
+	'context_embeddings_fname', 'load_dictionary_dir', 'signal_sample_mode',
+	'entity_noise_ratio'
 }
 
 def commandline2dict():
@@ -77,7 +82,7 @@ def commandline2dict():
 		key, val = arg.split('=')
 
 		if key not in legal_params:
-			raise ValueError('Unrecognized argument: %s.' % key)
+			raise ValueError('Unrecognized argument: %s' % key)
 
 		# Interpret numeric, list, and dictionary values properly, as
 		# well as strings enquoted in properly escaped quotes
@@ -178,7 +183,9 @@ if __name__ == '__main__':
 			'verbose': VERBOSE,
 			'num_processes': NUM_PROCESSES,
 			'read_data_async': READ_DATA_ASYNC,
-			'context_embeddings_fname': CONTEXT_EMBEDDINGS_FNAME
+			'context_embeddings_fname': CONTEXT_EMBEDDINGS_FNAME,
+			'signal_sample_mode': SIGNAL_SAMPLE_MODE,
+			'entity_noise_ratio': ENTITY_NOISE_RATIO
 		}
 
 		# get command-line overrides of property values
