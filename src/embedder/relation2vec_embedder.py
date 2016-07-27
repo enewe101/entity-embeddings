@@ -139,6 +139,7 @@ class Relation2VecEmbedder(object):
 		self._embed_relationship = function([input_var], relation_embedding)
 
 
+
 	def get_params(self):
 		# Note that parameters for l_embed_entity1 are the same as
 		# for l_embed_entity2, so we only need to fetch params for one

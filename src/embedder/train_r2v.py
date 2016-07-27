@@ -18,7 +18,7 @@ sys.path.append('..')
 from theano_minibatcher import NoiseContrastiveTheanoMinibatcher
 from relation2vec_embedder import Relation2VecEmbedder
 from dataset_reader import Relation2VecDatasetReader as DatasetReader
-from SETTINGS import DATA_DIR, COOCCURRENCE_DIR, SRC_DIR
+from SETTINGS import DATA_DIR, COOCCURRENCE_DIR 
 
 
 # Seed randomness for reproducibility
@@ -27,7 +27,7 @@ np.random.seed(0)
 
 # Set defaults and constants
 USAGE = (
-	'Usage: run-r2v \'command="command"\' \'save_dir="save/dir"\''
+	'Usage: ./train_r2v.py \'command="command"\' \'save_dir="save/dir"\''
 	' [optional_key=val ...]'
 )
 DIRECTORIES = [COOCCURRENCE_DIR]
@@ -49,6 +49,9 @@ MAX_QUEUE_SIZE = 2
 VERBOSE = True
 LOAD_DICT_DIR = os.path.join(DATA_DIR, 'dictionaries')
 READ_DATA_ASYNC = True
+CONTEXT_EMBEDDINGS_FNAME = os.path.join(
+	DATA_DIR, 'google-vectors-negative-300.txt')
+
 
 def prepare_dataset(params):
 	save_dir = params.pop('save_dir')
@@ -60,10 +63,21 @@ def train(params):
 	relation2vec(**params)
 
 
+legal_params = {
+	'command', 'files', 'directories', 'skip', 'save_dir', 'num_epochs',
+	'min_frequency', 'noise_ratio', 'batch_size', 'macrobatch_size',
+	'max_queue_size', 'num_embedding_dimensions', 'learning_rate',
+	'momentum', 'verbose', 'num_processes', 'read_data_async',
+	'context_embeddings_fname', 'load_dictionary_dir'
+}
+
 def commandline2dict():
 	properties = {}
 	for arg in sys.argv[1:]:
 		key, val = arg.split('=')
+
+		if key not in legal_params:
+			raise ValueError('Unrecognized argument: %s.' % key)
 
 		# Interpret numeric, list, and dictionary values properly, as
 		# well as strings enquoted in properly escaped quotes
@@ -78,14 +92,17 @@ def commandline2dict():
 	return properties
 
 
+
 def print_params(params):
 
 	# Print to stdout the set of parameters defining this run in a 
 	# json-like format, but with keys sorted lexicographically
 	params_to_print = dict(params)
-	params_to_print['skip'] = [r.pattern for r in params['skip']]
+	if 'skip' in params_to_print:
+		params_to_print['skip'] = [r.pattern for r in params['skip']]
 	for key in sorted(params_to_print.keys()):
 		print key, '=', params_to_print[key]
+
 
 
 if __name__ == '__main__':
@@ -93,13 +110,16 @@ if __name__ == '__main__':
 	commandline_params = commandline2dict()
 	try:
 		command = commandline_params.pop('command')
-		save_dir = commandline_params.pop('save_dir')
-	except KeyError:
+		assert('save_dir' in commandline_params)
+	except (KeyError, AssertionError):
 		raise ValueError(USAGE)
 
 	# This is just included to test argument parsing
 	if command == 'args':
-		print json.dumps(commandline_params)
+		print
+		print 'command:', command
+		print_params(commandline_params)
+		print
 
 	# Run over the entire dataset, prepare and save the entity and context 
 	# dictionaries.  No training is done.  This only has to be done once,
@@ -116,7 +136,6 @@ if __name__ == '__main__':
 			'files': FILES,
 			'directories': DIRECTORIES,
 			'skip': SKIP,
-			'save_dir': save_dir,
 			'noise_ratio': NOISE_RATIO,
 			'macrobatch_size': MACROBATCH_SIZE,
 			'max_queue_size': MAX_QUEUE_SIZE,
@@ -146,7 +165,6 @@ if __name__ == '__main__':
 			'files': FILES,
 			'directories': DIRECTORIES,
 			'skip': SKIP,
-			'save_dir': save_dir,
 			'num_epochs': NUM_EPOCHS,
 			'load_dictionary_dir': LOAD_DICT_DIR,
 			'min_frequency': MIN_FREQUENCY,
@@ -159,7 +177,8 @@ if __name__ == '__main__':
 			'momentum': MOMENTUM,
 			'verbose': VERBOSE,
 			'num_processes': NUM_PROCESSES,
-			'read_data_async': READ_DATA_ASYNC
+			'read_data_async': READ_DATA_ASYNC,
+			'context_embeddings_fname': CONTEXT_EMBEDDINGS_FNAME
 		}
 
 		# get command-line overrides of property values

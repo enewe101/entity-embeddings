@@ -9,6 +9,54 @@ from theano import function
 import theano
 import os
 
+
+def read_entity_embeddings(embeddings_fname, reader, embedder):
+	raise NotImplementedError()
+
+
+def read_context_embeddings(embeddings_fname, reader, embedder):
+	# We'll read the embeddings from file and write them into the 
+	# existing embeddings matrix. First, get the existing entity 
+	# embeddings.  
+	context_embedding_params = embedder.get_params()[1]
+	context_embeddings = context_embedding_params.get_value()
+
+	# Now read the embeddings file.  We will match the embeddings in 
+	# the file based on the word that appears in the first position
+	# on each line.  To do that, we need to already have a entity
+	# dictionary.
+	if not reader.prepared:
+		raise ValueError(
+			'Trying to load context embeddings from token-based embeddings '
+			'file without first preparing the reader.  The reader needs '
+			'to have built a context dictionary so that it can map the '
+			'embedding tokens onto indices in the embeddings matrix.'
+		)
+
+	context_dictionary = reader.context_dictionary
+
+	first_line = True
+	for line in open(embeddings_fname):
+
+		# skip first line
+		if first_line:
+			first_line = False
+			continue
+
+		# Parse the line
+		fields = line.strip().split()
+		token, vector = fields[0], fields[1:]
+
+		# Get the position of this embedding
+		token_id = context_dictionary.get_id(token)
+
+		# Overwrite the embedding using the one from file
+		context_embeddings[token_id] = vector
+
+	context_embeddings = context_embedding_params.set_value(
+		context_embeddings)
+
+
 def relation2vec(
 	files=[],
 	directories=[],
@@ -17,6 +65,8 @@ def relation2vec(
 	num_epochs=5,
 	entity_dictionary=None,
 	context_dictionary=None,
+	context_embeddings_fname=None,
+	entity_embeddings_fname=None,
 	load_dictionary_dir=None,
 	min_frequency=10,
 	noise_ratio=15,
@@ -95,6 +145,17 @@ def relation2vec(
 		word_embedding_init=word_embedding_init,
 		context_embedding_init=context_embedding_init
 	)
+
+	if context_embeddings_fname is not None:
+		if verbose:
+			print 'reading context embeddings'
+		read_context_embeddings(context_embeddings_fname, reader, embedder)
+
+	if entity_embeddings_fname is not None:
+		if verbose:
+			print 'reading context embeddings'
+		read_entity_embeddings(entity_embeddings_fname, reader, embedder)
+
 
 	# Architectue is ready.  Make the loss function, and use it to create 
 	# the parameter updates responsible for learning

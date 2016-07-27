@@ -19,3 +19,4 @@ macrobatch_size=1000000 \
 num_embedding_dimensions=200 \
 num_processes=12 \
 max_queue_size=3 \
+context_embeddings_fname=null
