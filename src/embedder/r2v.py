@@ -1,6 +1,9 @@
 import numpy as np
 from word2vec import get_noise_contrastive_loss
-from dataset_reader import Relation2VecDatasetReader as DatasetReader
+from dataset_reader import (
+	Relation2VecDatasetReader as DatasetReader, RANDOM_SINGLE_CHOICE,
+	FULL_CONTEXT
+)
 from relation2vec_embedder import Relation2VecEmbedder
 from theano_minibatcher import NoiseContrastiveTheanoMinibatcher
 from lasagne.init import Normal
@@ -58,30 +61,45 @@ def read_context_embeddings(embeddings_fname, reader, embedder):
 
 
 def relation2vec(
+
+	# Input / output options
 	files=[],
 	directories=[],
 	skip=[],
 	save_dir=None,
+	read_data_async=True,
+	num_processes=3,
+	max_queue_size=0,
+
+	# Batching options
 	num_epochs=5,
-	entity_dictionary=None,
-	context_dictionary=None,
-	context_embeddings_fname=None,
-	entity_embeddings_fname=None,
-	load_dictionary_dir=None,
-	min_frequency=10,
-	noise_ratio=15,
-	entity_noise_ratio=0.0,
 	batch_size = 1000,  # Number of *signal* examples per batch
 	macrobatch_size = 100000,
-	max_queue_size=0,
+
+	# Dictionary options
+	entity_dictionary=None,
+	context_dictionary=None,
+	load_dictionary_dir=None,
+	min_frequency=10,
+
+	# Sampling options
+	noise_ratio=15,
+	entity_noise_ratio=0.0,
+	signal_sample_mode=RANDOM_SINGLE_CHOICE,
+
+	# Embeddings options
+	context_embeddings_fname=None,
+	entity_embeddings_fname=None,
 	num_embedding_dimensions=500,
 	word_embedding_init=Normal(),
 	context_embedding_init=Normal(),
+
+	# Learning rate options
 	learning_rate=0.1,
 	momentum=0.9,
+
+	# Verbosity option
 	verbose=True,
-	read_data_async=True,
-	num_processes=3
 ):
 	'''
 	Helper function that handles all concerns involved in training
@@ -93,6 +111,12 @@ def relation2vec(
 	routine using the provided classes.  This function would be a starting
 	point for you.
 	'''
+
+	# For convenience, we allow signal_sample_mode to be a string
+	if signal_sample_mode == 'RANDOM_SINGLE_CHOICE':
+		signal_sample_mode = RANDOM_SINGLE_CHOICE
+	elif signal_sample_mode == 'FULL_CONTEXT':
+		signal_sample_mode = FULL_CONTEXT
 
 	# Make a Relation2VecDatasetReader, pass through parameters sent by 
 	# caller
@@ -108,6 +132,7 @@ def relation2vec(
 		entity_dictionary=entity_dictionary,
 		context_dictionary=context_dictionary,
 		load_dictionary_dir=load_dictionary_dir,
+		signal_sample_mode=signal_sample_mode,
 		verbose=verbose
 	)
 
@@ -146,11 +171,14 @@ def relation2vec(
 		context_embedding_init=context_embedding_init
 	)
 
+	# If a file for pre-trained context word embeddings was given, read it
 	if context_embeddings_fname is not None:
 		if verbose:
 			print 'reading context embeddings'
 		read_context_embeddings(context_embeddings_fname, reader, embedder)
 
+	# TODO: implement this!
+	# If a file for pre-trained entity embeddings was given, read it
 	if entity_embeddings_fname is not None:
 		if verbose:
 			print 'reading context embeddings'
