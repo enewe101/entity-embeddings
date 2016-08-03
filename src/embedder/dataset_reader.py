@@ -119,7 +119,7 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		macrobatch_size=20000,
 		signal_sample_mode=RANDOM_SINGLE_CHOICE,
 		verbose=True,
-
+		len_context=1,
 	):
 
 		# TODO: test that no discarding is occurring
@@ -145,6 +145,16 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		self.max_queue_size = max_queue_size
 		self.macrobatch_size = macrobatch_size
 		self.signal_sample_mode=signal_sample_mode
+		self.len_context = len_context
+
+		# Currently only the signal sample mode "between" can be used
+		# with non-unity len_context
+		if self.len_context != 1:
+			if self.signal_sample_mode != 'between':
+				raise SampleModeException(
+					'Non-unity len_context can only be used when '
+					'signal_sample_mode is "between".'
+				)
 
 		# Usually the dictionaries are made from scratch
 		self.entity_dictionary = UnigramDictionary()
@@ -383,10 +393,11 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 			if self.verbose:
 				print 'padding and numpyifying'
 
+			padding_row = [UNK,UNK] + [UNK] * self.len_context
 			signal_macrobatch = self.numpyify(
-				signal_examples + [[UNK,UNK,UNK]] * signal_remaining)
+				signal_examples + [padding_row] * signal_remaining)
 			noise_macrobatch = self.numpyify(
-				noise_examples + [[UNK,UNK,UNK]] * noise_remaining)
+				noise_examples + [padding_row] * noise_remaining)
 
 			if self.verbose:
 				print 'padded to length:', len(signal_macrobatch)
@@ -507,27 +518,32 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		# convert entities into ids
 		e1_id, e2_id = self.entity_dictionary.get_ids([e1, e2])
 
-		# Get the context tokens minus the entity_spans
-		filtered_context_tokens = self.eliminate_spans(
-			token_ids, entity_spans[e1] + entity_spans[e2]
+		# Get the tokens between the entities as context
+		context_indices = self.find_tokens_between_closest_pair(
+			entity_spans[e1], entity_spans[e2]
 		)
+		context = [token_ids[i] for i in context_indices]
 
 		# We can't train if there are no context words
-		if len(filtered_context_tokens) == 0:
+		if len(context) == 0:
 			return []
 
-		# Add a signal example.  We generate a singal example from a 
-		# randomly chosen token:
-		if self.signal_sample_mode == RANDOM_SINGLE_CHOICE:
-			context = np.random.choice(filtered_context_tokens)
-			signal_examples = [[e1_id, e2_id, context]]
+		# We need to ensure a consistent size for the signal examples
+		# If the current row is too long, downsample
+		if len(context) > self.len_context:
+			context = np.random.choice(
+				context, self.len_context, replace=False)
 
-		# Or generate many examples by including all context tokens.
-		elif self.signal_sample_mode == FULL_CONTEXT:
-			signal_examples = [
-				[e1_id, e2_id, context] 
-				for context in filtered_context_tokens
-			]
+		# If the current row is too short, upsample
+		elif len(context) < self.len_context:
+			context = np.random.choice(
+				context, self.len_context, replace=True)
+
+		# We create a single example, but we include all of the context 
+		# in that one example. They will be averaged...
+		signal_examples = [
+			[e1_id, e2_id] + list(context)
+		]
 
 		return signal_examples
 			
@@ -570,7 +586,13 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		'''
 
 		noise_examples = []
-		for e1_id, e2_id, context_id in signal_examples:
+		for row in signal_examples:
+
+			# This somewhat odd way of splitting e1, e2, and the context
+			# accounts for the fact that the context can be one or more
+			# elements
+			e1_id, e2_id = row[:2]
+			context = row[2:]
 
 			# Determine how many noise examples of each type to generate
 			num_noise_entities = int(np.round(
@@ -580,25 +602,25 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 
 			# Sample random entities and context tokens
 			noise_contexts = self.context_dictionary.sample(
-				(num_noise_contexts,))
+				(num_noise_contexts, len(context)))
 			noise_entities = self.entity_dictionary.sample(
 				(num_noise_entities,))
 
-			# Generate noise examples by inserting random context
+			# Generate noise examples by inserting random contexts
 			noise_examples.extend([
-				[e1_id, e2_id, noise_context_id]
-				for noise_context_id in noise_contexts
+				[e1_id, e2_id] +  list(noise_context)
+				for noise_context in noise_contexts
 			])
 
 			# Generate noise examples by inserting random entity.
 			# Randomly choose which entity in the pair to replace
 			for noise_entity in noise_entities:
 				if np.random.uniform() < 0.5:
-					noise_examples.append([
-						noise_entity, e2_id, context_id])
+					noise_example = [noise_entity, e2_id] + list(context)
+					noise_examples.append(noise_example)
 				else:
-					noise_examples.append([
-						e1_id, noise_entity, context_id])
+					noise_example = [e1_id, noise_entity] + list(context)
+					noise_examples.append(noise_example)
 
 		return noise_examples
 
@@ -750,10 +772,15 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		dimension (i.e. number of columns) being 3.
 		'''
 
-		if len(examples) > 0:
-			examples = np.array(examples, dtype='int32')
-		else:
-			examples = np.empty(shape=(0,3), dtype='int32')
+		try:
+			if len(examples) > 0:
+				examples = np.array(examples, dtype='int32')
+			else:
+				examples = np.empty(shape=(0,3), dtype='int32')
+		except ValueError:
+			for row in examples:
+				print len(row), row
+			raise
 
 		return examples
 

@@ -86,6 +86,7 @@ def relation2vec(
 	noise_ratio=15,
 	entity_noise_ratio=0.0,
 	signal_sample_mode=RANDOM_SINGLE_CHOICE,
+	len_context=1,
 
 	# Embeddings options
 	context_embeddings_fname=None,
@@ -133,6 +134,7 @@ def relation2vec(
 		context_dictionary=context_dictionary,
 		load_dictionary_dir=load_dictionary_dir,
 		signal_sample_mode=signal_sample_mode,
+		len_context=len_context,
 		verbose=verbose
 	)
 
@@ -168,7 +170,8 @@ def relation2vec(
 		context_vocab_size=reader.context_vocab_size(),
 		num_embedding_dimensions=num_embedding_dimensions,
 		word_embedding_init=word_embedding_init,
-		context_embedding_init=context_embedding_init
+		context_embedding_init=context_embedding_init,
+		len_context=len_context,
 	)
 
 	# If a file for pre-trained context word embeddings was given, read it

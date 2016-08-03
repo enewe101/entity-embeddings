@@ -56,6 +56,7 @@ CONTEXT_EMBEDDINGS_FNAME = os.path.join(
 	DATA_DIR, 'google-vectors-negative-300.txt')
 ENTITY_NOISE_RATIO = 0.0
 SIGNAL_SAMPLE_MODE = RANDOM_SINGLE_CHOICE
+LEN_CONTEXT = 1
 
 def prepare_dataset(params):
 	save_dir = params.pop('save_dir')
@@ -73,7 +74,7 @@ legal_params = {
 	'max_queue_size', 'num_embedding_dimensions', 'learning_rate',
 	'momentum', 'verbose', 'num_processes', 'read_data_async',
 	'context_embeddings_fname', 'load_dictionary_dir', 'signal_sample_mode',
-	'entity_noise_ratio'
+	'entity_noise_ratio', 'len_context'
 }
 
 def commandline2dict():
@@ -185,7 +186,8 @@ if __name__ == '__main__':
 			'read_data_async': READ_DATA_ASYNC,
 			'context_embeddings_fname': CONTEXT_EMBEDDINGS_FNAME,
 			'signal_sample_mode': SIGNAL_SAMPLE_MODE,
-			'entity_noise_ratio': ENTITY_NOISE_RATIO
+			'entity_noise_ratio': ENTITY_NOISE_RATIO,
+			'len_context': LEN_CONTEXT,
 		}
 
 		# get command-line overrides of property values

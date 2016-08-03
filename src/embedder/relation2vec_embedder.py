@@ -17,7 +17,8 @@ class Relation2VecEmbedder(object):
 		context_vocab_size=1000000,
 		num_embedding_dimensions=500,
 		word_embedding_init=Normal(),
-		context_embedding_init=Normal()
+		context_embedding_init=Normal(),
+		len_context=1
 	):
 
 		# Register most parameters to self namespace
@@ -29,11 +30,12 @@ class Relation2VecEmbedder(object):
 		self.entity_vocab_size = entity_vocab_size
 		self.context_vocab_size = context_vocab_size
 		self.num_embedding_dimensions = num_embedding_dimensions
+		self.len_context = len_context
 
 		# Slice the input var into relevant aspects
 		self.entity1 = self.input_var[:,0]
 		self.entity2 = self.input_var[:,1]
-		self.context = self.input_var[:,2]
+		self.context = self.input_var[:,2:]
 
 		# Take in and embed entity1
 		self.l_in_entity1 = layers.InputLayer(
@@ -64,12 +66,16 @@ class Relation2VecEmbedder(object):
 
 		# Take in and embed the context
 		self.l_in_context = layers.InputLayer(
-			shape=(batch_size,), input_var=self.context
+			shape=(batch_size,len_context), input_var=self.context
 		)
 		self.l_embed_context = layers.EmbeddingLayer(
 			self.l_in_context, context_vocab_size, num_embedding_dimensions
 		)
-		self.context_embedding = get_output(self.l_embed_context)
+		self.prelim_context_embedding = get_output(self.l_embed_context)
+
+		# Average the embedding accros the context
+		self.context_embedding = self.prelim_context_embedding.sum(
+			axis=1) / float(len_context)
 
 		# Compute the network output
 		self.output = sigmoid(row_dot(
