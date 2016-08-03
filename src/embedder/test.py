@@ -682,6 +682,59 @@ class TestNoiseContrastiveTheanoMinibatcher(TestCase):
 
 class TestDatasetReader(TestCase):
 
+	def test_sample_between_entities(self):
+		reader = Relation2VecDatasetReader()
+		fname = 'test-data/test-corpus/003-raw.tsv'
+		entity_pairs_to_test = [
+			('YAGO:Hong_Kong', 'YAGO:Po_Sang_Bank'),
+			None,
+			('YAGO:Israel', 'YAGO:Lebanon'),
+			('YAGO:Hezbollah', 'YAGO:Bint_Jbeil'),
+			('YAGO:Israel', 'YAGO:United_Nations'),
+			('YAGO:China', 'YAGO:Asian_Games'),
+			None,
+			None,
+			None,
+			('YAGO:United_Arab_Emirates', 'YAGO:South_Korea')
+		]
+		expected_tokens = [
+			[',', 'one', 'of', 'the', 'major', 'gold', 'dealers', 'in'],
+			None,
+			['fighter', 'bombers', 'visiting'],
+			['armed', 'wing', ',', 'the', 'Islamic', 'Resistance', ',', 
+				'fired', 'on', 'the', 'warplanes', 'as', 'they', 
+				'overflew', 'the', 'southern', 'region', 'of'],
+			['drew', 'between', 'the', 'two', 'countries', 'after'],
+			['continued', 'to', 'flaunt', 'its', 'all-round', 'shooting', 
+				'power', 'as', 'it', 'surged', 'into', 'the', 'semifinals',
+				'of', 'the', 'men', "'s", 'basketball', 'competition', 
+				'with', 'a', '106-55', 'defeat', 'of', 'Kazakstan', 'at', 
+				'the'],
+			None,
+			None,
+			None,
+			[',', 'which', 'won', 'its', 'Pool', 'B', 'game', '106-51', 
+				'against']
+		]
+
+		i = -1
+		for line, pair in zip(reader.parse(fname),entity_pairs_to_test):
+			i += 1
+
+			if pair is None:
+				continue
+
+			tokens, entity_spans = line
+			e1, e2 = pair
+			e_spans1, e_spans2 = entity_spans[e1], entity_spans[e2]
+			intervening_tokens = reader.find_tokens_between_closest_pair(
+				e_spans1, e_spans2)
+			intervening_tokens = [tokens[j] for j in intervening_tokens]
+			self.assertEqual(intervening_tokens, expected_tokens[i])
+			print expected_tokens[i]
+
+
+
 	def test_raises_not_implemented(self):
 		'''
 		Ensure that the reader raises an error if `get_vocab_size()` is 

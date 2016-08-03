@@ -94,6 +94,11 @@ def relation2vec_parse(filename, verbose=True):
 #		return word2vec_parse(filename)
 
 
+class Relation2VecDatesetReaderException(Exception):
+	pass
+class SampleModeException(Relation2VecDatesetReaderException):
+	pass
+
 class Relation2VecDatasetReader(Word2VecDatasetReader):
 
 	NOT_DONE = 0
@@ -409,9 +414,25 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 				# of entities in this line
 				for e1, e2 in itools.combinations(entity_spans, 2):
 
-					# Generate signal examples
-					signal_examples = self.generate_signal_examples(
-						e1, e2, token_ids, entity_spans)
+					# Generate signal examples according to sample mode
+					if self.signal_sample_mode == RANDOM_SINGLE_CHOICE:	
+						signal_examples = self.generate_signal_examples(
+							e1, e2, token_ids, entity_spans)
+
+					elif self.signal_sample_mode == FULL_CONTEXT:	
+						signal_examples = self.generate_signal_examples(
+							e1, e2, token_ids, entity_spans)
+
+					elif self.signal_sample_mode == 'between':
+						signal_examples = self.generate_signal_examples_between(
+							e1, e2, token_ids, entity_spans)
+
+					else:
+						raise SampleModeException(
+							'Unrecognized sample mode: %s' 
+							% self.sample_mode
+						)
+
 					num_examples += len(signal_examples)
 
 					# Continue if we couldn't pull out any signal examples.
@@ -431,6 +452,85 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		if self.verbose:
 			print 'num_examples', num_examples
 
+
+	def find_tokens_between_closest_pair(self, indexes1, indexes2):
+		distances = []
+
+		if len(indexes1) < 1 or len(indexes2) < 1:
+			raise ValueError(
+				'indexes1 and indexes2 must be non-empty lists of index'
+				' tuples.'
+			)
+
+		# Look at each pairing of indices for the entities, and calculate
+		# the distance between them
+		for i1 in indexes1:
+			for i2 in indexes2:
+
+				# The start index of entity spans are always off by one
+				# This is too costly to correct in the dataset, so 
+				# compensate here.  Now the span is in slice notation.
+				i1 = i1[0] - 1, i1[1]
+				i2 = i2[0] - 1, i2[1]
+
+				# Get the distance between the entity spans.  How to do
+				# this depends on which span comes first.
+				if i1[0] < i2[0]:
+					diff = min(i2) - max(i1)
+					tokens_between = range(max(i1), min(i2))
+
+				else:
+					diff = min(i1) - max(i2)
+					tokens_between = range(max(i2), min(i1))
+
+				# Store the calculated distance, and intervening tokens 
+				distances.append((diff, tokens_between))
+
+		# Sort distances so that the nearest pair of entities is last
+		distances.sort(reverse=True)
+
+		# We want the nearest pair of entities, but not entities that 
+		# are immediately next to one another
+		diff, tokens_between = distances.pop()
+		while len(tokens_between) < 1 and len(distances) > 0:
+			diff, tokens_between = distances.pop()
+
+		# Return the token ids between the nearest pair of entities
+		# that are not immediately next to one another
+		return tokens_between
+
+
+	def generate_signal_examples_between(
+		self, e1, e2, token_ids, entity_spans
+	):
+
+		# convert entities into ids
+		e1_id, e2_id = self.entity_dictionary.get_ids([e1, e2])
+
+		# Get the context tokens minus the entity_spans
+		filtered_context_tokens = self.eliminate_spans(
+			token_ids, entity_spans[e1] + entity_spans[e2]
+		)
+
+		# We can't train if there are no context words
+		if len(filtered_context_tokens) == 0:
+			return []
+
+		# Add a signal example.  We generate a singal example from a 
+		# randomly chosen token:
+		if self.signal_sample_mode == RANDOM_SINGLE_CHOICE:
+			context = np.random.choice(filtered_context_tokens)
+			signal_examples = [[e1_id, e2_id, context]]
+
+		# Or generate many examples by including all context tokens.
+		elif self.signal_sample_mode == FULL_CONTEXT:
+			signal_examples = [
+				[e1_id, e2_id, context] 
+				for context in filtered_context_tokens
+			]
+
+		return signal_examples
+			
 
 	def generate_signal_examples(self, e1, e2, token_ids, entity_spans):
 
