@@ -11,7 +11,13 @@ import numpy as np
 import gzip
 import os
 from word2vec.token_map import UNK
-from theano import shared, function, tensor as T
+
+# Possibly import theano and lasagne
+exclude_theano_set = 'EXCLUDE_THEANO' in os.environ 
+if exclude_theano_set and int(os.environ['EXCLUDE_THEANO']) == 1:
+	pass
+else:
+	from theano import shared, function, tensor as T
 
 
 class NoiseContrastiveTheanoMinibatcher(TheanoMinibatcher):

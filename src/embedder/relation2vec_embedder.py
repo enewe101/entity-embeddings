@@ -1,14 +1,23 @@
 import os
 import numpy as np
-from lasagne import layers
-from lasagne.layers import get_output, get_all_params, get_all_param_values
-from lasagne.init import Normal
-from theano import tensor as T, function
 from word2vec import get_noise_contrastive_loss, row_dot, sigmoid
 
 
+# Possibly import theano and lasagne
+exclude_theano_set = 'EXCLUDE_THEANO' in os.environ 
+if exclude_theano_set and int(os.environ['EXCLUDE_THEANO']) == 1:
+	pass
+else:
+	from lasagne import layers
+	from lasagne.layers import (
+		get_output, get_all_params, get_all_param_values
+	)
+	from lasagne.init import Normal
+	from theano import tensor as T, function
+
+
 class Relation2VecEmbedder(object):
-	
+
 	def __init__(
 		self,
 		input_var=None,
@@ -16,8 +25,8 @@ class Relation2VecEmbedder(object):
 		entity_vocab_size=10000,
 		context_vocab_size=1000000,
 		num_embedding_dimensions=500,
-		word_embedding_init=Normal(),
-		context_embedding_init=Normal(),
+		entity_embedding_init=None,
+		context_embedding_init=None,
 		len_context=1
 	):
 
@@ -25,6 +34,12 @@ class Relation2VecEmbedder(object):
 		self.input_var = input_var
 		if input_var is None:
 			self.input_var = T.imatrix()
+
+		if entity_embedding_init is None:
+			entity_embedding_init = Normal()
+
+		if context_embedding_init is None:
+			context_embedding_init = Normal()
 
 		self.batch_size = batch_size
 		self.entity_vocab_size = entity_vocab_size
@@ -42,7 +57,10 @@ class Relation2VecEmbedder(object):
 			shape=(batch_size,), input_var=self.entity1
 		)
 		self.l_embed_entity1 = layers.EmbeddingLayer(
-			self.l_in_entity1, entity_vocab_size, num_embedding_dimensions
+			incoming=self.l_in_entity1, 
+			input_size=entity_vocab_size, 
+			output_size=num_embedding_dimensions,
+			W=entity_embedding_init
 		)
 
 		# Take in and embed entity2 -- note this uses same parameters as
@@ -51,7 +69,9 @@ class Relation2VecEmbedder(object):
 			shape=(batch_size,), input_var=self.entity2
 		)
 		self.l_embed_entity2 = layers.EmbeddingLayer(
-			self.l_in_entity2, entity_vocab_size, num_embedding_dimensions,
+			incoming=self.l_in_entity2,
+			input_size=entity_vocab_size, 
+			output_size=num_embedding_dimensions,
 			W=self.l_embed_entity1.W
 		)
 
@@ -69,7 +89,8 @@ class Relation2VecEmbedder(object):
 			shape=(batch_size,len_context), input_var=self.context
 		)
 		self.l_embed_context = layers.EmbeddingLayer(
-			self.l_in_context, context_vocab_size, num_embedding_dimensions
+			self.l_in_context, context_vocab_size, num_embedding_dimensions,
+			W=context_embedding_init
 		)
 		self.prelim_context_embedding = get_output(self.l_embed_context)
 
@@ -143,7 +164,6 @@ class Relation2VecEmbedder(object):
 
 		# Compile the function
 		self._embed_relationship = function([input_var], relation_embedding)
-
 
 
 	def get_params(self):

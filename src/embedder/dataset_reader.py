@@ -8,7 +8,8 @@ from collections import defaultdict
 from multiprocessing import Queue, Process, Pipe
 from Queue import Empty
 from word2vec import (
-	DatasetReader as Word2VecDatasetReader, DataSetReaderIllegalStateException, TheanoMinibatcher,
+	DatasetReader as Word2VecDatasetReader, 
+	DataSetReaderIllegalStateException, #TheanoMinibatcher,
 	UnigramDictionary, reseed
 )
 import numpy as np
@@ -19,6 +20,7 @@ from word2vec.token_map import UNK
 TAB_SPLITTER = re.compile(r'\t+')
 RANDOM_SINGLE_CHOICE = 0
 FULL_CONTEXT = 1
+
 
 def word2vec_parse(filename):
 
@@ -87,11 +89,6 @@ def relation2vec_parse(filename, verbose=True):
 	return tokenized_sentences
 
 
-## We need to slightly change the parser used in the word2vec minibatcher
-## in order to handle the file format in this project
-#class Word2VecMinibatcher(_Word2VecMinibatcher):
-#	def parse(self, filename):
-#		return word2vec_parse(filename)
 
 
 class Relation2VecDatesetReaderException(Exception):
@@ -164,19 +161,19 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		if load_dictionary_dir is not None:
 			if verbose:
 				print 'Loading dictionary from: %s...' % load_dictionary_dir
-				self.load_dictionary(load_dictionary_dir)
+			self.load_dictionary(load_dictionary_dir)
 
 		# Or, if an existing dictionary was passed in, use it
 		if entity_dictionary is not None:
 			if verbose:
 				print 'An entity dictionary was supplied.'
-				self.entity_dictionary = entity_dictionary
+			self.entity_dictionary = entity_dictionary
 
 		# (same but for context dictionary)
 		if context_dictionary:
 			if verbose:
 				print 'A context dictionary was supplied.'
-				self.context_dictionary = context_dictionary
+			self.context_dictionary = context_dictionary
 
 		# Keep track of whether the dictionaries have been prepared
 		self.prepared = False
@@ -285,8 +282,9 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 	def save_dictionary(self, save_dir):
 		'''
 		Save both the dictionary and context_dictionary, using default
-		filenames (dictionary.gz and unigram-dictionary.gz), by specifying
-		only their containing save_dir
+		filenames (coungter-sampler.gz and token-map.gz), by specifying
+		only their containing directory (save_dir).  `save_dir` will be
+		created if it doesn't exist.
 		'''
 		# We will make the save_dir (but not its parents) if it doesn't exist
 		if not os.path.exists(save_dir):
@@ -346,13 +344,12 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 	def generate_macrobatches(self, filename_iterator):
 
 		'''
-		Assembles bunches of examples from the parsed data coming from
-		files that were read.  Normally, this function might yield
-		individual examples, however, in this case, we need to maintain
-		a distinction between the noise- and signal-examples, and to
-		keep them in consistent proportions.  So, here, we yield small
-		bunches that consist of 1 signal example, and X noise examples,
-		where X depends on `self.noise_ratio`.
+		Generator that produces macrobatches of signal and noise examples.
+		It calls on file reading, parsing, and example genearating 
+		machinery, but is itself only really responsible for the grouping
+		of yielded examples into macrobatches.  Each iteration of this 
+		generator yields a tuple consisting of a signal and noise 
+		macrobatch.
 		'''
 
 		mcbatch_size = self.macrobatch_size
@@ -514,6 +511,11 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 	def generate_signal_examples_between(
 		self, e1, e2, token_ids, entity_spans
 	):
+		'''
+		Extracts the tokens arising between e1 and e2 as context, and,
+		combining these with the entities, produces a signal example
+		'''
+		
 
 		# convert entities into ids
 		e1_id, e2_id = self.entity_dictionary.get_ids([e1, e2])
@@ -807,5 +809,5 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 
 
 
-class NoiseContrastiveTheanoMinibatcher(TheanoMinibatcher):
-	pass
+#class NoiseContrastiveTheanoMinibatcher(TheanoMinibatcher):
+#	pass

@@ -16,6 +16,7 @@ from dataset_reader import (
 )
 from theano_minibatcher import NoiseContrastiveTheanoMinibatcher
 
+
 #from minibatcher import (
 #	Relation2VecMinibatcher, relation2vec_parse, word2vec_parse,
 #	Word2VecMinibatcher
@@ -35,6 +36,8 @@ class TestParse(TestCase):
 
 
 class TestRelation2VecEmbedder(TestCase):
+
+
 
 	def test_read_embeddings(self):
 
@@ -95,7 +98,6 @@ class TestRelation2VecEmbedder(TestCase):
 				self.assertTrue(
 					np.allclose(original_embeddings[token_id], vector)
 				)
-
 
 
 	def test_save_load(self):
@@ -442,6 +444,93 @@ class TestRelation2VecEmbedder(TestCase):
 			for predicted in predicted_fit
 		]
 		self.assertTrue(all([diff < tolerance for diff in differences]))
+
+
+	def test_learning_function_freeze_context(self):
+
+		# Seed randomness for a reproducible test.
+		np.random.seed(1)
+
+		# Some constants for the test
+		files = ['test-data/test-corpus/a.tsv']
+		batch_size = 3
+		macrobatch_size = 1551
+		noise_ratio = 15
+		num_embedding_dimensions = 300
+		num_epochs = 2
+		num_replicates = 5
+		learning_rate = 0.01
+		momentum = 0.9
+		tolerance = 0.25
+		save_dir = 'test-data/test-entity-embedder'
+		context_embeddings_fname = 'test-data/pre-trained-embeddings.txt'
+		freeze_context = True
+
+		# Make a dataset reader
+		reader = Relation2VecDatasetReader(
+			files=files,
+			verbose=False
+		)
+		reader.prepare()
+
+		# Make a Word2VecEmbedder object
+		embedder = Relation2VecEmbedder(
+			entity_vocab_size=reader.entity_vocab_size(),
+			context_vocab_size=reader.context_vocab_size(),
+			num_embedding_dimensions=num_embedding_dimensions,
+		)
+
+		# Read in the embeddings from the text file
+		read_context_embeddings(context_embeddings_fname, reader, embedder)
+
+		# Get the initial context embeddings after loading from file
+		init_context_embeddings = embedder.get_params()[1].get_value()
+
+		# Also get the initial entity embeddings (these won't be frozen)
+		init_entity_embeddings = embedder.get_params()[0].get_value()
+
+
+		# Train the embedder using the convenience function
+		embedder, reader = relation2vec(
+			# Now run training with frozen context.  We'll be sure to
+			# initialize the context embeddings to what we got for the
+			# first non-trained embedding, so that they start with the
+			# same embeddings.  Then we'll check after that the context
+			# embedding hasn't changed
+			context_embedding_init=init_context_embeddings,
+			entity_embedding_init=init_entity_embeddings,
+
+			# We don't want to prune anything from the dictionary so that
+			# we keep all dimensions of the context embedding
+			min_frequency=None,	
+
+			files=files,
+			save_dir=save_dir,
+			num_epochs=num_epochs,
+			noise_ratio=noise_ratio,
+			batch_size = batch_size,
+			macrobatch_size = macrobatch_size,
+			num_embedding_dimensions=num_embedding_dimensions,
+			learning_rate=learning_rate,
+			momentum=momentum,
+			freeze_context=freeze_context,
+			verbose=False
+		)
+
+		final_context_embeddings = embedder.get_params()[1].get_value()
+		final_entity_embeddings = embedder.get_params()[0].get_value()
+
+		# The context embeddings were frozen, so should not have changed
+		self.assertTrue(np.allclose(
+			init_context_embeddings, final_context_embeddings
+		))
+
+		# The entity embeddings were not frozen, so they should have
+		# changed during training
+		self.assertFalse(np.allclose(
+			init_entity_embeddings, final_entity_embeddings
+		))
+
 
 
 	def test_learning_function(self):

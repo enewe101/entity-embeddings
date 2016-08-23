@@ -1,3 +1,6 @@
+import sys
+import os
+
 import numpy as np
 from word2vec import get_noise_contrastive_loss
 from dataset_reader import (
@@ -6,11 +9,18 @@ from dataset_reader import (
 )
 from relation2vec_embedder import Relation2VecEmbedder
 from theano_minibatcher import NoiseContrastiveTheanoMinibatcher
-from lasagne.init import Normal
-from lasagne.updates import nesterov_momentum
-from theano import function
-import theano
-import os
+
+
+# Possibly import theano and lasagne
+exclude_theano_set = 'EXCLUDE_THEANO' in os.environ 
+if exclude_theano_set and int(os.environ['EXCLUDE_THEANO']) == 1:
+	pass
+else:
+	print 'DID NOT EXCLUDE THEANO!'
+	from theano import function
+	import theano
+	from lasagne.init import Normal
+	from lasagne.updates import nesterov_momentum
 
 
 def read_entity_embeddings(embeddings_fname, reader, embedder):
@@ -21,6 +31,7 @@ def read_context_embeddings(embeddings_fname, reader, embedder):
 	# We'll read the embeddings from file and write them into the 
 	# existing embeddings matrix. First, get the existing entity 
 	# embeddings.  
+
 	context_embedding_params = embedder.get_params()[1]
 	context_embeddings = context_embedding_params.get_value()
 
@@ -56,8 +67,7 @@ def read_context_embeddings(embeddings_fname, reader, embedder):
 		# Overwrite the embedding using the one from file
 		context_embeddings[token_id] = vector
 
-	context_embeddings = context_embedding_params.set_value(
-		context_embeddings)
+	context_embedding_params.set_value(context_embeddings)
 
 
 def relation2vec(
@@ -92,12 +102,13 @@ def relation2vec(
 	context_embeddings_fname=None,
 	entity_embeddings_fname=None,
 	num_embedding_dimensions=500,
-	word_embedding_init=Normal(),
-	context_embedding_init=Normal(),
+	entity_embedding_init=None,
+	context_embedding_init=None,
 
 	# Learning rate options
 	learning_rate=0.1,
 	momentum=0.9,
+	freeze_context=False,
 
 	# Verbosity option
 	verbose=True,
@@ -138,8 +149,7 @@ def relation2vec(
 		verbose=verbose
 	)
 
-	# Prepare the minibatch generator
-	# (this produces the counter_sampler stats)
+	# Prepare the dataset reader (this produces unigram stats)
 	both_dictionaries_supplied = context_dictionary and entity_dictionary
 	if load_dictionary_dir is None and not both_dictionaries_supplied:
 		if verbose:
@@ -148,6 +158,8 @@ def relation2vec(
 
 	# If min_frequency was specified, prune the dictionaries
 	if min_frequency is not None:
+		if verbose:
+			print 'pruning dictionaries...'
 		reader.prune(min_frequency)
 
 	# Make a symbolic minibatcher 
@@ -169,7 +181,7 @@ def relation2vec(
 		entity_vocab_size=reader.entity_vocab_size(),
 		context_vocab_size=reader.context_vocab_size(),
 		num_embedding_dimensions=num_embedding_dimensions,
-		word_embedding_init=word_embedding_init,
+		entity_embedding_init=entity_embedding_init,
 		context_embedding_init=context_embedding_init,
 		len_context=len_context,
 	)
@@ -187,12 +199,18 @@ def relation2vec(
 			print 'reading context embeddings'
 		read_entity_embeddings(entity_embeddings_fname, reader, embedder)
 
-
 	# Architectue is ready.  Make the loss function, and use it to create 
 	# the parameter updates responsible for learning
 	loss = get_noise_contrastive_loss(embedder.get_output(), batch_size)
+
+	# Optionally exclude the context embeddings (in params[1]) from the
+	# parameters to be learnt.  This freezes them to their starting value
+	params = embedder.get_params()
+	if freeze_context:
+		params = [params[0], params[2], params[3]]
+
 	updates = nesterov_momentum(
-		loss, embedder.get_params(), learning_rate, momentum
+		loss, params, learning_rate, momentum
 	)
 
 	# Include minibatcher updates, which cause the symbolic batch to move
@@ -255,8 +273,8 @@ def show_computation_graph(
 	macrobatch_size = 100000,
 	max_queue_size=0,
 	num_embedding_dimensions=500,
-	word_embedding_init=Normal(),
-	context_embedding_init=Normal(),
+	entity_embedding_init=None,
+	context_embedding_init=None,
 	learning_rate=0.1,
 	momentum=0.9,
 	verbose=True,
@@ -303,7 +321,7 @@ def show_computation_graph(
 		entity_vocab_size=reader.entity_vocab_size(),
 		context_vocab_size=reader.context_vocab_size(),
 		num_embedding_dimensions=num_embedding_dimensions,
-		word_embedding_init=word_embedding_init,
+		entity_embedding_init=entity_embedding_init,
 		context_embedding_init=context_embedding_init
 	)
 

@@ -1,22 +1,18 @@
 #!/usr/bin/env python
 
-
 # Import external libraries
 import json
-import t4k
 import time
 import sys
+sys.path.append('..')
 import re
 import os
 import numpy as np
-from theano import tensor as T
-from r2v import relation2vec
 
 
 # Import internal libraries
-sys.path.append('..')
+from r2v import relation2vec
 from theano_minibatcher import NoiseContrastiveTheanoMinibatcher
-from relation2vec_embedder import Relation2VecEmbedder
 from dataset_reader import (
 	Relation2VecDatasetReader as DatasetReader,
 	FULL_CONTEXT, RANDOM_SINGLE_CHOICE
@@ -57,6 +53,8 @@ CONTEXT_EMBEDDINGS_FNAME = os.path.join(
 ENTITY_NOISE_RATIO = 0.0
 SIGNAL_SAMPLE_MODE = RANDOM_SINGLE_CHOICE
 LEN_CONTEXT = 1
+FREEZE_CONTEXT = False
+
 
 def prepare_dataset(params):
 	save_dir = params.pop('save_dir')
@@ -74,7 +72,7 @@ legal_params = {
 	'max_queue_size', 'num_embedding_dimensions', 'learning_rate',
 	'momentum', 'verbose', 'num_processes', 'read_data_async',
 	'context_embeddings_fname', 'load_dictionary_dir', 'signal_sample_mode',
-	'entity_noise_ratio', 'len_context'
+	'entity_noise_ratio', 'len_context', 'freeze_context'
 }
 
 def commandline2dict():
@@ -188,6 +186,7 @@ if __name__ == '__main__':
 			'signal_sample_mode': SIGNAL_SAMPLE_MODE,
 			'entity_noise_ratio': ENTITY_NOISE_RATIO,
 			'len_context': LEN_CONTEXT,
+			'freeze_context': FREEZE_CONTEXT,
 		}
 
 		# get command-line overrides of property values
