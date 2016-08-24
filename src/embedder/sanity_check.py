@@ -12,7 +12,8 @@ from SETTINGS import DATA_DIR
 
 RELATION_FILES = ['senators-states.txt', 'countries-capitals.txt']
 LOAD_DICTIONARY_DIR = os.path.join(DATA_DIR, 'dictionaries')
-MIN_FREQUENCY = 30
+MIN_QUERY_FREQUENCY = 30
+MIN_CONTEXT_FREQUENCY = 30
 
 
 def get_types():
@@ -98,7 +99,12 @@ def average_pairwise_match(examples1, examples2):
 
 
 
-def load(load_dictionary_dir, min_frequency, embeddings_dir):
+def load(
+	load_dictionary_dir,
+	min_query_frequency,
+	min_context_frequency,
+	embeddings_dir
+):
 
 	# load the minibatch generator.  Prune very rare tokens.
 	print 'Loading and pruning dictionaries'
@@ -106,8 +112,11 @@ def load(load_dictionary_dir, min_frequency, embeddings_dir):
 		load_dictionary_dir=load_dictionary_dir
 	)
 
-	if min_frequency is not None:
-		reader.prune(min_frequency)
+	if min_query_frequency > 0 or min_context_frequency > 0:
+		reader.prune(
+			min_query_frequency=min_query_frequency,
+			min_context_frequency=min_context_frequency
+		)
 
 	# Make an embedder with the correct sizes
 	print 'Making the embedder'
@@ -262,12 +271,16 @@ def run_tests(props):
 
 	# Unpack arguments
 	load_dictionary_dir = props['load_dictionary_dir']
-	min_frequency = props['min_frequency']
+	min_query_frequency = props['min_query_frequency']
+	min_context_frequency = props['min_context_frequency']
 	embeddings_dir = props['embeddings_dir']
 
 	# Load the embedder and dataset reader
 	embedder, reader = load(
-		load_dictionary_dir, min_frequency, embeddings_dir
+		load_dictionary_dir, 
+		min_query_frequency,
+		min_context_frequency, 
+		embeddings_dir
 	)
 
 	# Get a set of test entities from a curated set
@@ -322,7 +335,8 @@ if __name__ == '__main__':
 	# Merge default properties with properties specified on command line
 	props = {
 		'load_dictionary_dir': LOAD_DICTIONARY_DIR,
-		'min_frequency': MIN_FREQUENCY
+		'min_query_frequency': MIN_QUERY_FREQUENCY,
+		'min_context_frequency': MIN_CONTEXT_FREQUENCY,
 	}
 	command_line_props = commandline2dict()
 	props.update(command_line_props)

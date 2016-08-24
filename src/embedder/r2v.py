@@ -89,7 +89,8 @@ def relation2vec(
 	entity_dictionary=None,
 	context_dictionary=None,
 	load_dictionary_dir=None,
-	min_frequency=10,
+	min_query_frequency=0,
+	min_context_frequency=0,
 
 	# Sampling options
 	noise_ratio=15,
@@ -155,11 +156,15 @@ def relation2vec(
 			print 'preparing dictionaries...'
 		reader.prepare(save_dir=save_dir)
 
-	# If min_frequency was specified, prune the dictionaries
-	if min_frequency is not None:
+	# If either min_query_frequency or min_context_frequency is positive, 
+	# prune the dictionaries accordingly
+	if min_query_frequency > 0 or min_context_frequency > 0:
 		if verbose:
 			print 'pruning dictionaries...'
-		reader.prune(min_frequency)
+		reader.prune(
+			min_query_frequency=min_query_frequency,
+			min_context_frequency=min_context_frequency
+		)
 
 	# Make a symbolic minibatcher 
 	minibatcher = NoiseContrastiveTheanoMinibatcher(
@@ -266,7 +271,8 @@ def show_computation_graph(
 	entity_dictionary=None,
 	context_dictionary=None,
 	load_dictionary_dir=None,
-	min_frequency=10,
+	min_query_frequency=0,
+	min_context_frequency=0,
 	noise_ratio=15,
 	batch_size = 1000,  # Number of *signal* examples per batch
 	macrobatch_size = 100000,

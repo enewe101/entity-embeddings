@@ -37,7 +37,8 @@ SKIP = [re.compile('README.txt')]
 BATCH_SIZE=int(1e4)
 MACROBATCH_SIZE=int(1e6)
 NOISE_RATIO = 15
-MIN_FREQUENCY = 10
+MIN_QUERY_FREQUENCY = 10
+MIN_CONTEXT_FREQUENCY = 10
 NUM_EMBEDDING_DIMENSIONS = 500
 NUM_EPOCHS = 1
 LEARNING_RATE = 0.002
@@ -64,7 +65,8 @@ def train(params):
 
 legal_params = {
 	'command', 'files', 'directories', 'skip', 'save_dir', 'num_epochs',
-	'min_frequency', 'noise_ratio', 'batch_size', 'macrobatch_size',
+	'min_query_frequency', 'min_context_frequency', 'noise_ratio', 
+	'batch_size', 'macrobatch_size',
 	'max_queue_size', 'num_embedding_dimensions', 'learning_rate',
 	'momentum', 'verbose', 'num_processes', 'read_data_async',
 	'context_embeddings_fname', 'load_dictionary_dir', 'freeze_context'
@@ -166,7 +168,8 @@ if __name__ == '__main__':
 			'skip': SKIP,
 			'num_epochs': NUM_EPOCHS,
 			'load_dictionary_dir': LOAD_DICT_DIR,
-			'min_frequency': MIN_FREQUENCY,
+			'min_query_frequency': MIN_QUERY_FREQUENCY,
+			'min_context_frequency': MIN_CONTEXT_FREQUENCY,
 			'noise_ratio': NOISE_RATIO,
 			'batch_size': BATCH_SIZE,
 			'macrobatch_size': MACROBATCH_SIZE,

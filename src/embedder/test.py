@@ -528,7 +528,8 @@ class TestRelation2VecEmbedder(TestCase):
 
 			# We don't want to prune anything from the dictionary so that
 			# we keep all dimensions of the context embedding
-			min_frequency=None,	
+			min_query_frequency=0,	
+			min_context_frequency=0,	
 
 			files=files,
 			save_dir=save_dir,
