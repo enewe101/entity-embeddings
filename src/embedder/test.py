@@ -728,7 +728,6 @@ class TestRelation2VecEmbedder(TestCase):
 			cdict.get_ids(context) for context in
 			[('one', 'uno'), ('two', 'dos'), ('three', 'tres')]
 		]
-		print expected_best_fitting_context_ids
 
 		# The UNK token generally has high affinity for every relation 
 		# embedding because there is no strong gradient affecting it.  We 
@@ -736,7 +735,6 @@ class TestRelation2VecEmbedder(TestCase):
 		# for each relationship.
 		embedding_product[:,0] = 0
 		best_fitting_context_ids = np.argmax(embedding_product, axis=1)
-		print best_fitting_context_ids
 		for i in range(len(best_fitting_context_ids)):
 			best = best_fitting_context_ids[i]
 			expected_best = expected_best_fitting_context_ids[i]
@@ -899,6 +897,8 @@ class TestNoiseContrastiveTheanoMinibatcher(TestCase):
 
 class TestDatasetReader(TestCase):
 
+	# TODO: This does not appear to be actually testing, but rather just
+	# printing results.  Add assertions.
 	def test_sample_tokens_between(self):
 		fname = 'test-data/test-corpus/003-raw.tsv'
 		reader = Relation2VecDatasetReader(
