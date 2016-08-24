@@ -11,8 +11,8 @@ import itertools as itools
 import unittest
 from r2v import relation2vec, read_context_embeddings
 from dataset_reader import (
-	Relation2VecDatasetReader, DataSetReaderIllegalStateException,
-	FULL_CONTEXT
+	EntityPair2VecDatasetReader, Relation2VecDatasetReader, 
+	DataSetReaderIllegalStateException, FULL_CONTEXT
 )
 from theano_minibatcher import NoiseContrastiveTheanoMinibatcher
 
@@ -35,9 +35,35 @@ class TestParse(TestCase):
 		filename = 'test-data/test-corpus/004-raw.tsv'
 
 
+# TODO: make this a real test
+class TestParse(TestCase):
+
+	def test_parse(self):
+		filename = 'test-data/test-corpus/004-raw.tsv'
+
+
+class TestEntityPair2VecDatasetReader(TestCase):
+
+	def test_preparation(self):
+		files = ['test-data/test-corpus/a.tsv']
+		save_dir = 'test-data/test-entity-pair2vec-dataset-reader'
+		reader = EntityPair2VecDatasetReader(files=files)
+		reader.prepare(save_dir)
+		expected_token_map = [
+			'UNK', 'YAGO:Xinhua_News_Agency:::YAGO:Beijing',
+			'YAGO:Xinhua_News_Agency:::YAGO:Guangzhou',
+			'YAGO:United_States:::YAGO:Beijing',
+			'YAGO:United_States:::YAGO:Guangzhou',
+			'YAGO:Xinhua_News_Agency:::YAGO:United_States',
+			'YAGO:Guangzhou:::YAGO:Beijing', 'YAGO:Israel:::YAGO:Baalbek', 
+			'YAGO:Lebanon:::YAGO:Baalbek', 'YAGO:Lebanon:::YAGO:Israel',
+			'YAGO:United_States:::YAGO:Alexi_Lalas'
+		] 
+		found_token_map = reader.entity_pair_dictionary.token_map.tokens
+		self.assertEqual(found_token_map, expected_token_map)
+
+
 class TestRelation2VecEmbedder(TestCase):
-
-
 
 	def test_read_embeddings(self):
 

@@ -16,7 +16,6 @@ exclude_theano_set = 'EXCLUDE_THEANO' in os.environ
 if exclude_theano_set and int(os.environ['EXCLUDE_THEANO']) == 1:
 	pass
 else:
-	print 'DID NOT EXCLUDE THEANO!'
 	from theano import function
 	import theano
 	from lasagne.init import Normal
