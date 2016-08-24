@@ -897,64 +897,64 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 
 	# Integrate into dataset generation pipeline
 	# TODO: this should be called 'produce macrobatches'
-	def generate_macrobatches(self, filename_iterator):
+	#def generate_macrobatches(self, filename_iterator):
 
-		'''
-		Generator that produces macrobatches of signal and noise examples.
-		It calls on file reading, parsing, and example genearating 
-		machinery, but is itself only really responsible for the grouping
-		of yielded examples into macrobatches.  Each iteration of this 
-		generator yields a tuple consisting of a signal and noise 
-		macrobatch.
-		'''
+	#	'''
+	#	Generator that produces macrobatches of signal and noise examples.
+	#	It calls on file reading, parsing, and example genearating 
+	#	machinery, but is itself only really responsible for the grouping
+	#	of yielded examples into macrobatches.  Each iteration of this 
+	#	generator yields a tuple consisting of a signal and noise 
+	#	macrobatch.
+	#	'''
 
-		mcbatch_size = self.macrobatch_size
-		noise_ratio = self.noise_ratio
-		signal_examples = []
-		noise_examples = []
+	#	mcbatch_size = self.macrobatch_size
+	#	noise_ratio = self.noise_ratio
+	#	signal_examples = []
+	#	noise_examples = []
 
-		examples = self.generate_examples(filename_iterator)
-		for signal_chunk, noise_chunk in examples:
+	#	examples = self.generate_examples(filename_iterator)
+	#	for signal_chunk, noise_chunk in examples:
 
-			signal_examples.extend(signal_chunk)
-			noise_examples.extend(noise_chunk)
+	#		signal_examples.extend(signal_chunk)
+	#		noise_examples.extend(noise_chunk)
 
-			while len(signal_examples) > mcbatch_size:
-				if self.verbose:
-					print 'numpyifying'
-				signal_macrobatch = self.numpyify(
-					signal_examples[:mcbatch_size])
-				noise_macrobatch = self.numpyify(
-					noise_examples[:mcbatch_size * noise_ratio])
+	#		while len(signal_examples) > mcbatch_size:
+	#			if self.verbose:
+	#				print 'numpyifying'
+	#			signal_macrobatch = self.numpyify(
+	#				signal_examples[:mcbatch_size])
+	#			noise_macrobatch = self.numpyify(
+	#				noise_examples[:mcbatch_size * noise_ratio])
 
-				entities = signal_macrobatch[0][:2]
-				context = signal_macrobatch[0][2:]
-				entities = self.entity_dictionary.get_tokens(entities)
-				context = self.context_dictionary.get_tokens(context)
-				if self.verbose:
-					print 'no-padding:', len(signal_macrobatch)
-				yield signal_macrobatch, noise_macrobatch
+	#			entities = signal_macrobatch[0][:2]
+	#			context = signal_macrobatch[0][2:]
+	#			entities = self.entity_dictionary.get_tokens(entities)
+	#			context = self.context_dictionary.get_tokens(context)
+	#			if self.verbose:
+	#				print 'no-padding:', len(signal_macrobatch)
+	#			yield signal_macrobatch, noise_macrobatch
 
-				signal_examples = signal_examples[mcbatch_size:]
-				noise_examples = noise_examples[mcbatch_size*noise_ratio:]
+	#			signal_examples = signal_examples[mcbatch_size:]
+	#			noise_examples = noise_examples[mcbatch_size*noise_ratio:]
 
-		if len(signal_examples) > 0:
-			signal_remaining = mcbatch_size - len(signal_examples)
-			noise_remaining = (
-				mcbatch_size * noise_ratio - len(noise_examples))
+	#	if len(signal_examples) > 0:
+	#		signal_remaining = mcbatch_size - len(signal_examples)
+	#		noise_remaining = (
+	#			mcbatch_size * noise_ratio - len(noise_examples))
 
-			if self.verbose:
-				print 'padding and numpyifying'
+	#		if self.verbose:
+	#			print 'padding and numpyifying'
 
-			padding_row = [UNK,UNK] + [UNK] * self.len_context
-			signal_macrobatch = self.numpyify(
-				signal_examples + [padding_row] * signal_remaining)
-			noise_macrobatch = self.numpyify(
-				noise_examples + [padding_row] * noise_remaining)
+	#		padding_row = [UNK,UNK] + [UNK] * self.len_context
+	#		signal_macrobatch = self.numpyify(
+	#			signal_examples + [padding_row] * signal_remaining)
+	#		noise_macrobatch = self.numpyify(
+	#			noise_examples + [padding_row] * noise_remaining)
 
-			if self.verbose:
-				print 'padded to length:', len(signal_macrobatch)
-			yield signal_macrobatch, noise_macrobatch
+	#		if self.verbose:
+	#			print 'padded to length:', len(signal_macrobatch)
+	#		yield signal_macrobatch, noise_macrobatch
 
 
 	def generate_examples(self, filename_iterator):
@@ -1087,7 +1087,6 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 			]
 
 		return signal_examples
-			
 
 
 	def generate_noise_examples(self, signal_examples):
@@ -1136,165 +1135,164 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		return noise_examples
 
 
-	def generate_dataset_serial(self, save_dir=None):
-		'''
-		Generate the dataset from files handed to the constructor.  A single
-		process is used, and all the data is stored in a single file at
-		'save_dir/examples/0.npz'.
-		'''
+	#def generate_dataset_serial(self, save_dir=None):
+	#	'''
+	#	Generate the dataset from files handed to the constructor.  A single
+	#	process is used, and all the data is stored in a single file at
+	#	'save_dir/examples/0.npz'.
+	#	'''
 
-		# This cannot be called before calling prepare(), unless a prepared
-		# UnigramDictionary was passed to the self's constructor
-		if not self.prepared:
-			raise DataSetReaderIllegalStateException(
-				"DatasetReader: generate_examples() cannot be called before "
-				"prepare() is called unless a prepared UnigramDictionary has "
-				"was passed into the DatasetReader's constructor."
-			)
+	#	# This cannot be called before calling prepare(), unless a prepared
+	#	# UnigramDictionary was passed to the self's constructor
+	#	if not self.prepared:
+	#		raise DataSetReaderIllegalStateException(
+	#			"DatasetReader: generate_examples() cannot be called before "
+	#			"prepare() is called unless a prepared UnigramDictionary has "
+	#			"was passed into the DatasetReader's constructor."
+	#		)
 
-		# We save dataset in the "examples" subdir of the model_dir
-		if save_dir is not None:
-			examples_dir = os.path.join(save_dir, 'examples')
+	#	# We save dataset in the "examples" subdir of the model_dir
+	#	if save_dir is not None:
+	#		examples_dir = os.path.join(save_dir, 'examples')
 
-			# We are willing to create both the save_dir, and the
-			# 'examples' subdir, but not their parents
-			if not os.path.exists(save_dir):
-				os.mkdir(save_dir)
-			if not os.path.exists(examples_dir):
-				os.mkdir(examples_dir)
+	#		# We are willing to create both the save_dir, and the
+	#		# 'examples' subdir, but not their parents
+	#		if not os.path.exists(save_dir):
+	#			os.mkdir(save_dir)
+	#		if not os.path.exists(examples_dir):
+	#			os.mkdir(examples_dir)
 
-		else:
-			examples_dir = None
+	#	else:
+	#		examples_dir = None
 
-		# Generate the data for each file
-		file_iterator = self.generate_filenames()
-		macrobatches = self.generate_macrobatches(file_iterator)
-		for signal_examples, noise_examples in macrobatches:
+	#	# Generate the data for each file
+	#	file_iterator = self.generate_filenames()
+	#	macrobatches = self.generate_macrobatches(file_iterator)
+	#	for signal_examples, noise_examples in macrobatches:
 
-			## Save the data
-			#if examples_dir is not None:
-			#	save_path = os.path.join(examples_dir, '0.npz')
-			#	np.savez(
-			#		save_path,
-			#		signal_examples=self.signal_examples,
-			#		noise_examples=self.noise_examples
-			#	)
+	#		## Save the data
+	#		#if examples_dir is not None:
+	#		#	save_path = os.path.join(examples_dir, '0.npz')
+	#		#	np.savez(
+	#		#		save_path,
+	#		#		signal_examples=self.signal_examples,
+	#		#		noise_examples=self.noise_examples
+	#		#	)
 
-			yield signal_examples, noise_examples
-
-
-	def generate_dataset_worker(self, file_iterator, macrobatch_queue):
-		macrobatches = self.generate_macrobatches(file_iterator)
-		for signal_examples, noise_examples in macrobatches:
-			if self.verbose:
-				print 'sending macrobatch to parent process'
-			macrobatch_queue.put((signal_examples, noise_examples))
-
-		macrobatch_queue.close()
+	#		yield signal_examples, noise_examples
 
 
-	def generate_dataset_parallel(self, save_dir=None):
-		'''
-		Parallel version of generate_dataset_serial.  Each worker is 
-		responsible for saving its own part of the dataset to disk, called 
-		a macrobatch.  the files are saved at 
-		'save_dir/examples/<batch-num>.npz'.
-		'''
-		# This cannot be called before calling prepare(), unless a prepared
-		# UnigramDictionary was passed to the self's constructor
-		if not self.prepared:
-			raise DataSetReaderIllegalStateException(
-				"DatasetReader: generate_examples() cannot be called "
-				"before prepare() is called unless a prepared "
-				"UnigramDictionary has was passed into the DatasetReader's "
-				"constructor."
-			)
+	#def generate_dataset_worker(self, file_iterator, macrobatch_queue):
+	#	macrobatches = self.generate_macrobatches(file_iterator)
+	#	for signal_examples, noise_examples in macrobatches:
+	#		if self.verbose:
+	#			print 'sending macrobatch to parent process'
+	#		macrobatch_queue.put((signal_examples, noise_examples))
 
-		# We save dataset in the "examples" subdir of the model_dir
-		if save_dir is not None:
-			examples_dir = os.path.join(save_dir, 'examples')
-			# We are willing to create both the save_dir, and the
-			# 'examples' subdir, but not their parents
-			if not os.path.exists(save_dir):
-				os.mkdir(save_dir)
-			if not os.path.exists(examples_dir):
-				os.mkdir(examples_dir)
-		else:
-			examples_dir = None
-
-		file_queue = IterableQueue()
-		macrobatch_queue = IterableQueue(self.max_queue_size)
-
-		# Put all the filenames on a producer queue
-		file_producer = file_queue.get_producer()
-		for filename in self.generate_filenames():
-			file_producer.put(filename)
-		file_producer.close()
-
-		# Start a bunch of worker processes
-		for process_num in range(self.num_processes):
-			# Hop to a new location in the random-number-generator's state chain
-			reseed()
-			# Start child process that generates a portion of the dataset
-			args = (
-				file_queue.get_consumer(),
-				macrobatch_queue.get_producer()
-			)
-			Process(target=self.generate_dataset_worker, args=args).start()
-
-		# This will receive the macrobatches from all workers
-		macrobatch_consumer = macrobatch_queue.get_consumer()
-
-		# Close the iterable queues
-		file_queue.close()
-		macrobatch_queue.close()
-
-		# Retrieve the macrobatches from the workers, write them to file
-		signal_macrobatches = []
-		noise_macrobatches = []
-		for macrobatch_num, (signal_macrobatch, noise_macrobatch) in enumerate(macrobatch_consumer):
-			if self.verbose:
-				print 'receiving macrobatch from child process'
-			if examples_dir is not None:
-				save_path = os.path.join(examples_dir, '%d.npz' % macrobatch_num)
-				#np.savez(
-				#	save_path,
-				#	signal_examples=signal_macrobatch,
-				#	noise_examples=noise_macrobatch
-				#)
-
-			yield signal_macrobatch, noise_macrobatch
-			#signal_macrobatches.append(signal_macrobatch)
-			#noise_macrobatches.append(noise_macrobatch)
-
-		# Concatenate the macrobatches, and return the dataset
-		#print 'amalgamating macrobatches'
-		#self.signal_examples = np.concatenate(signal_macrobatches)
-		#self.noise_examples = np.concatenate(noise_macrobatches)
-		#self.data_loaded = True
-		#print 'returning dataset'
-		#return self.signal_examples, self.noise_examples
+	#	macrobatch_queue.close()
 
 
-	def numpyify(self, examples):
-		'''
-		Make an int32-type numpy array, ensuring that, even if the list of
-		examples is empty, the array is two-dimensional, with the second
-		dimension (i.e. number of columns) being 3.
-		'''
+	#def generate_dataset_parallel(self, save_dir=None):
+	#	'''
+	#	Parallel version of generate_dataset_serial.  Each worker is 
+	#	responsible for saving its own part of the dataset to disk, called 
+	#	a macrobatch.  the files are saved at 
+	#	'save_dir/examples/<batch-num>.npz'.
+	#	'''
+	#	# This cannot be called before calling prepare(), unless a prepared
+	#	# UnigramDictionary was passed to the self's constructor
+	#	if not self.prepared:
+	#		raise DataSetReaderIllegalStateException(
+	#			"DatasetReader: generate_examples() cannot be called "
+	#			"before prepare() is called unless a prepared "
+	#			"UnigramDictionary has was passed into the DatasetReader's "
+	#			"constructor."
+	#		)
 
-		try:
-			if len(examples) > 0:
-				examples = np.array(examples, dtype='int32')
-			else:
-				examples = np.empty(shape=(0,3), dtype='int32')
-		except ValueError:
-			for row in examples:
-				print len(row), row
-			raise
+	#	# We save dataset in the "examples" subdir of the model_dir
+	#	if save_dir is not None:
+	#		examples_dir = os.path.join(save_dir, 'examples')
+	#		# We are willing to create both the save_dir, and the
+	#		# 'examples' subdir, but not their parents
+	#		if not os.path.exists(save_dir):
+	#			os.mkdir(save_dir)
+	#		if not os.path.exists(examples_dir):
+	#			os.mkdir(examples_dir)
+	#	else:
+	#		examples_dir = None
 
-		return examples
+	#	file_queue = IterableQueue()
+	#	macrobatch_queue = IterableQueue(self.max_queue_size)
 
+	#	# Put all the filenames on a producer queue
+	#	file_producer = file_queue.get_producer()
+	#	for filename in self.generate_filenames():
+	#		file_producer.put(filename)
+	#	file_producer.close()
+
+	#	# Start a bunch of worker processes
+	#	for process_num in range(self.num_processes):
+	#		# Hop to a new location in the random-number-generator's state chain
+	#		reseed()
+	#		# Start child process that generates a portion of the dataset
+	#		args = (
+	#			file_queue.get_consumer(),
+	#			macrobatch_queue.get_producer()
+	#		)
+	#		Process(target=self.generate_dataset_worker, args=args).start()
+
+	#	# This will receive the macrobatches from all workers
+	#	macrobatch_consumer = macrobatch_queue.get_consumer()
+
+	#	# Close the iterable queues
+	#	file_queue.close()
+	#	macrobatch_queue.close()
+
+	#	# Retrieve the macrobatches from the workers, write them to file
+	#	signal_macrobatches = []
+	#	noise_macrobatches = []
+	#	for macrobatch_num, (signal_macrobatch, noise_macrobatch) in enumerate(macrobatch_consumer):
+	#		if self.verbose:
+	#			print 'receiving macrobatch from child process'
+	#		if examples_dir is not None:
+	#			save_path = os.path.join(examples_dir, '%d.npz' % macrobatch_num)
+	#			#np.savez(
+	#			#	save_path,
+	#			#	signal_examples=signal_macrobatch,
+	#			#	noise_examples=noise_macrobatch
+	#			#)
+
+	#		yield signal_macrobatch, noise_macrobatch
+	#		#signal_macrobatches.append(signal_macrobatch)
+	#		#noise_macrobatches.append(noise_macrobatch)
+
+	#	# Concatenate the macrobatches, and return the dataset
+	#	#print 'amalgamating macrobatches'
+	#	#self.signal_examples = np.concatenate(signal_macrobatches)
+	#	#self.noise_examples = np.concatenate(noise_macrobatches)
+	#	#self.data_loaded = True
+	#	#print 'returning dataset'
+	#	#return self.signal_examples, self.noise_examples
+
+
+	#def numpyify(self, examples):
+	#	'''
+	#	Make an int32-type numpy array, ensuring that, even if the list of
+	#	examples is empty, the array is two-dimensional, with the second
+	#	dimension (i.e. number of columns) being 3.
+	#	'''
+
+	#	try:
+	#		if len(examples) > 0:
+	#			examples = np.array(examples, dtype='int32')
+	#		else:
+	#			examples = np.empty(shape=(0,3), dtype='int32')
+	#	except ValueError:
+	#		for row in examples:
+	#			print len(row), row
+	#		raise
+
+	#	return examples
 
 
 	def eliminate_spans(self, token_ids, spans):
