@@ -956,6 +956,10 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 	#			print 'padded to length:', len(signal_macrobatch)
 	#		yield signal_macrobatch, noise_macrobatch
 
+	
+	def get_padding_row(self):
+		return [UNK,UNK] + [UNK] * self.len_context
+
 
 	def generate_examples(self, filename_iterator):
 
