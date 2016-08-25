@@ -24,7 +24,7 @@ else:
 	from lasagne.updates import nesterov_momentum
 
 
-def relation2vec(
+def entity_pair2vec(
 
 	# Input / output options
 	files=[],
@@ -124,8 +124,8 @@ def relation2vec(
 	embedder = Embedder(
 		input_var=minibatcher.get_batch(),
 		batch_size=full_batch_size,
-		query_vocab_size=reader.query_vocab_size(),
-		context_vocab_size=reader.context_vocab_size(),
+		query_vocabulary_size=reader.query_vocab_size(),
+		context_vocabulary_size=reader.context_vocab_size(),
 		num_embedding_dimensions=num_embedding_dimensions,
 		query_embedding_init=query_embedding_init,
 		context_embedding_init=context_embedding_init,

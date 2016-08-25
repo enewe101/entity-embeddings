@@ -106,7 +106,7 @@ class EntityPair2VecDatasetReader(Word2VecDatasetReader):
 		noise_ratio=15,
 		t=1.0,
 		num_processes=3,
-		entity_pair_dictionary=None,
+		query_dictionary=None,
 		context_dictionary=None,
 		load_dictionary_dir=None,
 		max_queue_size=0,
@@ -139,13 +139,13 @@ class EntityPair2VecDatasetReader(Word2VecDatasetReader):
 		)
 
 		# Register the parameters that don't exist for the base class
-		entity_pair_dictionary=entity_pair_dictionary
+		query_dictionary=query_dictionary
 		context_dictionary=context_dictionary
 		load_dictionary_dir=load_dictionary_dir
 		#self.signal_sample_mode=signal_sample_mode
 
 		# Usually the dictionaries are made from scratch
-		self.entity_pair_dictionary = UnigramDictionary()
+		self.query_dictionary = UnigramDictionary()
 		self.context_dictionary = UnigramDictionary()
 
 		# But if a dictionary dir was given, load from there
@@ -158,10 +158,10 @@ class EntityPair2VecDatasetReader(Word2VecDatasetReader):
 			self.load_dictionary(load_dictionary_dir)
 
 		# Or, if an existing dictionary was passed in, use it
-		if entity_pair_dictionary is not None:
+		if query_dictionary is not None:
 			if verbose:
 				print 'An entity dictionary was supplied.'
-			self.entity_pair_dictionary = entity_pair_dictionary
+			self.query_dictionary = query_dictionary
 
 		# (same but for context dictionary)
 		if context_dictionary:
@@ -173,7 +173,7 @@ class EntityPair2VecDatasetReader(Word2VecDatasetReader):
 		self.prepared = False
 		if load_dictionary_dir is not None:
 			self.prepared = True
-		elif context_dictionary and entity_pair_dictionary:
+		elif context_dictionary and query_dictionary:
 			self.prepared = True
 
 
@@ -185,8 +185,8 @@ class EntityPair2VecDatasetReader(Word2VecDatasetReader):
 		)
 
 
-	def entity_vocab_size(self):
-		return len(self.entity_pair_dictionary)
+	def query_vocab_size(self):
+		return len(self.query_dictionary)
 
 
 	def context_vocab_size(self):
@@ -198,16 +198,16 @@ class EntityPair2VecDatasetReader(Word2VecDatasetReader):
 		Load both the dictionary and context_dictionary, assuming default
 		filenames subfolers (entity-pair-dictionary and context-dictionary)
 		'''
-		self.entity_pair_dictionary.load(os.path.join(
-			load_dir, 'entity-pair-dictionary'
+		self.query_dictionary.load(os.path.join(
+			load_dir, 'query-dictionary'
 		))
 		self.context_dictionary.load(os.path.join(
 			load_dir, 'context-dictionary'
 		))
 
 
-	def load_entity_dictionary(self, filename):
-		self.entity_pair_dictionary.load(filename)
+	def load_query_dictionary(self, filename):
+		self.query_dictionary.load(filename)
 
 
 	def load_context_dictionary(self, filename):
@@ -227,14 +227,14 @@ class EntityPair2VecDatasetReader(Word2VecDatasetReader):
 			os.mkdir(save_dir)
 
 		# Delegate saving the dictionaries to the dictionary instances
-		self.entity_pair_dictionary.save(
-			os.path.join(save_dir, 'entity-pair-dictionary'))
+		self.query_dictionary.save(
+			os.path.join(save_dir, 'query-dictionary'))
 		self.context_dictionary.save(
 			os.path.join(save_dir, 'context-dictionary'))
 
 
-	def save_entity_dictionary(self, filename):
-		self.entity_pair_dictionary.save(filename)
+	def save_query_dictionary(self, filename):
+		self.query_dictionary.save(filename)
 
 
 	def save_context_dictionary(self, filename):
@@ -255,7 +255,7 @@ class EntityPair2VecDatasetReader(Word2VecDatasetReader):
 
 				# Update the entity-pair dictionary and context dictionary
 				self.context_dictionary.update(context_tokens)
-				self.entity_pair_dictionary.update(entity_pairs)
+				self.query_dictionary.update(entity_pairs)
 
 
 	def get_pairs(self, entity_spans):
@@ -272,7 +272,7 @@ class EntityPair2VecDatasetReader(Word2VecDatasetReader):
 		# Get all the entity pairs.  Enforce a unique ordering
 		# of the pair, by arbitrarily using lexicographic order
 		entity_pairs = [
-			(e1, e2) if e1 > e2 else (e2,e1) for e1, e2 in 
+			(e1, e2) if e1 < e2 else (e2,e1) for e1, e2 in 
 			itools.combinations(entity_spans.keys(),2)
 		]
 
@@ -297,18 +297,18 @@ class EntityPair2VecDatasetReader(Word2VecDatasetReader):
 				'\t...original vocabularies: entity, context = %d, %d'
 				% (
 					len(self.context_dictionary),
-					len(self.entity_pair_dictionary)
+					len(self.query_dictionary)
 			))
 
 		self.context_dictionary.prune(min_context_frequency)
-		self.entity_pair_dictionary.prune(min_query_frequency)
+		self.query_dictionary.prune(min_query_frequency)
 
 		if self.verbose:
 			print (
 				'\t...pruned vocabularies: entity, context = %d, %d'
 				% (
 					len(self.context_dictionary),
-					len(self.entity_pair_dictionary)
+					len(self.query_dictionary)
 			))
 
 
@@ -370,7 +370,7 @@ class EntityPair2VecDatasetReader(Word2VecDatasetReader):
 		'''
 		
 		# convert entity pairs into ids
-		entity_pair_id = self.entity_pair_dictionary.get_id(
+		entity_pair_id = self.query_dictionary.get_id(
 			entity_pair_str)
 
 		# Get the tokens between the entities as context
@@ -385,7 +385,7 @@ class EntityPair2VecDatasetReader(Word2VecDatasetReader):
 
 		# We create a single example for each of the context words.
 		signal_examples = [
-			[entity_pair_id, context_id] for context_id in context
+			[entity_pair_id, context_id] for context_id in context_ids
 		]
 
 		return signal_examples

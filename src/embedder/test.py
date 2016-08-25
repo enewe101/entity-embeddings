@@ -10,6 +10,7 @@ from lasagne.updates import nesterov_momentum
 import itertools as itools
 import unittest
 from r2v import relation2vec, read_context_embeddings
+from ep2v import entity_pair2vec
 from dataset_reader import (
 	EntityPair2VecDatasetReader, Relation2VecDatasetReader, 
 	DataSetReaderIllegalStateException, FULL_CONTEXT
@@ -740,6 +741,94 @@ class TestRelation2VecEmbedder(TestCase):
 			best = best_fitting_context_ids[i]
 			expected_best = expected_best_fitting_context_ids[i]
 			self.assertTrue(best in expected_best)
+
+
+class TestEntityPair2Vec(TestCase):
+
+	def test_learning_function(self):
+
+		# Seed randomness for a reproducible test.
+		np.random.seed(3)
+
+		# Some constants for the test
+		files = ['test-data/test-corpus/c.tsv']
+		batch_size = 3
+		macrobatch_size = 1551
+		noise_ratio = 15
+		num_embedding_dimensions = 5
+		num_epochs = 2
+		num_replicates = 5
+		learning_rate = 0.01
+		momentum = 0.9
+		tolerance = 0.25
+		save_dir = 'test-data/test-entity-pair-embedder'
+
+		# Train the embedder using the convenience function
+		embedder, reader = entity_pair2vec(
+			files=files,
+			save_dir=save_dir,
+			num_epochs=num_epochs,
+			min_query_frequency=0,
+			min_context_frequency=0,
+			noise_ratio=noise_ratio,
+			batch_size = batch_size,
+			macrobatch_size = macrobatch_size,
+			num_embedding_dimensions=num_embedding_dimensions,
+			learning_rate=learning_rate,
+			momentum=momentum,
+			verbose=False
+		)
+
+		# Get the IDs for the entities that occur together
+		# within the test corpus.  We'll be interested to see the
+		# relationship embedding for them that is learnt during training
+		edict = reader.query_dictionary
+		print edict.token_map.tokens
+		expected_pairs = ['A:::B', 'C:::D', 'E:::F']
+		expected_pairs_ids = [
+			edict.get_id(pair_str)
+			for pair_str in expected_pairs
+		]
+
+		# Get the parameters out of the trained model
+		W_relation, W_context = (
+			embedder.get_param_values()
+		)
+
+		# Get the embeddings for the entity-pairs ("relationships")
+		# occuring in the test corpus
+		embedded_relationships = embedder.embed(expected_pairs_ids)
+
+		# Take the dot product of the relationship embeddings
+		# with the context-word embeddings, and then process this
+		# through the sigmoid function.  This yields a
+		# relationship-context "fit-score", being larger if they
+		# have better fit according to the model.  The score has
+		# an interpretation as a probablity, see "Noise-Contrastive
+		# Estimation of Unnormalized Statistical Models, with
+		# Applications to Natural Image Statistics".
+		embedding_product = np.round(sigma(np.dot(
+			embedded_relationships, W_context.T
+		)),2)
+
+		print embedding_product
+
+		# Find the context words that fit best with each entity-pair.
+		# These should be equal to the ids for the contexts actually
+		# occuring along with those entity pairs in the coropus.  To see
+		# where these numbers come from, compare the contexts cooccurring
+		# with entity pairs in the test-corpus with their ids in the
+		# token_map saved at <savedir>
+		expected_best_fitting_context_ids = [2,5,8]
+		# The UNK token generally has high affinity for every relation 
+		# embedding because there is no strong gradient affecting it.  We 
+		# will mask the UNK before looking for best-fitting learned context
+		# for each relationship.
+		embedding_product[:,0] = 0
+		best_fitting_context_ids = np.argmax(embedding_product, axis=1)
+		self.assertTrue(np.array_equal(
+			best_fitting_context_ids, expected_best_fitting_context_ids
+		))
 
 
 

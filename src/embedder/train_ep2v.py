@@ -11,7 +11,7 @@ import numpy as np
 
 
 # Import internal libraries
-#from ep2v import entity_pair2vec
+from ep2v import entity_pair2vec
 from theano_minibatcher import NoiseContrastiveTheanoMinibatcher
 from dataset_reader import EntityPair2VecDatasetReader as DatasetReader
 from SETTINGS import DATA_DIR, COOCCURRENCE_DIR 
