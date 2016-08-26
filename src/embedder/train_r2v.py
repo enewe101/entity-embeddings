@@ -34,7 +34,7 @@ FILES = [
 	#os.path.join(COOCCURRENCE_DIR, '%s.tsv' % hex(i)[2:].zfill(3))
 	#for i in range(2)
 ]
-SKIP = [re.compile('README.txt')]
+SKIP = [r'README\.txt']
 BATCH_SIZE=int(1e4)
 MACROBATCH_SIZE=int(1e6)
 NOISE_RATIO = 15
@@ -103,11 +103,8 @@ def print_params(params):
 
 	# Print to stdout the set of parameters defining this run in a 
 	# json-like format, but with keys sorted lexicographically
-	params_to_print = dict(params)
-	if 'skip' in params_to_print:
-		params_to_print['skip'] = [r.pattern for r in params['skip']]
-	for key in sorted(params_to_print.keys()):
-		print key, '=', params_to_print[key]
+	for key in sorted(params.keys()):
+		print key, '=', repr(params[key])
 
 
 

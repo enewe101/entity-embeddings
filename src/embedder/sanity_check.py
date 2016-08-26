@@ -106,6 +106,8 @@ def load(
 	embeddings_dir
 ):
 
+	print 'loading embeddings from %s' % embeddings_dir
+	print 'loading dictionaries from %s' % load_dictionary_dir
 	# load the minibatch generator.  Prune very rare tokens.
 	print 'Loading and pruning dictionaries'
 	reader = DatasetReader(

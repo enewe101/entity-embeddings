@@ -145,6 +145,9 @@ class EntityPair2VecDatasetReader(Word2VecDatasetReader):
 		#self.signal_sample_mode=signal_sample_mode
 
 		# Usually the dictionaries are made from scratch
+		self.preapared = False
+		self.query_dict_loaded = False
+		self.context_dict_loaded = False
 		self.query_dictionary = UnigramDictionary()
 		self.context_dictionary = UnigramDictionary()
 
@@ -170,10 +173,7 @@ class EntityPair2VecDatasetReader(Word2VecDatasetReader):
 			self.context_dictionary = context_dictionary
 
 		# Keep track of whether the dictionaries have been prepared
-		self.prepared = False
-		if load_dictionary_dir is not None:
-			self.prepared = True
-		elif context_dictionary and query_dictionary:
+		if self.query_dict_loaded and self.context_dict_loaded:
 			self.prepared = True
 
 
@@ -205,13 +205,29 @@ class EntityPair2VecDatasetReader(Word2VecDatasetReader):
 			load_dir, 'context-dictionary'
 		))
 
+		# It is now possible to call the data generators
+		# `generate_dataset_serial()` and `generate_dataset_parallel()`
+		self.prepared = True
+
 
 	def load_query_dictionary(self, filename):
 		self.query_dictionary.load(filename)
 
+		# Once query and context dictionaries are loaded, one can call
+		# `generate_dataset_serial()` and `generate_dataset_parallel()`
+		self.query_dict_loaded = True
+		if self.query_dict_loaded and self.context_dict_loaded:
+			self.prepared = True
+
 
 	def load_context_dictionary(self, filename):
 		self.context_dictionary.load(filename)
+
+		# Once query and context dictionaries are loaded, one can call
+		# `generate_dataset_serial()` and `generate_dataset_parallel()`
+		self.context_dict_loaded = True
+		if self.query_dict_loaded and self.context_dict_loaded:
+			self.prepared = True
 
 
 	def save_dictionary(self, save_dir):
@@ -296,19 +312,19 @@ class EntityPair2VecDatasetReader(Word2VecDatasetReader):
 			print (
 				'\t...original vocabularies: entity, context = %d, %d'
 				% (
-					len(self.context_dictionary),
-					len(self.query_dictionary)
+					len(self.query_dictionary),
+					len(self.context_dictionary)
 			))
 
-		self.context_dictionary.prune(min_context_frequency)
 		self.query_dictionary.prune(min_query_frequency)
+		self.context_dictionary.prune(min_context_frequency)
 
 		if self.verbose:
 			print (
 				'\t...pruned vocabularies: entity, context = %d, %d'
 				% (
-					len(self.context_dictionary),
-					len(self.query_dictionary)
+					len(self.query_dictionary),
+					len(self.context_dictionary)
 			))
 
 
@@ -369,9 +385,13 @@ class EntityPair2VecDatasetReader(Word2VecDatasetReader):
 		combining these with the entities, produces a signal example
 		'''
 		
-		# convert entity pairs into ids
+		# convert entity pair into ids
 		entity_pair_id = self.query_dictionary.get_id(
 			entity_pair_str)
+
+		# Don't train on unrecognized entity pairs
+		if entity_pair_id == UNK:
+			return []
 
 		# Get the tokens between the entities as context
 		context_indices = find_tokens_between_closest_pair(
@@ -447,6 +467,9 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		kernel=None
 		t = 1.0
 
+		# Call the superclass's constructor.  Notice that we do not
+		# pass in the laod_dictionary_dir.  We handle all dictionary 
+		# here in the subclass instead.
 		super(Relation2VecDatasetReader, self).__init__(
 			files=files,
 			directories=directories,
@@ -475,6 +498,9 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 				)
 
 		# Usually the dictionaries are made from scratch
+		self.prepared = False
+		self.query_dict_loaded = False
+		self.context_dict_loaded = False
 		self.entity_dictionary = UnigramDictionary()
 		self.context_dictionary = UnigramDictionary()
 
@@ -489,18 +515,17 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 			if verbose:
 				print 'An entity dictionary was supplied.'
 			self.entity_dictionary = entity_dictionary
+			self.query_dict_loaded = True
 
 		# (same but for context dictionary)
 		if context_dictionary:
 			if verbose:
 				print 'A context dictionary was supplied.'
 			self.context_dictionary = context_dictionary
+			self.context_dict_loaded = True
 
 		# Keep track of whether the dictionaries have been prepared
-		self.prepared = False
-		if load_dictionary_dir is not None:
-			self.prepared = True
-		elif context_dictionary and entity_dictionary:
+		if self.query_dict_loaded and self.context_dict_loaded:
 			self.prepared = True
 
 
@@ -536,14 +561,29 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 			load_dir, 'context-dictionary'
 		))
 
+		# It is now possible to call the data generators
+		# `generate_dataset_serial()` and `generate_dataset_parallel()`
+		self.prepared = True
+
 
 	def load_entity_dictionary(self, filename):
 		self.entity_dictionary.load(filename)
+
+		# Once query and context dictionaries are loaded, one can call
+		# `generate_dataset_serial()` and `generate_dataset_parallel()`
+		self.query_dict_loaded = True
+		if self.query_dict_loaded and self.context_dict_loaded:
+			self.prepared = True
 
 
 	def load_context_dictionary(self, filename):
 		self.context_dictionary.load(filename)
 
+		# Once query and context dictionaries are loaded, one can call
+		# `generate_dataset_serial()` and `generate_dataset_parallel()`
+		self.query_dict_loaded = True
+		if self.query_dict_loaded and self.context_dict_loaded:
+			self.prepared = True
 
 	def save_dictionary(self, save_dir):
 		'''

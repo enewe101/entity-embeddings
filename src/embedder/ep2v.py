@@ -8,7 +8,6 @@ from word2vec import (
 from dataset_reader import (
 	EntityPair2VecDatasetReader as DatasetReader
 )
-from relation2vec_embedder import Relation2VecEmbedder
 from theano_minibatcher import NoiseContrastiveTheanoMinibatcher
 from r2v import read_context_embeddings, read_entity_embeddings
 
@@ -32,20 +31,20 @@ def entity_pair2vec(
 	skip=[],
 	save_dir=None,
 	read_data_async=True,
-	num_processes=3,
-	max_queue_size=0,
+	num_processes=12,
+	max_queue_size=2,
 
 	# Batching options
 	num_epochs=5,
-	batch_size = 1000,  # Number of *signal* examples per batch
+	batch_size = 200,  # Number of *signal* examples per batch
 	macrobatch_size = 100000,
 
 	# Dictionary options
 	query_dictionary=None,
 	context_dictionary=None,
 	load_dictionary_dir=None,
-	min_query_frequency=10,
-	min_context_frequency=10,
+	min_query_frequency=200,
+	min_context_frequency=20,
 
 	# Sampling options
 	noise_ratio=15,
@@ -53,7 +52,7 @@ def entity_pair2vec(
 	# Embeddings options
 	query_embeddings_fname=None,
 	context_embeddings_fname=None,
-	num_embedding_dimensions=500,
+	num_embedding_dimensions=300,
 	query_embedding_init=None,
 	context_embedding_init=None,
 
@@ -202,6 +201,7 @@ def entity_pair2vec(
 	# Save the model (the embeddings) if save_dir was provided
 	if save_dir is not None:
 		embedder.save(save_dir)
+		reader.save_dictionary(save_dir)
 
 	# Return the trained embedder and the dictionary mapping tokens
 	# to ids

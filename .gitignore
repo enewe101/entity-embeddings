@@ -9,4 +9,5 @@ env
 venv
 startenv
 test-data
-pbs
+src/embedder/pbs/*.stderr
+src/embedder/pbs/*.stdout

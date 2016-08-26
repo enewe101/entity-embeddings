@@ -33,20 +33,20 @@ FILES = [
 	#os.path.join(COOCCURRENCE_DIR, '%s.tsv' % hex(i)[2:].zfill(3))
 	#for i in range(2)
 ]
-SKIP = [re.compile('README.txt')]
-BATCH_SIZE=int(1e4)
+SKIP = [r'README\.txt']
+BATCH_SIZE=int(2e2)
 MACROBATCH_SIZE=int(1e6)
 NOISE_RATIO = 15
-MIN_QUERY_FREQUENCY = 10
-MIN_CONTEXT_FREQUENCY = 10
-NUM_EMBEDDING_DIMENSIONS = 500
+MIN_QUERY_FREQUENCY = 200
+MIN_CONTEXT_FREQUENCY = 20
+NUM_EMBEDDING_DIMENSIONS = 300
 NUM_EPOCHS = 1
 LEARNING_RATE = 0.002
-NUM_PROCESSES = 1
+NUM_PROCESSES = 12
 MOMENTUM = 0.9
 MAX_QUEUE_SIZE = 2
 VERBOSE = True
-LOAD_DICT_DIR = os.path.join(DATA_DIR, 'dictionaries')
+LOAD_DICT_DIR = os.path.join(DATA_DIR, 'entity-pair-dictionaries')
 READ_DATA_ASYNC = True
 CONTEXT_EMBEDDINGS_FNAME = os.path.join(
 	DATA_DIR, 'google-vectors-negative-300.txt')
@@ -71,6 +71,7 @@ legal_params = {
 	'momentum', 'verbose', 'num_processes', 'read_data_async',
 	'context_embeddings_fname', 'load_dictionary_dir', 'freeze_context'
 }
+
 
 def commandline2dict():
 	properties = {}
@@ -98,11 +99,8 @@ def print_params(params):
 
 	# Print to stdout the set of parameters defining this run in a 
 	# json-like format, but with keys sorted lexicographically
-	params_to_print = dict(params)
-	if 'skip' in params_to_print:
-		params_to_print['skip'] = [r.pattern for r in params['skip']]
-	for key in sorted(params_to_print.keys()):
-		print key, '=', params_to_print[key]
+	for key in sorted(params.keys()):
+		print key, '=', repr(params[key])
 
 
 
