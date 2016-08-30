@@ -757,19 +757,20 @@ class TestEntityPair2Vec(TestCase):
 		noise_ratio = 15
 		num_embedding_dimensions = 5
 		num_epochs = 2
-		num_replicates = 5
 		learning_rate = 0.01
 		momentum = 0.9
 		tolerance = 0.25
 		save_dir = 'test-data/test-entity-pair-embedder'
+		min_query_frequency = 0
+		min_context_frequency = 0
 
 		# Train the embedder using the convenience function
 		embedder, reader = entity_pair2vec(
 			files=files,
 			save_dir=save_dir,
 			num_epochs=num_epochs,
-			min_query_frequency=0,
-			min_context_frequency=0,
+			min_query_frequency=min_query_frequency,
+			min_context_frequency=min_context_frequency,
 			noise_ratio=noise_ratio,
 			batch_size = batch_size,
 			macrobatch_size = macrobatch_size,

@@ -263,7 +263,7 @@ class EntityPair2VecDatasetReader(Word2VecDatasetReader):
 		# so generate all pairwise combinations.  Add all pairwise
 		# entity combiations and all context tokens to the respective
 		# dictionaries
-		for filename in self.generate_filenames():
+		for i, filename in enumerate(self.generate_filenames()):
 			for line in self.parse(filename):
 
 				context_tokens, entity_spans = line

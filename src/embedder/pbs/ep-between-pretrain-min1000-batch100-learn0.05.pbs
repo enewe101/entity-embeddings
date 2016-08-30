@@ -3,7 +3,7 @@
 #PBS -l walltime=12:00:00
 #PBS -o /gs/project/eeg-641-aa/enewel3/entity-embeddings/src/embedder/pbs/entity-pair-pretrain-freeze-between.stdout
 #PBS -e /gs/project/eeg-641-aa/enewel3/entity-embeddings/src/embedder/pbs/entity-pair-pretrain-freeze-between.stderr
-#PBS -N entity-pair-pretrain-freeze-between
+#PBS -N ep-between-min1000-batch100-learn0.05
 
 # Load modules, go to source dir, activate virtualenv
 module load Python/2.7.10 CUDA/7.5.18 cuDNN/5.0-ga
@@ -11,36 +11,36 @@ cd /gs/project/eeg-641-aa/enewel3/entity-embeddings/src/embedder
 source ../../env/bin/activate
 
 # Define variables
-save_dir=/gs/project/eeg-641-aa/enewel3/entity-embeddings/data/entity-pair-pretrain-freeze-between
-min_query_frequency=200
+save_dir=/gs/project/eeg-641-aa/enewel3/entity-embeddings/data/ep-between-pretrain-min1000-batch100-learn0.05
+min_query_frequency=1000
 min_context_frequency=20
 
 # Run the model
 THEANO_FLAGS='floatX=float32,device=gpu' python train_ep2v.py \
 command=train \
 save_dir=$save_dir \
-batch_size=10 \
+batch_size=100 \
 macrobatch_size=5000 \
 noise_ratio=15 \
 min_query_frequency=$min_query_frequency \
 min_context_frequency=$min_context_frequency \
 num_embedding_dimensions=300 \
 num_epochs=1 \
-learning_rate=0.01 \
+learning_rate=0.05 \
 num_processes=12 \
 momentum=0.9 \
 max_queue_size=2 \
 verbose=true \
 load_dictionary_dir=/gs/project/eeg-641-aa/enewel3/entity-embeddings/data/entity-pair-dictionaries \
 read_data_async=true \
-context_embeddings_fname=null \
+context_embeddings_fname=/gs/project/eeg-641-aa/enewel3/entity-embeddings/data/google-vectors-negative-300.txt \
 freeze_context=null
 
-#/gs/project/eeg-641-aa/enewel3/entity-embeddings/data/google-vectors-negative-300.txt \
 
 #python sanity_check.py \
 #embeddings_dir=$save_dir \
 #load_dictionary_dir=$save_dir \
 #min_query_frequency=$min_query_frequency
 #min_context_frequency=$min_context_frequency
+
 
