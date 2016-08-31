@@ -51,12 +51,23 @@ class TestPairDictionary(TestCase):
 		('A','B'),
 		('A','B'),
 		('A','B'),
+		('A','B'),
+		('A','B'),
 
 		('C','D'),
 		('C','E'),
+		('C','E'),
+
 		('C','F'),
+		('C','F'),
+		('C','F'),
+
+		('C','G'),
+		('C','G'),
+		('C','G'),
 		('C','G'),
 
+		('D','E'),
 		('D','E'),
 		('D','E'),
 		('E','D'),
@@ -69,16 +80,43 @@ class TestPairDictionary(TestCase):
 		pair_dictionary.update(self.PAIRS)
 		delimiter = pair_dictionary.delimiter
 
+		pair_counter = Counter(self.PAIRS)
+		sorted_pairs = ['UNK'] + [
+			'A:::B', 'D:::E', 'C:::G', 'C:::F', 'C:::E', 'C:::D'
+		]
+		sorted_counts = [0] + [6, 5, 4, 3, 2, 1]
+
+		self.assertNotEqual(pair_dictionary.token_map.tokens, sorted_pairs)
+		self.assertNotEqual(
+			pair_dictionary.counter_sampler.counts, sorted_counts
+		)
+
+		pair_dictionary.sort()
+
+		self.assertEqual(pair_dictionary.token_map.tokens, sorted_pairs)
+		self.assertEqual(
+			pair_dictionary.counter_sampler.counts, sorted_counts
+		)
+
 		AB_id, BA_id = pair_dictionary.get_ids([('A', 'B'), ('B','A')])
-		self.assertEqual(pair_dictionary.get_frequency(AB_id), 4)
-		self.assertEqual(pair_dictionary.get_frequency(BA_id), 4)
+		self.assertEqual(pair_dictionary.get_frequency(AB_id), 6)
+		self.assertEqual(pair_dictionary.get_frequency(BA_id), 6)
 
 		DE_id, ED_id = pair_dictionary.get_ids([('D','E'), ('E','D')])
-		self.assertEqual(pair_dictionary.get_frequency(DE_id), 4)
-		self.assertEqual(pair_dictionary.get_frequency(ED_id), 4)
-		for c in 'DEFG':
-			Cc_id = pair_dictionary.get_id(('C',c))
-			self.assertEqual(pair_dictionary.get_frequency(Cc_id), 1)
+		self.assertEqual(pair_dictionary.get_frequency(DE_id), 5)
+		self.assertEqual(pair_dictionary.get_frequency(ED_id), 5)
+
+		CD_id = pair_dictionary.get_id(('C','D'))
+		self.assertEqual(pair_dictionary.get_frequency(CD_id), 1)
+
+		CE_id = pair_dictionary.get_id(('C','E'))
+		self.assertEqual(pair_dictionary.get_frequency(CE_id), 2)
+
+		CF_id = pair_dictionary.get_id(('C','F'))
+		self.assertEqual(pair_dictionary.get_frequency(CF_id), 3)
+
+		CG_id = pair_dictionary.get_id(('C','G'))
+		self.assertEqual(pair_dictionary.get_frequency(CG_id), 4)
 
 		self.assertEqual(
 			pair_dictionary.singles_map['A'], 
@@ -108,17 +146,17 @@ class TestPairDictionary(TestCase):
 			{'D%sE' % delimiter}
 		)
 
-		pair_dictionary.prune(min_frequency=4)
+		pair_dictionary.prune(min_frequency=5)
 		for c in 'DEFG':
 			Cc_id = pair_dictionary.get_id(('C',c))
 			self.assertEqual(Cc_id, UNK)
 		AB_id, BA_id = pair_dictionary.get_ids([('A', 'B'), ('B','A')])
-		self.assertEqual(pair_dictionary.get_frequency(AB_id), 4)
-		self.assertEqual(pair_dictionary.get_frequency(BA_id), 4)
+		self.assertEqual(pair_dictionary.get_frequency(AB_id), 6)
+		self.assertEqual(pair_dictionary.get_frequency(BA_id), 6)
 
 		DE_id, ED_id = pair_dictionary.get_ids([('D','E'), ('E','D')])
-		self.assertEqual(pair_dictionary.get_frequency(DE_id), 4)
-		self.assertEqual(pair_dictionary.get_frequency(ED_id), 4)
+		self.assertEqual(pair_dictionary.get_frequency(DE_id), 5)
+		self.assertEqual(pair_dictionary.get_frequency(ED_id), 5)
 
 		self.assertEqual(
 			pair_dictionary.singles_map['A'], 
