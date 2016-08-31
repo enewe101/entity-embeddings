@@ -88,24 +88,16 @@ def entity_pair2vec(
 		query_dictionary=query_dictionary,
 		context_dictionary=context_dictionary,
 		load_dictionary_dir=load_dictionary_dir,
+		min_query_frequency=min_query_frequency,
+		min_context_frequency=min_context_frequency,
 		verbose=verbose
 	)
 
 	# Prepare the dataset reader (this produces unigram stats)
-	both_dictionaries_supplied = context_dictionary and query_dictionary
-	if load_dictionary_dir is None and not both_dictionaries_supplied:
+	if not reader.is_prepared():
 		if verbose:
 			print 'preparing dictionaries...'
 		reader.prepare(save_dir=save_dir)
-
-	# If any min frequencies were specified, prune the dictionaries
-	if min_query_frequency is not None or min_context_frequency is not None:
-		if verbose:
-			print 'pruning dictionaries...'
-		reader.prune(
-			min_query_frequency=min_query_frequency, 
-			min_context_frequency=min_context_frequency
-		)
 
 	# Make a symbolic minibatcher 
 	minibatcher = NoiseContrastiveTheanoMinibatcher(

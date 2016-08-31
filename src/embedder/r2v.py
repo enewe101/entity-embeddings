@@ -88,9 +88,11 @@ def relation2vec(
 	# Dictionary options
 	entity_dictionary=None,
 	context_dictionary=None,
+	entity_pair_dictionary=None,
 	load_dictionary_dir=None,
 	min_query_frequency=0,
 	min_context_frequency=0,
+	min_entity_pair_frequency=0,
 
 	# Sampling options
 	noise_ratio=15,
@@ -143,6 +145,10 @@ def relation2vec(
 		num_processes=num_processes,
 		entity_dictionary=entity_dictionary,
 		context_dictionary=context_dictionary,
+		entity_pair_dictionary=entity_pair_dictionary,
+		min_query_frequency=min_query_frequency,
+		min_context_frequency=min_context_frequency,
+		min_entity_pair_frequency=min_entity_pair_frequency,
 		load_dictionary_dir=load_dictionary_dir,
 		signal_sample_mode=signal_sample_mode,
 		len_context=len_context,
@@ -150,21 +156,10 @@ def relation2vec(
 	)
 
 	# Prepare the dataset reader (this produces unigram stats)
-	both_dictionaries_supplied = context_dictionary and entity_dictionary
-	if load_dictionary_dir is None and not both_dictionaries_supplied:
+	if not reader.is_prepared():
 		if verbose:
 			print 'preparing dictionaries...'
 		reader.prepare(save_dir=save_dir)
-
-	# If either min_query_frequency or min_context_frequency is positive, 
-	# prune the dictionaries accordingly
-	if min_query_frequency > 0 or min_context_frequency > 0:
-		if verbose:
-			print 'pruning dictionaries...'
-		reader.prune(
-			min_query_frequency=min_query_frequency,
-			min_context_frequency=min_context_frequency
-		)
 
 	# Make a symbolic minibatcher 
 	minibatcher = NoiseContrastiveTheanoMinibatcher(
