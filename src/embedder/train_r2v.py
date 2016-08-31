@@ -40,6 +40,7 @@ MACROBATCH_SIZE=int(1e6)
 NOISE_RATIO = 15
 MIN_QUERY_FREQUENCY = 10
 MIN_CONTEXT_FREQUENCY = 10
+MIN_ENTITY_PAIR_FREQUENCY = 10
 NUM_EMBEDDING_DIMENSIONS = 500
 NUM_EPOCHS = 1
 LEARNING_RATE = 0.002
@@ -69,7 +70,8 @@ def train(params):
 
 legal_params = {
 	'command', 'files', 'directories', 'skip', 'save_dir', 'num_epochs',
-	'min_query_frequency', 'min_context_frequency', 'noise_ratio', 
+	'min_query_frequency', 'min_context_frequency', 
+	'min_entity_pair_frequency', 'noise_ratio', 
 	'batch_size', 'macrobatch_size',
 	'max_queue_size', 'num_embedding_dimensions', 'learning_rate',
 	'momentum', 'verbose', 'num_processes', 'read_data_async',
@@ -172,6 +174,7 @@ if __name__ == '__main__':
 			'load_dictionary_dir': LOAD_DICT_DIR,
 			'min_query_frequency': MIN_QUERY_FREQUENCY,
 			'min_context_frequency': MIN_CONTEXT_FREQUENCY,
+			'min_entity_pair_frequency': MIN_ENTITY_PAIR_FREQUENCY,
 			'noise_ratio': NOISE_RATIO,
 			'batch_size': BATCH_SIZE,
 			'macrobatch_size': MACROBATCH_SIZE,

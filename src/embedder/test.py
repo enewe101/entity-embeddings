@@ -176,16 +176,17 @@ class TestEntityPair2VecDatasetReader(TestCase):
 		reader = EntityPair2VecDatasetReader(files=files)
 		reader.prepare(save_dir)
 		expected_token_map = [
-			'UNK', 'YAGO:Xinhua_News_Agency:::YAGO:Beijing',
-			'YAGO:Xinhua_News_Agency:::YAGO:Guangzhou',
-			'YAGO:United_States:::YAGO:Beijing',
-			'YAGO:United_States:::YAGO:Guangzhou',
-			'YAGO:Xinhua_News_Agency:::YAGO:United_States',
-			'YAGO:Guangzhou:::YAGO:Beijing', 'YAGO:Israel:::YAGO:Baalbek', 
-			'YAGO:Lebanon:::YAGO:Baalbek', 'YAGO:Lebanon:::YAGO:Israel',
-			'YAGO:United_States:::YAGO:Alexi_Lalas'
-		] 
-		found_token_map = reader.entity_pair_dictionary.token_map.tokens
+			'UNK', 'YAGO:Beijing:::YAGO:Xinhua_News_Agency', 
+			'YAGO:Beijing:::YAGO:Guangzhou',
+			'YAGO:Guangzhou:::YAGO:United_States',
+			'YAGO:United_States:::YAGO:Xinhua_News_Agency',
+			'YAGO:Beijing:::YAGO:United_States',
+			'YAGO:Guangzhou:::YAGO:Xinhua_News_Agency',
+			'YAGO:Baalbek:::YAGO:Israel', 'YAGO:Israel:::YAGO:Lebanon',
+			'YAGO:Baalbek:::YAGO:Lebanon',
+			'YAGO:Alexi_Lalas:::YAGO:United_States'
+		]
+		found_token_map = reader.query_dictionary.token_map.tokens
 		self.assertEqual(found_token_map, expected_token_map)
 
 
@@ -1186,7 +1187,7 @@ class TestEntityPair2Vec(TestCase):
 		# within the test corpus.  We'll be interested to see the
 		# relationship embedding for them that is learnt during training
 		edict = reader.query_dictionary
-		expected_pairs = ['A:::B', 'C:::D', 'E:::F']
+		expected_pairs = [('A','B'), ('C','D'), ('E','F')]
 		expected_pairs_ids = [
 			edict.get_id(pair_str)
 			for pair_str in expected_pairs
@@ -2021,7 +2022,7 @@ class TestDatasetReader(TestCase):
 		with self.assertRaises(DataSetReaderIllegalStateException):
 			list(reader.generate_dataset_parallel())
 
-		# Now prepare the dictionarise
+		# Now prepare the dictionaries
 		reader.prepare(save_dir=save_dir)
 
 		# With dictionaries prepared, generating the dataset should work
@@ -2054,13 +2055,16 @@ class TestDatasetReader(TestCase):
 			files=files,
 			macrobatch_size = batch_size,
 			noise_ratio=noise_ratio,
-			verbose=False
+			verbose=False,
+			min_entity_pair_frequency=0,
+			min_query_frequency=0,
+			min_context_frequency=0
 		)
 
 		# Load 2 out of 3 dictionaries.  Should raise an error when we
 		# try to generate data
-		new_reader.load_entity_dictionary(os.path.join(
-			save_dir, 'entity-dictionary'))
+		new_reader.load_entity_pair_dictionary(os.path.join(
+			save_dir, 'entity-pair-dictionary'))
 		new_reader.load_context_dictionary(os.path.join(
 			save_dir, 'context-dictionary'))
 		with self.assertRaises(DataSetReaderIllegalStateException):
@@ -2069,16 +2073,15 @@ class TestDatasetReader(TestCase):
 			list(new_reader.generate_dataset_parallel())
 
 		# Load the missing dictionary.  Should generate data now.
-		new_reader.load_entity_pair_dictionary(os.path.join(
-			save_dir, 'entity-pair-dictionary'))
+		new_reader.load_entity_dictionary(os.path.join(
+			save_dir, 'entity-dictionary'))
+		print list(new_reader.generate_dataset_parallel())
 		self.assertEqual(
 			len(list(new_reader.generate_dataset_parallel())), 5
 		)
 		self.assertEqual(
 			len(list(new_reader.generate_dataset_serial())), 5
 		)
-
-
 
 
 
@@ -2102,7 +2105,8 @@ class TestDatasetReader(TestCase):
 		)
 
 		reader.prepare(save_dir=save_dir)
-		self.assertEqual(reader.entity_vocab_size(), 10)
+
+		self.assertEqual(reader.entity_vocab_size(), 9)
 		self.assertEqual(reader.context_vocab_size(), 104)
 		self.assertEqual(reader.entity_pair_vocab_size(), 11)
 
@@ -2115,7 +2119,7 @@ class TestDatasetReader(TestCase):
 		new_reader.load_dictionary(save_dir)
 
 		# First check that the loaded dictionaries are of the correct size
-		self.assertEqual(new_reader.entity_vocab_size(), 10)
+		self.assertEqual(new_reader.entity_vocab_size(), 9)
 		self.assertEqual(new_reader.context_vocab_size(), 104)
 		self.assertEqual(new_reader.entity_pair_vocab_size(), 11)
 
@@ -2166,7 +2170,7 @@ class TestDatasetReader(TestCase):
 		new_reader.load_dictionary(save_dir)
 
 		# First check that the loaded dictionaries are of the correct size
-		self.assertEqual(new_reader.entity_vocab_size(), 10)
+		self.assertEqual(new_reader.entity_vocab_size(), 9)
 		self.assertEqual(new_reader.context_vocab_size(), 104)
 		self.assertEqual(new_reader.entity_pair_vocab_size(), 11)
 

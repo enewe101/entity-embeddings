@@ -38,7 +38,7 @@ def read_context_embeddings(embeddings_fname, reader, embedder):
 	# the file based on the word that appears in the first position
 	# on each line.  To do that, we need to already have a entity
 	# dictionary.
-	if not reader.prepared:
+	if not reader.is_prepared():
 		raise ValueError(
 			'Trying to load context embeddings from token-based embeddings '
 			'file without first preparing the reader.  The reader needs '
