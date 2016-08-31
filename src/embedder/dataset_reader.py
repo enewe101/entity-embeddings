@@ -741,23 +741,6 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		self.entity_pair_dictionary.prune(self.min_entity_pair_frequency)
 		self.prune_entity_dictionary()
 
-		## Eliminate entities from the entity_dictionary that don't arise
-		## in the frequent pairs left in the entity_pair_dictionary after
-		## it was pruned.
-		#entities = self.entity_dictionary.token_map.tokens
-		#for entity in entities:
-
-		#	# Don't try to remove the special UNK token
-		#	if entity == 'UNK':
-		#		continue
-
-		#	# Remove entities that aren't part of a retained pair
-		#	if entity not in self.entity_pair_dictionary.singles_map:
-		#		self.entity_dictionary.remove(entity)
-
-		## Compactify the dictionary after all the removals
-		#self.entity_dictionary.compact()
-
 		if self.verbose:
 			print (
 				'\t...pruned vocabularies: entity, context = %d, %d'

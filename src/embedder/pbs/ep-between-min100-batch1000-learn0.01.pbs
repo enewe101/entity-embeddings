@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -l nodes=1:ppn=12:gpus=1
-#PBS -l walltime=72:00:00
+#PBS -l walltime=12:00:00
 #PBS -o /gs/project/eeg-641-aa/enewel3/entity-embeddings/src/embedder/pbs/ep-between-min100-batch1000-learn0.01.stdout
 #PBS -e /gs/project/eeg-641-aa/enewel3/entity-embeddings/src/embedder/pbs/ep-between-min100-batch1000-learn0.01.stderr
 #PBS -N ep-between-min100-batch1000-learn0.01
