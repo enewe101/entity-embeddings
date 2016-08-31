@@ -26,6 +26,10 @@ class PairDictionary(UnigramDictionary):
 
 		self.delimiter = delimiter
 
+	def sort(self):
+		super(PairDictionary, self).sort()
+		self.build_singles_map()
+
 
 	def remove(self, token_pair):
 		token1, token2, pair_token = self.glom(token_pair)
