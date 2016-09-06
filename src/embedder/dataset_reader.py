@@ -113,10 +113,10 @@ def get_pairs(entity_spans):
 
 	# Convert the entity pairs to strings, and keep the corresponding
 	# spans associated to them
-	entity_pair_spans = {
-		p : (entity_spans[p[0]], entity_spans[p[1]])
+	entity_pair_spans = dict([
+		(p , (entity_spans[p[0]], entity_spans[p[1]]))
 		for p in entity_pairs
-	}
+	])
 
 	return entity_pair_spans
 
