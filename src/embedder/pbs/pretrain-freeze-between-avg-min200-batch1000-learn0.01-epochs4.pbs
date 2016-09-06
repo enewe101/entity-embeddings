@@ -1,9 +1,9 @@
 #!/bin/bash
 #PBS -l nodes=1:ppn=12:gpus=1
 #PBS -l walltime=12:00:00
-#PBS -o /gs/project/eeg-641-aa/enewel3/entity-embeddings/src/embedder/pbs/pretrain-freeze-between-avg-min1000-batch1000-learn0.01-epochs4.stdout
-#PBS -e /gs/project/eeg-641-aa/enewel3/entity-embeddings/src/embedder/pbs/pretrain-freeze-between-avg-min1000-batch1000-learn0.01-epochs4.stderr
-#PBS -N pretrain-freeze-between-avg-min1000-batch1000-learn0.01-epochs4
+#PBS -o /gs/project/eeg-641-aa/enewel3/entity-embeddings/src/embedder/pbs/pretrain-freeze-between-avg-min200-batch1000-learn0.01-epochs4.stdout
+#PBS -e /gs/project/eeg-641-aa/enewel3/entity-embeddings/src/embedder/pbs/pretrain-freeze-between-avg-min200-batch1000-learn0.01-epochs4.stderr
+#PBS -N pretrain-freeze-between-avg-min200-batch1000-learn0.01-epochs4
 
 # Load modules, go to source dir, activate virtualenv
 module load Python/2.7.10 CUDA/7.5.18 cuDNN/5.0-ga
@@ -11,7 +11,7 @@ cd /gs/project/eeg-641-aa/enewel3/entity-embeddings/src/embedder
 source ../../env/bin/activate
 
 # Define variables
-save_dir=/gs/project/eeg-641-aa/enewel3/entity-embeddings/data/pretrain-freeze-between-avg-min1000-batch1000-learn0.01-epochs4
+save_dir=/gs/project/eeg-641-aa/enewel3/entity-embeddings/data/pretrain-freeze-between-avg-min200-batch1000-learn0.01-epochs4
 context_embeddings_fname=/gs/project/eeg-641-aa/enewel3/entity-embeddings/data/google-vectors-negative-300.txt
 load_dictionary_dir=/gs/project/eeg-641-aa/enewel3/entity-embeddings/data/dictionaries
 
@@ -26,7 +26,7 @@ macrobatch_size=50000 \
 noise_ratio=15 \
 min_query_frequency=20 \
 min_context_frequency=20 \
-min_entity_pair_frequency=1000 \
+min_entity_pair_frequency=200 \
 num_embedding_dimensions=300 \
 num_epochs=4 \
 learning_rate=0.01 \

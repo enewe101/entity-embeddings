@@ -113,10 +113,10 @@ def get_pairs(entity_spans):
 
 	# Convert the entity pairs to strings, and keep the corresponding
 	# spans associated to them
-	entity_pair_spans = {
-		p : (entity_spans[p[0]], entity_spans[p[1]])
+	entity_pair_spans = dict([
+		(p , (entity_spans[p[0]], entity_spans[p[1]]))
 		for p in entity_pairs
-	}
+	])
 
 	return entity_pair_spans
 
@@ -740,23 +740,6 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		self.context_dictionary.prune(self.min_context_frequency)
 		self.entity_pair_dictionary.prune(self.min_entity_pair_frequency)
 		self.prune_entity_dictionary()
-
-		## Eliminate entities from the entity_dictionary that don't arise
-		## in the frequent pairs left in the entity_pair_dictionary after
-		## it was pruned.
-		#entities = self.entity_dictionary.token_map.tokens
-		#for entity in entities:
-
-		#	# Don't try to remove the special UNK token
-		#	if entity == 'UNK':
-		#		continue
-
-		#	# Remove entities that aren't part of a retained pair
-		#	if entity not in self.entity_pair_dictionary.singles_map:
-		#		self.entity_dictionary.remove(entity)
-
-		## Compactify the dictionary after all the removals
-		#self.entity_dictionary.compact()
 
 		if self.verbose:
 			print (

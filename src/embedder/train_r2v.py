@@ -82,7 +82,13 @@ legal_params = {
 def commandline2dict():
 	properties = {}
 	for arg in sys.argv[1:]:
-		key, val = arg.split('=')
+		try:
+			key, val = arg.split('=')
+		except ValueError:
+			raise ValueError(
+				'malformed arg: %s. Did you accidentally add a space?'
+				% arg
+			)
 
 		if key not in legal_params:
 			raise ValueError('Unrecognized argument: %s' % key)
