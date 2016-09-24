@@ -12,6 +12,7 @@ from word2vec import (
 	DataSetReaderIllegalStateException, #TheanoMinibatcher,
 	UnigramDictionary, reseed
 )
+from pair_dictionary import PairDictionary
 import numpy as np
 import gzip
 import os
@@ -20,7 +21,8 @@ from word2vec.token_map import UNK
 TAB_SPLITTER = re.compile(r'\t+')
 RANDOM_SINGLE_CHOICE = 0
 FULL_CONTEXT = 1
-
+MAX_LEN_SENTENCE = 80
+MAX_ENTITIES_PER_SENTENCE = 10
 
 def word2vec_parse(filename):
 
@@ -67,7 +69,10 @@ def relation2vec_parse(filename, verbose=True):
 		# Skip anything with more than 10 unique entities, or more than 
 		# 80 words
 		num_lines += 1
-		if num_unique > 10 or len(tokens) > 80:
+		if (
+			num_unique > MAX_ENTITIES_PER_SENTENCE 
+			or len(tokens) > MAX_LEN_SENTENCE
+		):
 			num_skipped += 1
 			continue
 
@@ -89,6 +94,348 @@ def relation2vec_parse(filename, verbose=True):
 	return tokenized_sentences
 
 
+def get_pairs(entity_spans):
+	'''
+	The input, entity_spans is a dictionary with keys being entity
+	canonicalized names, and values being the token spans corresponding
+	to references to that entity in a given sentence.  This function
+	produces all of the *pairs of entities*, and the 2-tuples of
+	their corresponding spans (one set of spans for each entity)
+	The entity pairs are guaranteed to be in lexicographic order so
+	that every entity-pair has a unique name
+	'''
+
+	# Get all the entity pairs.  Enforce a unique ordering
+	# of the pair, by arbitrarily using lexicographic order
+	entity_pairs = [
+		(e1, e2) for e1, e2 in itools.combinations(entity_spans.keys(),2)
+	]
+
+	# Convert the entity pairs to strings, and keep the corresponding
+	# spans associated to them
+	entity_pair_spans = dict([
+		(p , (entity_spans[p[0]], entity_spans[p[1]]))
+		for p in entity_pairs
+	])
+
+	return entity_pair_spans
+
+
+
+class EntityPair2VecDatasetReader(Word2VecDatasetReader):
+
+	NOT_DONE = 0
+	DONE = 1
+
+	def __init__(
+		self,
+		files=[],
+		directories=[],
+		skip=[],
+		noise_ratio=15,
+		t=1.0,
+		num_processes=3,
+		query_dictionary=None,
+		context_dictionary=None,
+		load_dictionary_dir=None,
+		min_query_frequency=0,
+		min_context_frequency=0,
+		max_queue_size=0,
+		macrobatch_size=20000,
+		parse=relation2vec_parse,
+		#signal_sample_mode=RANDOM_SINGLE_CHOICE,
+		verbose=True,
+	):
+
+		# These configurations, which exist for the base class,
+		# are clamped to None here because they don't make sense here.
+		unigram_dictionary = None
+		kernel = None
+
+		# Call the base class' __init__ function
+		super(EntityPair2VecDatasetReader, self).__init__(
+			files=files,
+			directories=directories,
+			skip=skip,
+			noise_ratio=noise_ratio,
+			t=t,
+			num_processes=num_processes,
+			unigram_dictionary=unigram_dictionary,
+			kernel=kernel,
+			max_queue_size=max_queue_size,
+			macrobatch_size=macrobatch_size,
+			parse=parse,
+			verbose=verbose
+		)
+
+		# Register the parameters that don't exist for the base class
+		#self.signal_sample_mode=signal_sample_mode
+		self.min_query_frequency = min_query_frequency
+		self.min_context_frequency = min_context_frequency
+
+		# Usually the dictionaries are made from scratch
+		self.query_dict_loaded = False
+		self.context_dict_loaded = False
+		self.query_dictionary = PairDictionary()
+		self.context_dictionary = UnigramDictionary()
+
+		# But if a dictionary dir was given, load from there
+		if load_dictionary_dir is not None:
+			if verbose:
+				print (
+					'Loading dictionary from: %s...' 
+					% load_dictionary_dir
+				)
+			self.load_dictionary(load_dictionary_dir)
+
+		# Or, if an existing dictionary was passed in, use it
+		if query_dictionary is not None:
+			if verbose:
+				print 'An entity dictionary was supplied.'
+			self.query_dictionary = query_dictionary
+			self.query_dictionary.prune(self.min_query_frequency)
+			self.query_dict_loaded = True
+
+		# (same but for context dictionary)
+		if context_dictionary:
+			if verbose:
+				print 'A context dictionary was supplied.'
+			self.context_dictionary = context_dictionary
+			self.context_dictionary.prune(self.min_context_frequency)
+			self.context_dict_loaded = True
+
+
+	def get_vocab_size(self):
+		raise NotImplementedError(
+			'Relation2VecDatasetReader: does not support '
+			'`get_vocab_size()`. use `entity_vocab_size()` or '
+			'`context_vocab_size()`.'
+		)
+
+
+	def query_vocab_size(self):
+		return len(self.query_dictionary)
+
+
+	def context_vocab_size(self):
+		return len(self.context_dictionary)
+
+
+	def load_dictionary(self, load_dir):
+		'''
+		Load both the dictionary and context_dictionary, assuming default
+		filenames subfolers (entity-pair-dictionary and context-dictionary)
+		'''
+		self.load_query_dictionary(os.path.join(
+			load_dir, 'query-dictionary'
+		))
+		self.load_context_dictionary(os.path.join(
+			load_dir, 'context-dictionary'
+		))
+
+
+	def is_prepared(self):
+
+		if (
+			self.query_dict_loaded 
+			and self.context_dict_loaded
+		):
+			return True
+		return False
+
+
+	def load_query_dictionary(self, filename):
+		self.query_dictionary.load(filename)
+		self.query_dictionary.prune(self.min_query_frequency)
+
+		# Once query and context dictionaries are loaded, one can call
+		# `generate_dataset_serial()` and `generate_dataset_parallel()`
+		self.query_dict_loaded = True
+
+
+	def load_context_dictionary(self, filename):
+		self.context_dictionary.load(filename)
+		self.context_dictionary.prune(self.min_context_frequency)
+
+		# Once query and context dictionaries are loaded, one can call
+		# `generate_dataset_serial()` and `generate_dataset_parallel()`
+		self.context_dict_loaded = True
+
+
+	def save_dictionary(self, save_dir):
+		'''
+		Save both the dictionary and context_dictionary, using default
+		filenames (coungter-sampler.gz and token-map.gz), by specifying
+		only their containing directory (save_dir).  `save_dir` will be
+		created if it doesn't exist.
+		'''
+
+		# Make save_dir if it doesn't exist
+		if not os.path.exists(save_dir):
+			os.mkdir(save_dir)
+
+		# Delegate saving the dictionaries to the dictionary instances
+		self.query_dictionary.save(
+			os.path.join(save_dir, 'query-dictionary'))
+		self.context_dictionary.save(
+			os.path.join(save_dir, 'context-dictionary'))
+
+
+	def save_query_dictionary(self, filename):
+		self.query_dictionary.save(filename)
+
+
+	def save_context_dictionary(self, filename):
+		self.context_dictionary.save(filename)
+
+
+	def preparation(self, savedir):
+		# For each line, get the context tokens and entity tokens.
+		# We're treating entity-pairs as the query objects to embed,
+		# so generate all pairwise combinations.  Add all pairwise
+		# entity combiations and all context tokens to the respective
+		# dictionaries
+		for i, filename in enumerate(self.generate_filenames()):
+			for line in self.parse(filename):
+
+				context_tokens, entity_spans = line
+				entity_pairs = get_pairs(entity_spans).keys()
+
+				# Update the entity-pair dictionary and context dictionary
+				self.context_dictionary.update(context_tokens)
+				self.query_dictionary.update(entity_pairs)
+
+		self.query_dict_loaded = True
+		self.context_dict_loaded = True
+
+
+	def prune(self):
+		'''
+		Very similar to baseclass implementation, but allows pruning the
+		context and query dictionaries based on different thresholds.
+		'''
+		if self.verbose:
+			print 'prunning dictionaries...'
+			print (
+				'\t...original vocabularies: entity, context = %d, %d'
+				% (
+					len(self.query_dictionary),
+					len(self.context_dictionary)
+			))
+
+		self.query_dictionary.prune(self.min_query_frequency)
+		self.context_dictionary.prune(self.min_context_frequency)
+
+		if self.verbose:
+			print (
+				'\t...pruned vocabularies: entity, context = %d, %d'
+				% (
+					len(self.query_dictionary),
+					len(self.context_dictionary)
+			))
+
+
+	def generate_examples(self, filename_iterator):
+
+		num_examples = 0
+		for fname in filename_iterator:
+
+			parsed = self.parse(fname)
+			for line in parsed:
+
+				context_tokens, entity_spans = line
+
+				# Sentences with less than two entities can't be used for
+				# learning
+				if len(entity_spans) < 2:
+					continue
+
+				entity_pair_spans = get_pairs(entity_spans)
+				token_ids = self.context_dictionary.get_ids(context_tokens)
+
+				# We'll now generate signal examples and noise
+				# examples for training.  Iterate over every pair
+				# of entities in this line
+				for pair_str in entity_pair_spans:
+
+					signal_examples = (
+						self.generate_signal_examples_between(
+							pair_str, entity_pair_spans, token_ids
+					))
+
+					num_examples += len(signal_examples)
+
+					# Continue if we couldn't pull out any signal examples
+					# (e.g. if there aren't enough context tokens).
+					if len(signal_examples) == 0:
+						continue
+
+					# Generate the noise examples by replacing an entity
+					# or the context by random entity or context
+					noise_examples = self.generate_noise_examples(
+						signal_examples)
+
+					num_examples += len(noise_examples)
+
+					yield (signal_examples, noise_examples)
+
+		if self.verbose:
+			print 'num_examples', num_examples
+
+
+	# TODO: test!
+	def generate_signal_examples_between(
+		self, entity_pair_str, entity_pair_spans, token_ids
+	):
+		'''
+		Extracts the tokens arising between e1 and e2 as context, and,
+		combining these with the entities, produces a signal example
+		'''
+		
+		# convert entity pair into ids
+		entity_pair_id = self.query_dictionary.get_id(
+			entity_pair_str)
+
+		# Don't train on unrecognized entity pairs
+		if entity_pair_id == UNK:
+			return []
+
+		# Get the tokens between the entities as context
+		context_indices = find_tokens_between_closest_pair(
+			*entity_pair_spans[entity_pair_str]
+		)
+		context_ids = [token_ids[i] for i in context_indices]
+
+		# We can't train if there are no context words
+		if len(context_ids) == 0:
+			return []
+
+		# We create a single example for each of the context words.
+		signal_examples = [
+			[entity_pair_id, context_id] for context_id in context_ids
+		]
+
+		return signal_examples
+			
+
+	def generate_noise_examples(self, signal_examples):
+		'''
+		Generate the noise examples by replacing an entity or the context 
+		by random entity or context.  This is almost identical to the 
+		method in the baseclass, but in the base class the query and
+		context dictionaries are identical, whereas here we must be sure to
+		sample from the context dictionary.
+		'''
+
+		noise_examples = []
+		for query_token_id, context_token_id in signal_examples:
+			noise_examples.extend([
+				[query_token_id, self.context_dictionary.sample()]
+				for i in range(self.noise_ratio)
+			])
+
+		return noise_examples
+
 
 
 class Relation2VecDatesetReaderException(Exception):
@@ -96,6 +443,17 @@ class Relation2VecDatesetReaderException(Exception):
 class SampleModeException(Relation2VecDatesetReaderException):
 	pass
 
+
+#TODO: if dictionaries are not loaded in the expected order, then 
+# the entity dictionary might not get pruned properly: it always needs
+# to be pruned after the entity_pair_dictionary is pruned.  Loading
+# a new entity_pair dictionary manually without calling prune() or
+# prune_entity_dictionary will cause this bug.
+# Passing a load_dictionary_dir, supplying all three
+# dictionaries to the constructor, calling load_dictionary(), or calling
+# prune() will keep the dictionaries in sync.  The only risk is calling
+# load_entity_pair_dictionary, or supplying the entity_pair_dictionary
+# to the constructor without also supplying the entity_dictionary.
 class Relation2VecDatasetReader(Word2VecDatasetReader):
 
 	NOT_DONE = 0
@@ -111,6 +469,10 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		num_processes=3,
 		entity_dictionary=None,
 		context_dictionary=None,
+		entity_pair_dictionary=None,
+		min_query_frequency=0,
+		min_entity_pair_frequency=0,
+		min_context_frequency=0,
 		load_dictionary_dir=None,
 		max_queue_size=0,
 		macrobatch_size=20000,
@@ -122,10 +484,13 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		# TODO: test that no discarding is occurring
 		# TODO: ensure that kernel is not being used to sample signal 
 		# context 
-		unigram_dictionary=None,
+		unigram_dictionary = None
 		kernel=None
 		t = 1.0
 
+		# Call the superclass's constructor.  Notice that we do not
+		# pass in the laod_dictionary_dir.  We handle all dictionary 
+		# here in the subclass instead.
 		super(Relation2VecDatasetReader, self).__init__(
 			files=files,
 			directories=directories,
@@ -143,6 +508,9 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		self.macrobatch_size = macrobatch_size
 		self.signal_sample_mode=signal_sample_mode
 		self.len_context = len_context
+		self.min_query_frequency = min_query_frequency
+		self.min_entity_pair_frequency = min_entity_pair_frequency
+		self.min_context_frequency = min_context_frequency
 
 		# Currently only the signal sample mode "between" can be used
 		# with non-unity len_context
@@ -154,8 +522,12 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 				)
 
 		# Usually the dictionaries are made from scratch
+		self.query_dict_loaded = False
+		self.context_dict_loaded = False
+		self.entity_pair_dict_loaded = False
 		self.entity_dictionary = UnigramDictionary()
 		self.context_dictionary = UnigramDictionary()
+		self.entity_pair_dictionary = PairDictionary()
 
 		# But if a dictionary dir was given, load from there
 		if load_dictionary_dir is not None:
@@ -163,24 +535,30 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 				print 'Loading dictionary from: %s...' % load_dictionary_dir
 			self.load_dictionary(load_dictionary_dir)
 
-		# Or, if an existing dictionary was passed in, use it
-		if entity_dictionary is not None:
-			if verbose:
-				print 'An entity dictionary was supplied.'
-			self.entity_dictionary = entity_dictionary
-
 		# (same but for context dictionary)
 		if context_dictionary:
 			if verbose:
 				print 'A context dictionary was supplied.'
 			self.context_dictionary = context_dictionary
+			self.context_dictionary.prune(self.min_context_frequency)
+			self.context_dict_loaded = True
 
-		# Keep track of whether the dictionaries have been prepared
-		self.prepared = False
-		if load_dictionary_dir is not None:
-			self.prepared = True
-		elif context_dictionary and entity_dictionary:
-			self.prepared = True
+		# (same but for entity_pair_dictionary)
+		if entity_pair_dictionary is not None:
+			if verbose:
+				print 'An entity-pair dictionary was supplied.'
+			self.entity_pair_dictionary = entity_pair_dictionary
+			self.entity_pair_dictionary.prune(
+				self.min_entity_pair_frequency)
+			self.entity_pair_dict_loaded = True
+
+		# Or, if an existing dictionary was passed in, use it
+		if entity_dictionary is not None:
+			if verbose:
+				print 'An entity dictionary was supplied.'
+			self.entity_dictionary = entity_dictionary
+			self.prune_entity_dictionary()
+			self.query_dict_loaded = True
 
 
 	def get_vocab_size(self):
@@ -190,6 +568,7 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 			'`context_vocab_size()`.'
 		)
 
+
 	def parse(self, filename):
 		return relation2vec_parse(filename, self.verbose)
 
@@ -197,9 +576,11 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 	def entity_vocab_size(self):
 		return len(self.entity_dictionary)
 
-
 	def context_vocab_size(self):
 		return len(self.context_dictionary)
+
+	def entity_pair_vocab_size(self):
+		return len(self.entity_pair_dictionary)
 
 
 	def load_dictionary(self, load_dir):
@@ -208,75 +589,81 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		filenames (dictionary.gz and unigram-dictionary.gz), by specifying
 		their containing load_dir.
 		'''
-		self.entity_dictionary.load(os.path.join(
-			load_dir, 'entity-dictionary'
+		self.load_entity_pair_dictionary(os.path.join(
+			load_dir, 'entity-pair-dictionary'
 		))
-		self.context_dictionary.load(os.path.join(
+		self.load_context_dictionary(os.path.join(
 			load_dir, 'context-dictionary'
 		))
+
+		# It is essential that this one is loaded last after the 
+		# entity_pair_dictionary, because it's pruning (as part of loading)
+		# requires that the entity dictionary is already pruned
+		self.load_entity_dictionary(os.path.join(
+			load_dir, 'entity-dictionary'
+		))
+
+
+	def prune_entity_dictionary(self):
+
+		# First prune the entity dictionary based on its min frequency
+		self.entity_dictionary.prune(self.min_query_frequency)
+
+		# Eliminate entities from the entity_dictionary that don't arise
+		# in the frequent pairs left in the entity_pair_dictionary after
+		# it was pruned.
+		entities = self.entity_dictionary.token_map.tokens
+		for entity in entities:
+
+			# Don't try to remove the special UNK token
+			if entity == 'UNK':
+				continue
+
+			# Remove entities that aren't part of a retained pair
+			if entity not in self.entity_pair_dictionary.singles_map:
+				self.entity_dictionary.remove(entity)
+
+		# Compactify the dictionary after all the removals
+		self.entity_dictionary.compact()
 
 
 	def load_entity_dictionary(self, filename):
 		self.entity_dictionary.load(filename)
+		self.prune_entity_dictionary()
+
+		# Once query and context dictionaries are loaded, one can call
+		# `generate_dataset_serial()` and `generate_dataset_parallel()`
+		self.query_dict_loaded = True
+
+
+	def is_prepared(self):
+
+		if (
+			self.query_dict_loaded 
+			and self.context_dict_loaded
+			and self.entity_pair_dict_loaded
+		):
+			return True
+		return False
+
+
+	def load_entity_pair_dictionary(self, filename):
+		self.entity_pair_dictionary.load(filename)
+		self.entity_pair_dictionary.prune(self.min_entity_pair_frequency)
+
+		# Once entity, entity-pair, and context, dictionaries are loaded,
+		# one can call `generate_dataset_serial()` and 
+		# `generate_dataset_parallel()`
+		self.entity_pair_dict_loaded = True
 
 
 	def load_context_dictionary(self, filename):
 		self.context_dictionary.load(filename)
+		self.context_dictionary.prune(self.min_context_frequency)
 
-
-	def save_data(self, save_dir):
-		'''
-		Save the generated dataset to the given directory.
-		'''
-
-		if not self.data_loaded:
-			raise DataSetReaderIllegalStateException(
-				'DatasetReader: cannot save the dataset before any data has '
-				'been generated.'
-			)
-
-		examples_dir = os.path.join(save_dir, 'examples')
-		# We are willing to create both the save_dir, and the
-		# 'examples' subdir, but not their parents
-		if not os.path.exists(save_dir):
-			os.mkdir(save_dir)
-		if not os.path.exists(examples_dir):
-			os.mkdir(examples_dir)
-
-		path = os.path.join(examples_dir, '0.npz')
-		np.savez(
-			path,
-			signal_examples=self.signal_examples,
-			noise_examples=self.noise_examples
-		)
-
-
-	MATCH_EXAMPLE_STORE = re.compile(r'[0-9]+\.npz')
-	def load_data(self, save_dir):
-		'''
-		Load the dataset from the given directory
-		'''
-		examples_dir = os.path.join(save_dir, 'examples')
-		fnames = check_output(['ls %s' % examples_dir], shell=True).split()
-		signal_macrobatches = []
-		noise_macrobatches = []
-		for fname in fnames:
-			if not self.MATCH_EXAMPLE_STORE.match(fname):
-				continue
-			f = np.load(os.path.join(examples_dir, fname))
-			signal_macrobatches.append(f['signal_examples'].astype('int32'))
-			noise_macrobatches.append(f['noise_examples'].astype('int32'))
-
-		if len(signal_macrobatches) < 1 or len(noise_macrobatches) < 1:
-			raise IOError(
-				'DatasetReader: no example data files found in %s.' 
-				% examples_dir
-			)
-
-		self.signal_examples = np.concatenate(signal_macrobatches)
-		self.noise_examples = np.concatenate(noise_macrobatches)
-		self.data_loaded = True
-		return self.signal_examples, self.noise_examples
+		# Once query and context dictionaries are loaded, one can call
+		# `generate_dataset_serial()` and `generate_dataset_parallel()`
+		self.context_dict_loaded = True
 
 
 	def save_dictionary(self, save_dir):
@@ -286,7 +673,9 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		only their containing directory (save_dir).  `save_dir` will be
 		created if it doesn't exist.
 		'''
-		# We will make the save_dir (but not its parents) if it doesn't exist
+
+		# We will make the save_dir (but not its parents) if it doesn't 
+		# exist
 		if not os.path.exists(save_dir):
 			os.mkdir(save_dir)
 
@@ -295,6 +684,8 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 			os.path.join(save_dir, 'entity-dictionary'))
 		self.context_dictionary.save(
 			os.path.join(save_dir, 'context-dictionary'))
+		self.entity_pair_dictionary.save(
+			os.path.join(save_dir, 'entity-pair-dictionary'))
 
 
 	def save_entity_dictionary(self, filename):
@@ -305,6 +696,10 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		self.context_dictionary.save(filename)
 
 
+	def save_entity_pair_dictionary(self, filename):
+		self.entity_pair_dictionary.save(filename)
+
+
 	def preparation(self, savedir):
 		# For each line, get the context tokens and entity tokens.
 		# Add both to the respective dictionaries.  Also add the context
@@ -313,11 +708,22 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		for filename in self.generate_filenames():
 			for line in self.parse(filename):
 				context_tokens, entity_spans = line
+
+				# Add entities and context tokens to respective dictionaries
 				self.context_dictionary.update(context_tokens)
 				self.entity_dictionary.update(entity_spans.keys())
 
+				# Add entity pairs to the entity pair dictionary
+				entity_pairs = get_pairs(entity_spans).keys()
+				self.entity_pair_dictionary.update(entity_pairs)
 
-	def prune(self, min_frequency=5):
+		# Mark all the dictionaries as loaded
+		self.entity_pair_dict_loaded = True
+		self.query_dict_loaded = True
+		self.context_dict_loaded = True
+
+
+	def prune(self):
 		'''
 		Exposes the prune function for the underlying UnigramDictionary
 		used for the context_dictionary.
@@ -326,79 +732,26 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 			print 'prunning dictionaries...'
 			print (
 				'\t...original vocabularies: entity, context = %d, %d'
-				% (len(self.context_dictionary), len(self.entity_dictionary)
+				% (
+					len(self.context_dictionary),
+					len(self.entity_dictionary)
 			))
 
-		self.context_dictionary.prune(min_frequency)
-		self.entity_dictionary.prune(min_frequency)
+		self.context_dictionary.prune(self.min_context_frequency)
+		self.entity_pair_dictionary.prune(self.min_entity_pair_frequency)
+		self.prune_entity_dictionary()
 
 		if self.verbose:
 			print (
 				'\t...pruned vocabularies: entity, context = %d, %d'
-				% (len(self.context_dictionary), len(self.entity_dictionary)
+				% (
+					len(self.context_dictionary),
+					len(self.entity_dictionary)
 			))
 
-
-	# Integrate into dataset generation pipeline
-	# TODO: this should be called 'produce macrobatches'
-	def generate_macrobatches(self, filename_iterator):
-
-		'''
-		Generator that produces macrobatches of signal and noise examples.
-		It calls on file reading, parsing, and example genearating 
-		machinery, but is itself only really responsible for the grouping
-		of yielded examples into macrobatches.  Each iteration of this 
-		generator yields a tuple consisting of a signal and noise 
-		macrobatch.
-		'''
-
-		mcbatch_size = self.macrobatch_size
-		noise_ratio = self.noise_ratio
-		signal_examples = []
-		noise_examples = []
-
-		examples = self.generate_examples(filename_iterator)
-		for signal_chunk, noise_chunk in examples:
-
-			signal_examples.extend(signal_chunk)
-			noise_examples.extend(noise_chunk)
-
-			while len(signal_examples) > mcbatch_size:
-				if self.verbose:
-					print 'numpyifying'
-				signal_macrobatch = self.numpyify(
-					signal_examples[:mcbatch_size])
-				noise_macrobatch = self.numpyify(
-					noise_examples[:mcbatch_size * noise_ratio])
-
-				entities = signal_macrobatch[0][:2]
-				context = signal_macrobatch[0][2:]
-				entities = self.entity_dictionary.get_tokens(entities)
-				context = self.context_dictionary.get_tokens(context)
-				if self.verbose:
-					print 'no-padding:', len(signal_macrobatch)
-				yield signal_macrobatch, noise_macrobatch
-
-				signal_examples = signal_examples[mcbatch_size:]
-				noise_examples = noise_examples[mcbatch_size*noise_ratio:]
-
-		if len(signal_examples) > 0:
-			signal_remaining = mcbatch_size - len(signal_examples)
-			noise_remaining = (
-				mcbatch_size * noise_ratio - len(noise_examples))
-
-			if self.verbose:
-				print 'padding and numpyifying'
-
-			padding_row = [UNK,UNK] + [UNK] * self.len_context
-			signal_macrobatch = self.numpyify(
-				signal_examples + [padding_row] * signal_remaining)
-			noise_macrobatch = self.numpyify(
-				noise_examples + [padding_row] * noise_remaining)
-
-			if self.verbose:
-				print 'padded to length:', len(signal_macrobatch)
-			yield signal_macrobatch, noise_macrobatch
+	
+	def get_padding_row(self):
+		return [UNK,UNK] + [UNK] * self.len_context
 
 
 	def generate_examples(self, filename_iterator):
@@ -461,53 +814,6 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 			print 'num_examples', num_examples
 
 
-	def find_tokens_between_closest_pair(self, indexes1, indexes2):
-		distances = []
-
-		if len(indexes1) < 1 or len(indexes2) < 1:
-			raise ValueError(
-				'indexes1 and indexes2 must be non-empty lists of index'
-				' tuples.'
-			)
-
-		# Look at each pairing of indices for the entities, and calculate
-		# the distance between them
-		for i1 in indexes1:
-			for i2 in indexes2:
-
-				# The start index of entity spans are always off by one
-				# This is too costly to correct in the dataset, so 
-				# compensate here.  Now the span is in slice notation.
-				i1 = i1[0] - 1, i1[1]
-				i2 = i2[0] - 1, i2[1]
-
-				# Get the distance between the entity spans.  How to do
-				# this depends on which span comes first.
-				if i1[0] < i2[0]:
-					diff = min(i2) - max(i1)
-					tokens_between = range(max(i1), min(i2))
-
-				else:
-					diff = min(i1) - max(i2)
-					tokens_between = range(max(i2), min(i1))
-
-				# Store the calculated distance, and intervening tokens 
-				distances.append((diff, tokens_between))
-
-		# Sort distances so that the nearest pair of entities is last
-		distances.sort(reverse=True)
-
-		# We want the nearest pair of entities, but not entities that 
-		# are immediately next to one another
-		diff, tokens_between = distances.pop()
-		while len(tokens_between) < 1 and len(distances) > 0:
-			diff, tokens_between = distances.pop()
-
-		# Return the token ids between the nearest pair of entities
-		# that are not immediately next to one another
-		return tokens_between
-
-
 	def generate_signal_examples_between(
 		self, e1, e2, token_ids, entity_spans
 	):
@@ -520,8 +826,14 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		# convert entities into ids
 		e1_id, e2_id = self.entity_dictionary.get_ids([e1, e2])
 
+		# Don't create examples using unknown entities
+		if e1_id == UNK or e2_id == UNK:
+			if self.verbose:
+				print 'skipping unknown entity'
+			return []
+
 		# Get the tokens between the entities as context
-		context_indices = self.find_tokens_between_closest_pair(
+		context_indices = find_tokens_between_closest_pair(
 			entity_spans[e1], entity_spans[e2]
 		)
 		context = [token_ids[i] for i in context_indices]
@@ -555,6 +867,12 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		# convert entities into ids
 		e1_id, e2_id = self.entity_dictionary.get_ids([e1, e2])
 
+		# Don't create examples using unknown entities
+		if e1_id == UNK or e2_id == UNK:
+			if self.verbose:
+				print 'skipping unknown entity'
+			return []
+
 		# Get the context tokens minus the entity_spans
 		filtered_context_tokens = self.eliminate_spans(
 			token_ids, entity_spans[e1] + entity_spans[e2]
@@ -578,7 +896,6 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 			]
 
 		return signal_examples
-			
 
 
 	def generate_noise_examples(self, signal_examples):
@@ -627,167 +944,6 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		return noise_examples
 
 
-	def generate_dataset_serial(self, save_dir=None):
-		'''
-		Generate the dataset from files handed to the constructor.  A single
-		process is used, and all the data is stored in a single file at
-		'save_dir/examples/0.npz'.
-		'''
-
-		# This cannot be called before calling prepare(), unless a prepared
-		# UnigramDictionary was passed to the self's constructor
-		if not self.prepared:
-			raise DataSetReaderIllegalStateException(
-				"DatasetReader: generate_examples() cannot be called before "
-				"prepare() is called unless a prepared UnigramDictionary has "
-				"was passed into the DatasetReader's constructor."
-			)
-
-		# We save dataset in the "examples" subdir of the model_dir
-		if save_dir is not None:
-			examples_dir = os.path.join(save_dir, 'examples')
-
-			# We are willing to create both the save_dir, and the
-			# 'examples' subdir, but not their parents
-			if not os.path.exists(save_dir):
-				os.mkdir(save_dir)
-			if not os.path.exists(examples_dir):
-				os.mkdir(examples_dir)
-
-		else:
-			examples_dir = None
-
-		# Generate the data for each file
-		file_iterator = self.generate_filenames()
-		macrobatches = self.generate_macrobatches(file_iterator)
-		for signal_examples, noise_examples in macrobatches:
-
-			## Save the data
-			#if examples_dir is not None:
-			#	save_path = os.path.join(examples_dir, '0.npz')
-			#	np.savez(
-			#		save_path,
-			#		signal_examples=self.signal_examples,
-			#		noise_examples=self.noise_examples
-			#	)
-
-			yield signal_examples, noise_examples
-
-
-	def generate_dataset_worker(self, file_iterator, macrobatch_queue):
-		macrobatches = self.generate_macrobatches(file_iterator)
-		for signal_examples, noise_examples in macrobatches:
-			if self.verbose:
-				print 'sending macrobatch to parent process'
-			macrobatch_queue.put((signal_examples, noise_examples))
-
-		macrobatch_queue.close()
-
-
-	def generate_dataset_parallel(self, save_dir=None):
-		'''
-		Parallel version of generate_dataset_serial.  Each worker is 
-		responsible for saving its own part of the dataset to disk, called 
-		a macrobatch.  the files are saved at 
-		'save_dir/examples/<batch-num>.npz'.
-		'''
-		# This cannot be called before calling prepare(), unless a prepared
-		# UnigramDictionary was passed to the self's constructor
-		if not self.prepared:
-			raise DataSetReaderIllegalStateException(
-				"DatasetReader: generate_examples() cannot be called "
-				"before prepare() is called unless a prepared "
-				"UnigramDictionary has was passed into the DatasetReader's "
-				"constructor."
-			)
-
-		# We save dataset in the "examples" subdir of the model_dir
-		if save_dir is not None:
-			examples_dir = os.path.join(save_dir, 'examples')
-			# We are willing to create both the save_dir, and the
-			# 'examples' subdir, but not their parents
-			if not os.path.exists(save_dir):
-				os.mkdir(save_dir)
-			if not os.path.exists(examples_dir):
-				os.mkdir(examples_dir)
-		else:
-			examples_dir = None
-
-		file_queue = IterableQueue()
-		macrobatch_queue = IterableQueue(self.max_queue_size)
-
-		# Put all the filenames on a producer queue
-		file_producer = file_queue.get_producer()
-		for filename in self.generate_filenames():
-			file_producer.put(filename)
-		file_producer.close()
-
-		# Start a bunch of worker processes
-		for process_num in range(self.num_processes):
-			# Hop to a new location in the random-number-generator's state chain
-			reseed()
-			# Start child process that generates a portion of the dataset
-			args = (
-				file_queue.get_consumer(),
-				macrobatch_queue.get_producer()
-			)
-			Process(target=self.generate_dataset_worker, args=args).start()
-
-		# This will receive the macrobatches from all workers
-		macrobatch_consumer = macrobatch_queue.get_consumer()
-
-		# Close the iterable queues
-		file_queue.close()
-		macrobatch_queue.close()
-
-		# Retrieve the macrobatches from the workers, write them to file
-		signal_macrobatches = []
-		noise_macrobatches = []
-		for macrobatch_num, (signal_macrobatch, noise_macrobatch) in enumerate(macrobatch_consumer):
-			if self.verbose:
-				print 'receiving macrobatch from child process'
-			if examples_dir is not None:
-				save_path = os.path.join(examples_dir, '%d.npz' % macrobatch_num)
-				#np.savez(
-				#	save_path,
-				#	signal_examples=signal_macrobatch,
-				#	noise_examples=noise_macrobatch
-				#)
-
-			yield signal_macrobatch, noise_macrobatch
-			#signal_macrobatches.append(signal_macrobatch)
-			#noise_macrobatches.append(noise_macrobatch)
-
-		# Concatenate the macrobatches, and return the dataset
-		#print 'amalgamating macrobatches'
-		#self.signal_examples = np.concatenate(signal_macrobatches)
-		#self.noise_examples = np.concatenate(noise_macrobatches)
-		#self.data_loaded = True
-		#print 'returning dataset'
-		#return self.signal_examples, self.noise_examples
-
-
-	def numpyify(self, examples):
-		'''
-		Make an int32-type numpy array, ensuring that, even if the list of
-		examples is empty, the array is two-dimensional, with the second
-		dimension (i.e. number of columns) being 3.
-		'''
-
-		try:
-			if len(examples) > 0:
-				examples = np.array(examples, dtype='int32')
-			else:
-				examples = np.empty(shape=(0,3), dtype='int32')
-		except ValueError:
-			for row in examples:
-				print len(row), row
-			raise
-
-		return examples
-
-
-
 	def eliminate_spans(self, token_ids, spans):
 		'''
 		Return the list of token_ids, but with the tokens that are
@@ -808,6 +964,70 @@ class Relation2VecDatasetReader(Word2VecDatasetReader):
 		return t4k.skip(token_ids, adjusted_spans)
 
 
+
+def find_tokens_between_closest_pair(indexes1, indexes2):
+	'''
+	Input: two lists of "entity-spans".  An entity span is the start and
+		end token indices that define where in a sentance an entity
+		mention occurs.  The inputs are each lists of entity spans (because
+		a given entity often occurs in multiple places in a sentence) due
+		to coreference.
+
+	Finds the indices of tokens arising between the two nearest mentions,
+	one outlined by indexes1, the other outlined by indexes2.  However,
+	it won't consider the case where the two entities are immediately 
+	adjacent as a valid case, and would instead return the tokens between
+	the next-closest pair of mentions.
+
+	The idea here is that the tokens between two entities that are close
+	together give some semantic indication of their relationship (but if
+	the two entities are immediately adjacent, we don't get any context
+	tokens).
+	'''
+	distances = []
+
+	if len(indexes1) < 1 or len(indexes2) < 1:
+		raise ValueError(
+			'indexes1 and indexes2 must be non-empty lists of index'
+			' tuples.'
+		)
+
+	# Look at each pairing of indices for the entities, and calculate
+	# the distance between them
+	for i1 in indexes1:
+		for i2 in indexes2:
+
+			# The start index of entity spans are always off by one
+			# This is too costly to correct in the dataset, so 
+			# compensate here.  Now the span is in slice notation.
+			i1 = i1[0] - 1, i1[1]
+			i2 = i2[0] - 1, i2[1]
+
+			# Get the distance between the entity spans.  How to do
+			# this depends on which span comes first.
+			if i1[0] < i2[0]:
+				diff = min(i2) - max(i1)
+				tokens_between = range(max(i1), min(i2))
+
+			else:
+				diff = min(i1) - max(i2)
+				tokens_between = range(max(i2), min(i1))
+
+			# Store the calculated distance, and intervening tokens 
+			distances.append((diff, tokens_between))
+
+	# Sort distances so that the nearest pair of entities is last
+	distances.sort(reverse=True)
+
+	# We want the nearest pair of entities, but not entities that 
+	# are immediately next to one another
+	diff, tokens_between = distances.pop()
+	while len(tokens_between) < 1 and len(distances) > 0:
+		diff, tokens_between = distances.pop()
+
+	# Return the token ids between the nearest pair of entities
+	# that are not immediately next to one another
+	return tokens_between
 
 #class NoiseContrastiveTheanoMinibatcher(TheanoMinibatcher):
 #	pass

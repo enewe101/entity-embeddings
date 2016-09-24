@@ -16,7 +16,6 @@ exclude_theano_set = 'EXCLUDE_THEANO' in os.environ
 if exclude_theano_set and int(os.environ['EXCLUDE_THEANO']) == 1:
 	pass
 else:
-	print 'DID NOT EXCLUDE THEANO!'
 	from theano import function
 	import theano
 	from lasagne.init import Normal
@@ -39,7 +38,7 @@ def read_context_embeddings(embeddings_fname, reader, embedder):
 	# the file based on the word that appears in the first position
 	# on each line.  To do that, we need to already have a entity
 	# dictionary.
-	if not reader.prepared:
+	if not reader.is_prepared():
 		raise ValueError(
 			'Trying to load context embeddings from token-based embeddings '
 			'file without first preparing the reader.  The reader needs '
@@ -89,8 +88,11 @@ def relation2vec(
 	# Dictionary options
 	entity_dictionary=None,
 	context_dictionary=None,
+	entity_pair_dictionary=None,
 	load_dictionary_dir=None,
-	min_frequency=10,
+	min_query_frequency=0,
+	min_context_frequency=0,
+	min_entity_pair_frequency=0,
 
 	# Sampling options
 	noise_ratio=15,
@@ -143,6 +145,10 @@ def relation2vec(
 		num_processes=num_processes,
 		entity_dictionary=entity_dictionary,
 		context_dictionary=context_dictionary,
+		entity_pair_dictionary=entity_pair_dictionary,
+		min_query_frequency=min_query_frequency,
+		min_context_frequency=min_context_frequency,
+		min_entity_pair_frequency=min_entity_pair_frequency,
 		load_dictionary_dir=load_dictionary_dir,
 		signal_sample_mode=signal_sample_mode,
 		len_context=len_context,
@@ -150,17 +156,10 @@ def relation2vec(
 	)
 
 	# Prepare the dataset reader (this produces unigram stats)
-	both_dictionaries_supplied = context_dictionary and entity_dictionary
-	if load_dictionary_dir is None and not both_dictionaries_supplied:
+	if not reader.is_prepared():
 		if verbose:
 			print 'preparing dictionaries...'
 		reader.prepare(save_dir=save_dir)
-
-	# If min_frequency was specified, prune the dictionaries
-	if min_frequency is not None:
-		if verbose:
-			print 'pruning dictionaries...'
-		reader.prune(min_frequency)
 
 	# Make a symbolic minibatcher 
 	minibatcher = NoiseContrastiveTheanoMinibatcher(
@@ -252,6 +251,7 @@ def relation2vec(
 	# Save the model (the embeddings) if save_dir was provided
 	if save_dir is not None:
 		embedder.save(save_dir)
+		reader.save_dictionary(save_dir)
 
 	# Return the trained embedder and the dictionary mapping tokens
 	# to ids
@@ -267,7 +267,8 @@ def show_computation_graph(
 	entity_dictionary=None,
 	context_dictionary=None,
 	load_dictionary_dir=None,
-	min_frequency=10,
+	min_query_frequency=0,
+	min_context_frequency=0,
 	noise_ratio=15,
 	batch_size = 1000,  # Number of *signal* examples per batch
 	macrobatch_size = 100000,

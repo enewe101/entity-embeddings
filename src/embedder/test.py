@@ -1,20 +1,23 @@
-from word2vec import UNK
+from word2vec import (
+	UNK, get_noise_contrastive_loss, reseed, UnigramDictionary
+)
 from theano import tensor as T, function
 import numpy as np
 import os
 import shutil
 from collections import defaultdict, Counter
 from relation2vec_embedder import Relation2VecEmbedder
-from word2vec import get_noise_contrastive_loss, reseed
 from lasagne.updates import nesterov_momentum
 import itertools as itools
 import unittest
 from r2v import relation2vec, read_context_embeddings
+from ep2v import entity_pair2vec
 from dataset_reader import (
-	Relation2VecDatasetReader, DataSetReaderIllegalStateException,
-	FULL_CONTEXT
+	EntityPair2VecDatasetReader, Relation2VecDatasetReader, 
+	DataSetReaderIllegalStateException, FULL_CONTEXT
 )
 from theano_minibatcher import NoiseContrastiveTheanoMinibatcher
+from pair_dictionary import PairDictionary
 
 
 #from minibatcher import (
@@ -35,9 +38,382 @@ class TestParse(TestCase):
 		filename = 'test-data/test-corpus/004-raw.tsv'
 
 
+# TODO: make this a real test
+class TestParse(TestCase):
+
+	def test_parse(self):
+		filename = 'test-data/test-corpus/004-raw.tsv'
+
+
+class TestPairDictionary(TestCase):
+	PAIRS = [
+		('A','B'),
+		('A','B'),
+		('A','B'),
+		('A','B'),
+		('A','B'),
+		('A','B'),
+
+		('C','D'),
+		('C','E'),
+		('C','E'),
+
+		('C','F'),
+		('C','F'),
+		('C','F'),
+
+		('C','G'),
+		('C','G'),
+		('C','G'),
+		('C','G'),
+
+		('D','E'),
+		('D','E'),
+		('D','E'),
+		('E','D'),
+		('E','D'),
+	]
+	COUNTER = Counter(PAIRS)
+
+	def test_stuff(self):
+		pair_dictionary = PairDictionary()
+		pair_dictionary.update(self.PAIRS)
+		delimiter = pair_dictionary.delimiter
+
+		pair_counter = Counter(self.PAIRS)
+		sorted_pairs = ['UNK'] + [
+			'A:::B', 'D:::E', 'C:::G', 'C:::F', 'C:::E', 'C:::D'
+		]
+		sorted_counts = [0] + [6, 5, 4, 3, 2, 1]
+
+		self.assertNotEqual(pair_dictionary.token_map.tokens, sorted_pairs)
+		self.assertNotEqual(
+			pair_dictionary.counter_sampler.counts, sorted_counts
+		)
+
+		pair_dictionary.sort()
+
+		self.assertEqual(pair_dictionary.token_map.tokens, sorted_pairs)
+		self.assertEqual(
+			pair_dictionary.counter_sampler.counts, sorted_counts
+		)
+
+		AB_id, BA_id = pair_dictionary.get_ids([('A', 'B'), ('B','A')])
+		self.assertEqual(pair_dictionary.get_frequency(AB_id), 6)
+		self.assertEqual(pair_dictionary.get_frequency(BA_id), 6)
+
+		DE_id, ED_id = pair_dictionary.get_ids([('D','E'), ('E','D')])
+		self.assertEqual(pair_dictionary.get_frequency(DE_id), 5)
+		self.assertEqual(pair_dictionary.get_frequency(ED_id), 5)
+
+		CD_id = pair_dictionary.get_id(('C','D'))
+		self.assertEqual(pair_dictionary.get_frequency(CD_id), 1)
+
+		CE_id = pair_dictionary.get_id(('C','E'))
+		self.assertEqual(pair_dictionary.get_frequency(CE_id), 2)
+
+		CF_id = pair_dictionary.get_id(('C','F'))
+		self.assertEqual(pair_dictionary.get_frequency(CF_id), 3)
+
+		CG_id = pair_dictionary.get_id(('C','G'))
+		self.assertEqual(pair_dictionary.get_frequency(CG_id), 4)
+
+		self.assertEqual(
+			pair_dictionary.singles_map['A'], 
+			{'A%sB' % delimiter}
+		)
+		self.assertEqual(
+			pair_dictionary.singles_map['B'], 
+			{'A%sB' % delimiter}
+		)
+		self.assertEqual(
+			pair_dictionary.singles_map['C'], 
+			{'C%s%s' % (delimiter,c) for c in 'DEFG'}
+		)
+		self.assertEqual(
+			pair_dictionary.singles_map['E'], 
+			{'D%sE' % delimiter, 'C%sE' % delimiter}
+		)
+		self.assertEqual(
+			pair_dictionary.singles_map['D'], 
+			{'D%sE' % delimiter, 'C%sD' % delimiter}
+		)
+
+		pair_dictionary.remove(('E','C'))
+		pair_dictionary.compact()
+		self.assertEqual(
+			pair_dictionary.singles_map['E'], 
+			{'D%sE' % delimiter}
+		)
+
+		pair_dictionary.prune(min_frequency=5)
+		for c in 'DEFG':
+			Cc_id = pair_dictionary.get_id(('C',c))
+			self.assertEqual(Cc_id, UNK)
+		AB_id, BA_id = pair_dictionary.get_ids([('A', 'B'), ('B','A')])
+		self.assertEqual(pair_dictionary.get_frequency(AB_id), 6)
+		self.assertEqual(pair_dictionary.get_frequency(BA_id), 6)
+
+		DE_id, ED_id = pair_dictionary.get_ids([('D','E'), ('E','D')])
+		self.assertEqual(pair_dictionary.get_frequency(DE_id), 5)
+		self.assertEqual(pair_dictionary.get_frequency(ED_id), 5)
+
+		self.assertEqual(
+			pair_dictionary.singles_map['A'], 
+			{'A%sB' % delimiter}
+		)
+		self.assertEqual(
+			pair_dictionary.singles_map['B'], 
+			{'A%sB' % delimiter}
+		)
+		self.assertEqual(
+			pair_dictionary.singles_map['E'], 
+			{'D%sE' % delimiter}
+		)
+		self.assertEqual(
+			pair_dictionary.singles_map['D'], 
+			{'D%sE' % delimiter}
+		)
+		with self.assertRaises(KeyError):
+			pair_dictionary.singles_map['C']
+		self.assertFalse(any([
+			c in pair_dictionary.singles_map for c in 'CFG'
+		]))
+		self.assertTrue(all([
+			c in pair_dictionary.singles_map for c in 'ABDE'
+		]))
+
+		save_dir = 'test-data/test-pair-dictionary'
+		pair_dictionary.save(save_dir)
+		new_pair_dictionary = PairDictionary()
+		new_pair_dictionary.load(save_dir)
+
+		self.assertEqual(
+			pair_dictionary.token_map.tokens,
+			new_pair_dictionary.token_map.tokens
+		)
+		self.assertEqual(
+			pair_dictionary.counter_sampler.counts,
+			new_pair_dictionary.counter_sampler.counts
+		)
+		self.assertEqual(
+			pair_dictionary.singles_map,
+			new_pair_dictionary.singles_map,
+		)
+
+
+
+class TestEntityPair2VecDatasetReader(TestCase):
+
+	def test_preparation(self):
+		files = ['test-data/test-corpus/a.tsv']
+		save_dir = 'test-data/test-entity-pair2vec-dataset-reader'
+		if os.path.exists(save_dir):
+			shutil.rmtree(save_dir)
+
+		reader = EntityPair2VecDatasetReader(files=files)
+		reader.prepare(save_dir)
+		expected_token_map = [
+			'UNK', 'YAGO:Beijing:::YAGO:Xinhua_News_Agency', 
+			'YAGO:Beijing:::YAGO:Guangzhou',
+			'YAGO:Guangzhou:::YAGO:United_States',
+			'YAGO:United_States:::YAGO:Xinhua_News_Agency',
+			'YAGO:Beijing:::YAGO:United_States',
+			'YAGO:Guangzhou:::YAGO:Xinhua_News_Agency',
+			'YAGO:Baalbek:::YAGO:Israel', 'YAGO:Israel:::YAGO:Lebanon',
+			'YAGO:Baalbek:::YAGO:Lebanon',
+			'YAGO:Alexi_Lalas:::YAGO:United_States'
+		]
+		found_token_map = reader.query_dictionary.token_map.tokens
+		self.assertEqual(found_token_map, expected_token_map)
+
+
+	def test_pruning(self):
+		'''
+		Try running generate_dataset_serial and generate_dataset_parallel
+		without properly loading all the dictionaries.  It should throw
+		an error.  When all dictionaries have been loaded, it should work.
+		'''
+
+		save_dir = 'test-data/test-entity-pair2vec-dataset-reader'
+		if os.path.exists(save_dir):
+			shutil.rmtree(save_dir)
+		files = ['test-data/test-corpus/003-raw.tsv']
+		macrobatch_size=200
+		noise_ratio = 15
+
+		# First prepare a dataset reader on the target test corpus
+		# no pruning.  Ensure that the full expected dictionary sizes
+		# are seen
+		reader = EntityPair2VecDatasetReader(
+			files=files,
+			macrobatch_size = macrobatch_size,
+			noise_ratio=noise_ratio,
+			min_query_frequency=0,
+			min_context_frequency=0,
+			verbose=False
+		)
+		reader.prepare(save_dir=save_dir)
+		self.assertEqual(reader.query_vocab_size(), 12)
+		self.assertEqual(reader.context_vocab_size(), 185)
+
+		# Now prepare a dataset reader, this time specifying min 
+		# frequencies, and ensure that the dicitonary sizes the expected
+		# (smaller) sizes
+		reader = EntityPair2VecDatasetReader(
+			files=files,
+			macrobatch_size = macrobatch_size,
+			noise_ratio=noise_ratio,
+			min_query_frequency=2,
+			min_context_frequency=5,
+			verbose=False
+		)
+		reader.prepare(save_dir=save_dir)
+		self.assertEqual(reader.query_vocab_size(), 2)
+		self.assertEqual(reader.context_vocab_size(), 9)
+
+		# Now make a dataset reader, and read the dicitonaries from file,
+		# but again specify min frequencies, and check that
+		# that the dicitonary sizes the expected (smaller) sizes
+		reader = EntityPair2VecDatasetReader(
+			files=files,
+			macrobatch_size = macrobatch_size,
+			noise_ratio=noise_ratio,
+			min_query_frequency=2,
+			min_context_frequency=5,
+			load_dictionary_dir=save_dir,
+			verbose=False
+		)
+		self.assertEqual(reader.query_vocab_size(), 2)
+		self.assertEqual(reader.context_vocab_size(), 9)
+
+		# Now make a dataset reader, and read each dicitonary manually
+		# from file. Again specify min frequencies, and check that
+		# that the dicitonary sizes the expected (smaller) sizes
+		reader = EntityPair2VecDatasetReader(
+			files=files,
+			macrobatch_size = macrobatch_size,
+			noise_ratio=noise_ratio,
+			min_query_frequency=2,
+			min_context_frequency=5,
+			verbose=False
+		)
+		reader.load_query_dictionary(os.path.join(
+			save_dir, 'query-dictionary'))
+		reader.load_context_dictionary(os.path.join(
+			save_dir, 'context-dictionary'))
+		self.assertEqual(reader.query_vocab_size(), 2)
+		self.assertEqual(reader.context_vocab_size(), 9)
+
+		# Now pre-load the dictionaries, and pass them into the 
+		# DatasetReader's constructor. Again specify min frequencies, and 
+		# check that that the dicitonary sizes the expected (smaller) sizes
+		query_dictionary = UnigramDictionary()
+		query_dictionary.load(os.path.join(save_dir, 'query-dictionary'))
+		context_dictionary = UnigramDictionary()
+		context_dictionary.load(os.path.join(
+			save_dir, 'context-dictionary'))
+
+		reader = EntityPair2VecDatasetReader(
+			files=files,
+			macrobatch_size = macrobatch_size,
+			noise_ratio=noise_ratio,
+			min_query_frequency=2,
+			min_context_frequency=5,
+			context_dictionary=context_dictionary,
+			query_dictionary=query_dictionary,
+			verbose=False
+		)
+		self.assertEqual(reader.query_vocab_size(), 2)
+		self.assertEqual(reader.context_vocab_size(), 9)
+
+
+	def test_check_prepared(self):
+		'''
+		Try running generate_dataset_serial and generate_dataset_parallel
+		without properly loading all the dictionaries.  It should throw
+		an error.  When all dictionaries have been loaded, it should work.
+		'''
+
+		save_dir = 'test-data/test-entity-pair2vec-dataset-reader'
+		if os.path.exists(save_dir):
+			shutil.rmtree(save_dir)
+
+		files = ['test-data/test-corpus/a.tsv']
+		batch_size = 2
+		noise_ratio = 15
+		reader = EntityPair2VecDatasetReader(
+			files=files,
+			macrobatch_size = batch_size,
+			noise_ratio=noise_ratio,
+			verbose=False
+		)
+
+		# Trying to generate the dataset (series or parallel) should
+		# raise an error
+		with self.assertRaises(DataSetReaderIllegalStateException):
+			list(reader.generate_dataset_serial())
+		with self.assertRaises(DataSetReaderIllegalStateException):
+			list(reader.generate_dataset_parallel())
+
+		# Now prepare the dictionarise
+		reader.prepare(save_dir=save_dir)
+
+		# With dictionaries prepared, generating the dataset should work
+		self.assertEqual(
+			len(list(reader.generate_dataset_parallel())), 64
+		)
+		self.assertEqual(
+			len(list(reader.generate_dataset_serial())), 64
+		)
+
+		# Now load a new reader, and load dictionaries manually
+		new_reader = EntityPair2VecDatasetReader(
+			files=files,
+			macrobatch_size = batch_size,
+			noise_ratio=noise_ratio,
+			verbose=False
+		)
+		new_reader.load_dictionary(save_dir)
+
+		# With dictionaries loaded, generating the dataset should work
+		self.assertEqual(
+			len(list(new_reader.generate_dataset_parallel())), 64
+		)
+		self.assertEqual(
+			len(list(new_reader.generate_dataset_serial())), 64
+		)
+
+		# Now load a new reader, and load dictionaries manually
+		new_reader = EntityPair2VecDatasetReader(
+			files=files,
+			macrobatch_size = batch_size,
+			noise_ratio=noise_ratio,
+			verbose=False
+		)
+
+		# Load 1 out of 2 dictionaries.  Should raise an error when we
+		# try to generate data
+		new_reader.load_query_dictionary(os.path.join(
+			save_dir, 'query-dictionary'))
+		with self.assertRaises(DataSetReaderIllegalStateException):
+			list(new_reader.generate_dataset_serial())
+		with self.assertRaises(DataSetReaderIllegalStateException):
+			list(new_reader.generate_dataset_parallel())
+
+		# Load the missing dictionary.  Should generate data now.
+		new_reader.load_context_dictionary(os.path.join(
+			save_dir, 'context-dictionary'))
+		self.assertEqual(
+			len(list(new_reader.generate_dataset_parallel())), 64
+		)
+		self.assertEqual(
+			len(list(new_reader.generate_dataset_serial())), 64
+		)
+
+
+
 class TestRelation2VecEmbedder(TestCase):
-
-
 
 	def test_read_embeddings(self):
 
@@ -446,6 +822,37 @@ class TestRelation2VecEmbedder(TestCase):
 		self.assertTrue(all([diff < tolerance for diff in differences]))
 
 
+	def test_learning_function_does_prune(self):
+
+		save_dir = 'test-data/test-relation2vec-dataset-reader'
+		if os.path.exists(save_dir):
+			shutil.rmtree(save_dir)
+		files = ['test-data/test-corpus/e.tsv']
+		batch_size=3
+		macrobatch_size=6
+		noise_ratio = 15
+		num_epochs = 1
+		num_embedding_dimensions=5
+
+		embedder, reader = relation2vec(
+			files=files,
+			macrobatch_size = macrobatch_size,
+			batch_size = batch_size,
+			noise_ratio=noise_ratio,
+			min_query_frequency=4,
+			min_context_frequency=4,
+			min_entity_pair_frequency=4,
+			save_dir=save_dir,
+			num_epochs=num_epochs,
+			num_embedding_dimensions=num_embedding_dimensions,
+			verbose=True,
+		)
+
+		self.assertEqual(reader.entity_vocab_size(), 5)
+		self.assertEqual(reader.entity_pair_vocab_size(), 3)
+		self.assertEqual(reader.context_vocab_size(), 11)
+
+
 	def test_learning_function_freeze_context(self):
 
 		# Seed randomness for a reproducible test.
@@ -502,7 +909,8 @@ class TestRelation2VecEmbedder(TestCase):
 
 			# We don't want to prune anything from the dictionary so that
 			# we keep all dimensions of the context embedding
-			min_frequency=None,	
+			min_query_frequency=0,	
+			min_context_frequency=0,	
 
 			files=files,
 			save_dir=save_dir,
@@ -702,7 +1110,6 @@ class TestRelation2VecEmbedder(TestCase):
 			cdict.get_ids(context) for context in
 			[('one', 'uno'), ('two', 'dos'), ('three', 'tres')]
 		]
-		print expected_best_fitting_context_ids
 
 		# The UNK token generally has high affinity for every relation 
 		# embedding because there is no strong gradient affecting it.  We 
@@ -710,11 +1117,157 @@ class TestRelation2VecEmbedder(TestCase):
 		# for each relationship.
 		embedding_product[:,0] = 0
 		best_fitting_context_ids = np.argmax(embedding_product, axis=1)
-		print best_fitting_context_ids
 		for i in range(len(best_fitting_context_ids)):
 			best = best_fitting_context_ids[i]
 			expected_best = expected_best_fitting_context_ids[i]
 			self.assertTrue(best in expected_best)
+
+
+class TestEntityPair2Vec(TestCase):
+
+	def test_learning_function_does_prune(self):
+
+		# Some constants for the test
+		files = ['test-data/test-corpus/003-raw.tsv']
+		save_dir = 'test-data/test-entity-pair-embedder'
+		if os.path.exists(save_dir):
+			shutil.rmtree(save_dir)
+		batch_size = 3
+		macrobatch_size = 1551
+		num_embedding_dimensions = 5
+		num_epochs = 1
+
+		# Train the embedder using the convenience function
+		embedder, reader = entity_pair2vec(
+			files=files,
+			save_dir=save_dir,
+			num_epochs=num_epochs,
+			min_query_frequency=0,
+			min_context_frequency=0,
+			batch_size = batch_size,
+			macrobatch_size = macrobatch_size,
+			num_embedding_dimensions=num_embedding_dimensions,
+			verbose=False
+		)
+
+		self.assertEqual(reader.query_vocab_size(), 12)
+		self.assertEqual(reader.context_vocab_size(), 185)
+
+		# Train the embedder using the convenience function
+		embedder, reader = entity_pair2vec(
+			files=files,
+			save_dir=save_dir,
+			num_epochs=num_epochs,
+			min_query_frequency=2,
+			min_context_frequency=5,
+			batch_size = batch_size,
+			macrobatch_size = macrobatch_size,
+			num_embedding_dimensions=num_embedding_dimensions,
+			verbose=False
+		)
+
+		self.assertEqual(reader.query_vocab_size(), 2)
+		self.assertEqual(reader.context_vocab_size(), 9)
+
+		# Train the embedder using the convenience function
+		embedder, reader = entity_pair2vec(
+			files=files,
+			save_dir=save_dir,
+			num_epochs=num_epochs,
+			min_query_frequency=2,
+			min_context_frequency=10,
+			batch_size = batch_size,
+			macrobatch_size = macrobatch_size,
+			num_embedding_dimensions=num_embedding_dimensions,
+			verbose=False
+		)
+
+		self.assertEqual(reader.query_vocab_size(), 2)
+		self.assertEqual(reader.context_vocab_size(), 4)
+
+
+	def test_learning_function(self):
+
+		# Seed randomness for a reproducible test.
+		np.random.seed(3)
+
+		# Some constants for the test
+		files = ['test-data/test-corpus/c.tsv']
+		batch_size = 3
+		macrobatch_size = 1551
+		noise_ratio = 15
+		num_embedding_dimensions = 5
+		num_epochs = 2
+		learning_rate = 0.01
+		momentum = 0.9
+		tolerance = 0.25
+		save_dir = 'test-data/test-entity-pair-embedder'
+		min_query_frequency = 0
+		min_context_frequency = 0
+
+		# Train the embedder using the convenience function
+		embedder, reader = entity_pair2vec(
+			files=files,
+			save_dir=save_dir,
+			num_epochs=num_epochs,
+			min_query_frequency=min_query_frequency,
+			min_context_frequency=min_context_frequency,
+			noise_ratio=noise_ratio,
+			batch_size = batch_size,
+			macrobatch_size = macrobatch_size,
+			num_embedding_dimensions=num_embedding_dimensions,
+			learning_rate=learning_rate,
+			momentum=momentum,
+			verbose=False
+		)
+
+		# Get the IDs for the entities that occur together
+		# within the test corpus.  We'll be interested to see the
+		# relationship embedding for them that is learnt during training
+		edict = reader.query_dictionary
+		expected_pairs = [('A','B'), ('C','D'), ('E','F')]
+		expected_pairs_ids = [
+			edict.get_id(pair_str)
+			for pair_str in expected_pairs
+		]
+
+		# Get the parameters out of the trained model
+		W_relation, W_context = (
+			embedder.get_param_values()
+		)
+
+		# Get the embeddings for the entity-pairs ("relationships")
+		# occuring in the test corpus
+		embedded_relationships = embedder.embed(expected_pairs_ids)
+
+		# Take the dot product of the relationship embeddings
+		# with the context-word embeddings, and then process this
+		# through the sigmoid function.  This yields a
+		# relationship-context "fit-score", being larger if they
+		# have better fit according to the model.  The score has
+		# an interpretation as a probablity, see "Noise-Contrastive
+		# Estimation of Unnormalized Statistical Models, with
+		# Applications to Natural Image Statistics".
+		embedding_product = np.round(sigma(np.dot(
+			embedded_relationships, W_context.T
+		)),2)
+
+		# Find the context words that fit best with each entity-pair.
+		# These should be equal to the ids for the contexts actually
+		# occuring along with those entity pairs in the coropus.  To see
+		# where these numbers come from, compare the contexts cooccurring
+		# with entity pairs in the test-corpus with their ids in the
+		# token_map saved at <savedir>
+		expected_best_fitting_context_ids = [2,5,8]
+		# The UNK token generally has high affinity for every relation 
+		# embedding because there is no strong gradient affecting it.  We 
+		# will mask the UNK before looking for best-fitting learned context
+		# for each relationship.
+		embedding_product[:,0] = 0
+		best_fitting_context_ids = np.argmax(embedding_product, axis=1)
+		self.assertTrue(np.array_equal(
+			best_fitting_context_ids, expected_best_fitting_context_ids
+		))
 
 
 
@@ -873,6 +1426,8 @@ class TestNoiseContrastiveTheanoMinibatcher(TestCase):
 
 class TestDatasetReader(TestCase):
 
+	# TODO: This does not appear to be actually testing, but rather just
+	# printing results.  Add assertions.
 	def test_sample_tokens_between(self):
 		fname = 'test-data/test-corpus/003-raw.tsv'
 		reader = Relation2VecDatasetReader(
@@ -1477,12 +2032,103 @@ class TestDatasetReader(TestCase):
 			self.assertEqual(found_tokens_no_spans, expected_tokens[e1,e2])
 
 
+	def test_check_prepared(self):
+		'''
+		Try running generate_dataset_serial and generate_dataset_parallel
+		without properly loading all the dictionaries.  It should throw
+		an error.  When all dictionaries have been loaded, it should work.
+		'''
+
+		save_dir = 'test-data/test-relation2vec-dataset-reader'
+		if os.path.exists(save_dir):
+			shutil.rmtree(save_dir)
+
+		files = ['test-data/test-corpus/a.tsv']
+		batch_size = 2
+		noise_ratio = 15
+		reader = Relation2VecDatasetReader(
+			files=files,
+			macrobatch_size = batch_size,
+			noise_ratio=noise_ratio,
+			verbose=False
+		)
+
+		# Trying to generate the dataset (series or parallel) should
+		# raise an error
+		with self.assertRaises(DataSetReaderIllegalStateException):
+			list(reader.generate_dataset_serial())
+		with self.assertRaises(DataSetReaderIllegalStateException):
+			list(reader.generate_dataset_parallel())
+
+		# Now prepare the dictionaries
+		reader.prepare(save_dir=save_dir)
+
+		# With dictionaries prepared, generating the dataset should work
+		self.assertEqual(
+			len(list(reader.generate_dataset_parallel())), 5
+		)
+		self.assertEqual(
+			len(list(reader.generate_dataset_serial())), 5
+		)
+
+		# Now load a new reader, and load dictionaries manually
+		new_reader = Relation2VecDatasetReader(
+			files=files,
+			macrobatch_size = batch_size,
+			noise_ratio=noise_ratio,
+			verbose=False
+		)
+		new_reader.load_dictionary(save_dir)
+
+		# With dictionaries loaded, generating the dataset should work
+		self.assertEqual(
+			len(list(new_reader.generate_dataset_parallel())), 5
+		)
+		self.assertEqual(
+			len(list(new_reader.generate_dataset_serial())), 5
+		)
+
+		# Now load a new reader, and load dictionaries manually
+		new_reader = Relation2VecDatasetReader(
+			files=files,
+			macrobatch_size = batch_size,
+			noise_ratio=noise_ratio,
+			verbose=False,
+			min_entity_pair_frequency=0,
+			min_query_frequency=0,
+			min_context_frequency=0
+		)
+
+		# Load 2 out of 3 dictionaries.  Should raise an error when we
+		# try to generate data
+		new_reader.load_entity_pair_dictionary(os.path.join(
+			save_dir, 'entity-pair-dictionary'))
+		new_reader.load_context_dictionary(os.path.join(
+			save_dir, 'context-dictionary'))
+		with self.assertRaises(DataSetReaderIllegalStateException):
+			list(new_reader.generate_dataset_serial())
+		with self.assertRaises(DataSetReaderIllegalStateException):
+			list(new_reader.generate_dataset_parallel())
+
+		# Load the missing dictionary.  Should generate data now.
+		new_reader.load_entity_dictionary(os.path.join(
+			save_dir, 'entity-dictionary'))
+		print list(new_reader.generate_dataset_parallel())
+		self.assertEqual(
+			len(list(new_reader.generate_dataset_parallel())), 5
+		)
+		self.assertEqual(
+			len(list(new_reader.generate_dataset_serial())), 5
+		)
+
+
+
 	def test_save_load_dictionaries(self):
 		'''
 		Try saving and reloading a Relation2VecMinibatcher's dictionaries,
 		and ensure they are unchanged by the saving and loading.
 		'''
-		save_dir = 'test-data/test-dataset-reader'
+		save_dir = 'test-data/test-relation2vec-dataset-reader'
 		if os.path.exists(save_dir):
 			shutil.rmtree(save_dir)
 
@@ -1496,7 +2142,11 @@ class TestDatasetReader(TestCase):
 			verbose=False
 		)
 
-		reader.prepare(save_dir='test-data/test-minibatch-generator')
+		reader.prepare(save_dir=save_dir)
+
+		self.assertEqual(reader.entity_vocab_size(), 9)
+		self.assertEqual(reader.context_vocab_size(), 104)
+		self.assertEqual(reader.entity_pair_vocab_size(), 11)
 
 		new_reader = Relation2VecDatasetReader(
 			files=files,
@@ -1504,41 +2154,63 @@ class TestDatasetReader(TestCase):
 			noise_ratio=noise_ratio,
 			verbose=False
 		)
-		new_reader.load_dictionary('test-data/test-minibatch-generator')
+		new_reader.load_dictionary(save_dir)
+
+		# First check that the loaded dictionaries are of the correct size
+		self.assertEqual(new_reader.entity_vocab_size(), 9)
+		self.assertEqual(new_reader.context_vocab_size(), 104)
+		self.assertEqual(new_reader.entity_pair_vocab_size(), 11)
 
 		# check that the underlying data in the dictionaries and unigram
-		# are the same
+		# are the same.  First check the entity_dictionary
 		self.assertEqual(
 			reader.entity_dictionary.token_map.tokens,
 			new_reader.entity_dictionary.token_map.tokens
 		)
 		self.assertEqual(
-			reader.context_dictionary.token_map.tokens,
-			new_reader.context_dictionary.token_map.tokens
-		)
-		self.assertEqual(
 			reader.entity_dictionary.counter_sampler.counts,
 			new_reader.entity_dictionary.counter_sampler.counts
+		)
+
+		# Check the context dictionary
+		self.assertEqual(
+			reader.context_dictionary.token_map.tokens,
+			new_reader.context_dictionary.token_map.tokens
 		)
 		self.assertEqual(
 			reader.context_dictionary.counter_sampler.counts,
 			new_reader.context_dictionary.counter_sampler.counts
 		)
 
-		# Now we'll try using the manual call to save
-		shutil.rmtree('test-data/test-minibatch-generator')
+		# Check the entity-pair-dictionary
+		self.assertEqual(
+			reader.entity_pair_dictionary.token_map.tokens,
+			new_reader.entity_pair_dictionary.token_map.tokens
+		)
+		self.assertEqual(
+			reader.entity_pair_dictionary.counter_sampler.counts,
+			new_reader.entity_pair_dictionary.counter_sampler.counts
+		)
 
-		# These functions don't automatically make the parent directory
-		# if it doesn't exist, so we need to make it
-		reader.save_dictionary('test-data/test-minibatch-generator')
+		# Remove the dictionaries before the next part of the dest
+		shutil.rmtree(save_dir)
+
+		# Now we'll try using the manual call to save
+		reader.save_dictionary(save_dir)
+
+		# Create a new reader and try to load the dictionaries
 		new_reader = Relation2VecDatasetReader(
 			files=files,
 			macrobatch_size=batch_size,
 			noise_ratio=noise_ratio,
 			verbose=False
 		)
+		new_reader.load_dictionary(save_dir)
 
-		new_reader.load_dictionary('test-data/test-minibatch-generator')
+		# First check that the loaded dictionaries are of the correct size
+		self.assertEqual(new_reader.entity_vocab_size(), 9)
+		self.assertEqual(new_reader.context_vocab_size(), 104)
+		self.assertEqual(new_reader.entity_pair_vocab_size(), 11)
 
 		# check that the underlying data in the dictionaries and unigram
 		# are the same
@@ -1547,135 +2219,281 @@ class TestDatasetReader(TestCase):
 			new_reader.entity_dictionary.token_map.tokens
 		)
 		self.assertEqual(
-			reader.context_dictionary.token_map.tokens,
-			new_reader.context_dictionary.token_map.tokens
-		)
-		self.assertEqual(
 			reader.entity_dictionary.counter_sampler.counts,
 			new_reader.entity_dictionary.counter_sampler.counts
+		)
+		self.assertEqual(
+			reader.context_dictionary.token_map.tokens,
+			new_reader.context_dictionary.token_map.tokens
 		)
 		self.assertEqual(
 			reader.context_dictionary.counter_sampler.counts,
 			new_reader.context_dictionary.counter_sampler.counts
 		)
+		self.assertEqual(
+			reader.entity_pair_dictionary.token_map.tokens,
+			new_reader.entity_pair_dictionary.token_map.tokens
+		)
+		self.assertEqual(
+			reader.entity_pair_dictionary.counter_sampler.counts,
+			new_reader.entity_pair_dictionary.counter_sampler.counts
+		)
+
+
+	def test_pruning(self):
+		'''
+		Try running generate_dataset_serial and generate_dataset_parallel
+		without properly loading all the dictionaries.  It should throw
+		an error.  When all dictionaries have been loaded, it should work.
+		'''
+
+		save_dir = 'test-data/test-relation2vec-dataset-reader'
+		if os.path.exists(save_dir):
+			shutil.rmtree(save_dir)
+		files = ['test-data/test-corpus/e.tsv']
+		macrobatch_size=5
+		noise_ratio = 15
+
+		# First prepare a dataset reader on the target test corpus
+		# no pruning.  Ensure that the full expected dictionary sizes
+		# are seen
+		reader = Relation2VecDatasetReader(
+			files=files,
+			macrobatch_size = macrobatch_size,
+			noise_ratio=noise_ratio,
+			min_query_frequency=0,
+			min_context_frequency=0,
+			verbose=False
+		)
+		reader.prepare(save_dir=save_dir)
+		self.assertEqual(reader.entity_vocab_size(), 12)
+		self.assertEqual(reader.entity_pair_vocab_size(), 16)
+		self.assertEqual(reader.context_vocab_size(), 15)
+
+		# Now prepare a dataset reader, this time specifying min 
+		# frequencies, and ensure that the dicitonary sizes the expected
+		# (smaller) sizes
+		reader = Relation2VecDatasetReader(
+			files=files,
+			macrobatch_size = macrobatch_size,
+			noise_ratio=noise_ratio,
+			min_query_frequency=4,
+			min_context_frequency=4,
+			verbose=False
+		)
+		reader.prepare(save_dir=save_dir)
+		self.assertEqual(reader.entity_vocab_size(), 8)
+		self.assertEqual(reader.entity_pair_vocab_size(), 16)
+		self.assertEqual(reader.context_vocab_size(), 11)
+
+		# Now prepare a dataset reader, this time specifying min 
+		# frequencies, and ensure that the dicitonary sizes the expected
+		# (smaller) sizes
+		reader = Relation2VecDatasetReader(
+			files=files,
+			macrobatch_size = macrobatch_size,
+			noise_ratio=noise_ratio,
+			min_query_frequency=4,
+			min_context_frequency=4,
+			min_entity_pair_frequency=4,
+			verbose=False
+		)
+		reader.prepare(save_dir=save_dir)
+		self.assertEqual(reader.entity_vocab_size(), 5)
+		self.assertEqual(reader.entity_pair_vocab_size(), 3)
+		self.assertEqual(reader.context_vocab_size(), 11)
+
+		# Now make a dataset reader, and read the dicitonaries from file,
+		# but again specify min frequencies, and check that
+		# that the dicitonary sizes the expected (smaller) sizes
+		reader = Relation2VecDatasetReader(
+			files=files,
+			macrobatch_size = macrobatch_size,
+			noise_ratio=noise_ratio,
+			min_query_frequency=4,
+			min_context_frequency=4,
+			min_entity_pair_frequency=4,
+			load_dictionary_dir=save_dir,
+			verbose=False
+		)
+		print reader.entity_dictionary.token_map.tokens
+		print reader.entity_pair_dictionary.token_map.tokens
+		print reader.context_dictionary.token_map.tokens
+
+		self.assertEqual(reader.entity_vocab_size(), 5)
+		self.assertEqual(reader.entity_pair_vocab_size(), 3)
+		self.assertEqual(reader.context_vocab_size(), 11)
+
+		# Now make a dataset reader, and read each dicitonary manually
+		# from file. Again specify min frequencies, and check that
+		# that the dicitonary sizes the expected (smaller) sizes
+		reader = Relation2VecDatasetReader(
+			files=files,
+			macrobatch_size = macrobatch_size,
+			noise_ratio=noise_ratio,
+			min_query_frequency=4,
+			min_context_frequency=4,
+			min_entity_pair_frequency=4,
+			verbose=False
+		)
+		reader.load_entity_pair_dictionary(os.path.join(
+			save_dir, 'entity-pair-dictionary'))
+		reader.load_entity_dictionary(os.path.join(
+			save_dir, 'entity-dictionary'))
+		reader.load_context_dictionary(os.path.join(
+			save_dir, 'context-dictionary'))
+		self.assertEqual(reader.entity_vocab_size(), 5)
+		self.assertEqual(reader.entity_pair_vocab_size(), 3)
+		self.assertEqual(reader.context_vocab_size(), 11)
+
+		# Now pre-load the dictionaries, and pass them into the 
+		# DatasetReader's constructor. Again specify min frequencies, and 
+		# check that that the dicitonary sizes the expected (smaller) sizes
+		entity_dictionary = UnigramDictionary()
+		entity_dictionary.load(os.path.join(save_dir, 'entity-dictionary'))
+
+		entity_pair_dictionary = PairDictionary()
+		entity_pair_dictionary.load(
+			os.path.join(save_dir, 'entity-pair-dictionary'))
+
+		context_dictionary = UnigramDictionary()
+		context_dictionary.load(os.path.join(
+			save_dir, 'context-dictionary'))
+
+		reader = Relation2VecDatasetReader(
+			files=files,
+			macrobatch_size = macrobatch_size,
+			noise_ratio=noise_ratio,
+			min_query_frequency=4,
+			min_context_frequency=4,
+			min_entity_pair_frequency=4,
+			context_dictionary=context_dictionary,
+			entity_dictionary=entity_dictionary,
+			entity_pair_dictionary=entity_pair_dictionary,
+			verbose=False
+		)
+		self.assertEqual(reader.entity_vocab_size(), 5)
+		self.assertEqual(reader.entity_pair_vocab_size(), 3)
+		self.assertEqual(reader.context_vocab_size(), 11)
+
 
 
 	# TODO: this test deactivated for now because the saving and loading
 	# of pre-compiled datasets wasn't migrated to the new macrobatching
 	# approach to dataset iteration.  Should we enable saving and loading
 	# again?
-	def _test_save_load_examples_serial(self):
-		'''
-		Try saving and reloading a Relation2VecDatasetReader
-		'''
-		save_dir = 'test-data/test-dataset-reader'
-		if os.path.exists(save_dir):
-			shutil.rmtree(save_dir)
+	#def test_save_load_examples_serial(self):
+	#	'''
+	#	Try saving and reloading a Relation2VecDatasetReader
+	#	'''
+	#	save_dir = 'test-data/test-dataset-reader'
+	#	if os.path.exists(save_dir):
+	#		shutil.rmtree(save_dir)
 
-		files = ['test-data/test-corpus/a.tsv']
-		batch_size = 5
-		noise_ratio = 15
-		reader = Relation2VecDatasetReader(
-			files=files,
-			macrobatch_size = batch_size,
-			noise_ratio=noise_ratio,
-			verbose=False
-		)
-		reader.prepare()
-		reader.generate_dataset_serial(save_dir)
+	#	files = ['test-data/test-corpus/a.tsv']
+	#	batch_size = 5
+	#	noise_ratio = 15
+	#	reader = Relation2VecDatasetReader(
+	#		files=files,
+	#		macrobatch_size = batch_size,
+	#		noise_ratio=noise_ratio,
+	#		verbose=False
+	#	)
+	#	reader.prepare()
+	#	reader.generate_dataset_serial(save_dir)
 
-		new_reader = Relation2VecDatasetReader(
-			files=files,
-			macrobatch_size = batch_size,
-			noise_ratio=noise_ratio,
-			verbose=False
-		)
-		new_reader.load_data(save_dir)
+	#	new_reader = Relation2VecDatasetReader(
+	#		files=files,
+	#		macrobatch_size = batch_size,
+	#		noise_ratio=noise_ratio,
+	#		verbose=False
+	#	)
+	#	new_reader.load_data(save_dir)
 
-		# check that the underlying data in the dictionaries and unigram
-		# are the same
-		self.assertTrue(np.array_equal(new_reader.signal_examples, reader.signal_examples))
-		self.assertTrue(np.array_equal(new_reader.noise_examples, reader.noise_examples))
+	#	# check that the underlying data in the dictionaries and unigram
+	#	# are the same
+	#	self.assertTrue(np.array_equal(new_reader.signal_examples, reader.signal_examples))
+	#	self.assertTrue(np.array_equal(new_reader.noise_examples, reader.noise_examples))
 
-		# Next, test manually calling the save function.  Clear the data from disk.
-		shutil.rmtree(save_dir)
+	#	# Next, test manually calling the save function.  Clear the data from disk.
+	#	shutil.rmtree(save_dir)
 
-		# Call the save function on the existing reader
-		reader.save_data(save_dir)
+	#	# Call the save function on the existing reader
+	#	reader.save_data(save_dir)
 
-		# Make a fresh reader in which we will load the data just saved.
-		new_reader = Relation2VecDatasetReader(
-			files=files,
-			macrobatch_size=batch_size,
-			noise_ratio=noise_ratio,
-			verbose=False
-		)
-		new_reader.load_data(save_dir)
+	#	# Make a fresh reader in which we will load the data just saved.
+	#	new_reader = Relation2VecDatasetReader(
+	#		files=files,
+	#		macrobatch_size=batch_size,
+	#		noise_ratio=noise_ratio,
+	#		verbose=False
+	#	)
+	#	new_reader.load_data(save_dir)
 
-		# check that the underlying data in the dictionaries and unigram
-		# are the same
-		self.assertTrue(np.array_equal(new_reader.signal_examples, reader.signal_examples))
-		self.assertTrue(np.array_equal(new_reader.noise_examples, reader.noise_examples))
+	#	# check that the underlying data in the dictionaries and unigram
+	#	# are the same
+	#	self.assertTrue(np.array_equal(new_reader.signal_examples, reader.signal_examples))
+	#	self.assertTrue(np.array_equal(new_reader.noise_examples, reader.noise_examples))
 
-		# Now we'll try using the manual call to save
-		shutil.rmtree(save_dir)
+	#	# Now we'll try using the manual call to save
+	#	shutil.rmtree(save_dir)
 
 
-	def _test_save_load_examples_parallel(self):
-		'''
-		Try saving and reloading a Relation2VecDatasetReader
-		'''
-		save_dir = 'test-data/test-dataset-reader'
-		if os.path.exists(save_dir):
-			shutil.rmtree(save_dir)
+	#def _test_save_load_examples_parallel(self):
+	#	'''
+	#	Try saving and reloading a Relation2VecDatasetReader
+	#	'''
+	#	save_dir = 'test-data/test-dataset-reader'
+	#	if os.path.exists(save_dir):
+	#		shutil.rmtree(save_dir)
 
-		files = ['test-data/test-corpus/a.tsv']
-		batch_size = 5
-		noise_ratio = 15
-		reader = Relation2VecDatasetReader(
-			files=files,
-			macrobatch_size = batch_size,
-			noise_ratio=noise_ratio,
-			verbose=False
-		)
-		reader.prepare()
-		reader.generate_dataset_parallel(save_dir)
+	#	files = ['test-data/test-corpus/a.tsv']
+	#	batch_size = 5
+	#	noise_ratio = 15
+	#	reader = Relation2VecDatasetReader(
+	#		files=files,
+	#		macrobatch_size = batch_size,
+	#		noise_ratio=noise_ratio,
+	#		verbose=False
+	#	)
+	#	reader.prepare()
+	#	reader.generate_dataset_parallel(save_dir)
 
-		new_reader = Relation2VecDatasetReader(
-			files=files,
-			macrobatch_size = batch_size,
-			noise_ratio=noise_ratio,
-			verbose=False
-		)
-		new_reader.load_data(save_dir)
+	#	new_reader = Relation2VecDatasetReader(
+	#		files=files,
+	#		macrobatch_size = batch_size,
+	#		noise_ratio=noise_ratio,
+	#		verbose=False
+	#	)
+	#	new_reader.load_data(save_dir)
 
-		# check that the underlying data in the dictionaries and unigram
-		# are the same
-		self.assertTrue(np.array_equal(new_reader.signal_examples, reader.signal_examples))
-		self.assertTrue(np.array_equal(new_reader.noise_examples, reader.noise_examples))
+	#	# check that the underlying data in the dictionaries and unigram
+	#	# are the same
+	#	self.assertTrue(np.array_equal(new_reader.signal_examples, reader.signal_examples))
+	#	self.assertTrue(np.array_equal(new_reader.noise_examples, reader.noise_examples))
 
-		# Next, test manually calling the save function.  Clear the data from disk.
-		shutil.rmtree(save_dir)
+	#	# Next, test manually calling the save function.  Clear the data from disk.
+	#	shutil.rmtree(save_dir)
 
-		# Call the save function on the existing reader
-		reader.save_data(save_dir)
+	#	# Call the save function on the existing reader
+	#	reader.save_data(save_dir)
 
-		# Make a fresh reader in which we will load the data just saved.
-		new_reader = Relation2VecDatasetReader(
-			files=files,
-			macrobatch_size=batch_size,
-			noise_ratio=noise_ratio,
-			verbose=False
-		)
-		new_reader.load_data(save_dir)
+	#	# Make a fresh reader in which we will load the data just saved.
+	#	new_reader = Relation2VecDatasetReader(
+	#		files=files,
+	#		macrobatch_size=batch_size,
+	#		noise_ratio=noise_ratio,
+	#		verbose=False
+	#	)
+	#	new_reader.load_data(save_dir)
 
-		# check that the underlying data in the dictionaries and unigram
-		# are the same
-		self.assertTrue(np.array_equal(new_reader.signal_examples, reader.signal_examples))
-		self.assertTrue(np.array_equal(new_reader.noise_examples, reader.noise_examples))
+	#	# check that the underlying data in the dictionaries and unigram
+	#	# are the same
+	#	self.assertTrue(np.array_equal(new_reader.signal_examples, reader.signal_examples))
+	#	self.assertTrue(np.array_equal(new_reader.noise_examples, reader.noise_examples))
 
-		# Now we'll try using the manual call to save
-		shutil.rmtree(save_dir)
+	#	# Now we'll try using the manual call to save
+	#	shutil.rmtree(save_dir)
 
 
 

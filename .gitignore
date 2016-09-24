@@ -8,7 +8,6 @@ del
 env
 venv
 startenv
-src/embedder/test-data/test-minibatch-generator
-src/embedder/test-data/test-entity-embedder
-src/embedder/test-data/test-embedder
-pbs
+test-data
+src/embedder/pbs/*.stderr
+src/embedder/pbs/*.stdout

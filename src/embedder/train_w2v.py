@@ -35,9 +35,7 @@ FILES = [
 DIRECTORIES = [
 	#COOCCURRENCE_DIR
 ]
-SKIP = [
-	re.compile(r'README\.txt'), re.compile(r'test')
-]
+SKIP = [r'README\.txt', r'test']
 THRESHOLD = 1 # This means there will be no discarding
 BATCH_SIZE=int(1e4)
 MACROBATCH_SIZE=int(1e6)
@@ -136,11 +134,8 @@ def print_params(params):
 
 	# Print to stdout the set of parameters defining this run in a 
 	# json-like format, but with keys sorted lexicographically
-	params_to_print = dict(params)
-	if 'skip' in params_to_print:
-		params_to_print['skip'] = [r.pattern for r in params['skip']]
-	for key in sorted(params_to_print.keys()):
-		print key, '=', params_to_print[key]
+	for key in sorted(params.keys()):
+		print key, '=', repr(params[key])
 
 
 if __name__ == '__main__':

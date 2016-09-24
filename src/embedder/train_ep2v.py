@@ -11,12 +11,9 @@ import numpy as np
 
 
 # Import internal libraries
-from r2v import relation2vec
+from ep2v import entity_pair2vec
 from theano_minibatcher import NoiseContrastiveTheanoMinibatcher
-from dataset_reader import (
-	Relation2VecDatasetReader as DatasetReader,
-	FULL_CONTEXT, RANDOM_SINGLE_CHOICE
-)
+from dataset_reader import EntityPair2VecDatasetReader as DatasetReader
 from SETTINGS import DATA_DIR, COOCCURRENCE_DIR 
 
 
@@ -26,35 +23,33 @@ np.random.seed(0)
 
 # Set defaults and constants
 USAGE = (
-	'Usage: ./train_r2v.py \'command="command"\' \'save_dir="save/dir"\''
+	'Usage: ./train_ep2v.py \'command="command"\' \'save_dir="save/dir"\''
 	' [optional_key=val ...]'
 )
-DIRECTORIES = [COOCCURRENCE_DIR]
+DIRECTORIES = [
+	COOCCURRENCE_DIR
+]
 FILES = [
 	#os.path.join(COOCCURRENCE_DIR, '%s.tsv' % hex(i)[2:].zfill(3))
 	#for i in range(2)
 ]
 SKIP = [r'README\.txt']
-BATCH_SIZE=int(1e4)
+BATCH_SIZE=int(2e2)
 MACROBATCH_SIZE=int(1e6)
 NOISE_RATIO = 15
-MIN_QUERY_FREQUENCY = 10
-MIN_CONTEXT_FREQUENCY = 10
-MIN_ENTITY_PAIR_FREQUENCY = 10
-NUM_EMBEDDING_DIMENSIONS = 500
+MIN_QUERY_FREQUENCY = 200
+MIN_CONTEXT_FREQUENCY = 20
+NUM_EMBEDDING_DIMENSIONS = 300
 NUM_EPOCHS = 1
 LEARNING_RATE = 0.002
-NUM_PROCESSES = 1
+NUM_PROCESSES = 12
 MOMENTUM = 0.9
 MAX_QUEUE_SIZE = 2
 VERBOSE = True
-LOAD_DICT_DIR = os.path.join(DATA_DIR, 'dictionaries')
+LOAD_DICT_DIR = os.path.join(DATA_DIR, 'entity-pair-dictionaries')
 READ_DATA_ASYNC = True
 CONTEXT_EMBEDDINGS_FNAME = os.path.join(
 	DATA_DIR, 'google-vectors-negative-300.txt')
-ENTITY_NOISE_RATIO = 0.0
-SIGNAL_SAMPLE_MODE = RANDOM_SINGLE_CHOICE
-LEN_CONTEXT = 1
 FREEZE_CONTEXT = False
 
 
@@ -65,30 +60,23 @@ def prepare_dataset(params):
 
 
 def train(params):
-	relation2vec(**params)
+	entity_pair2vec(**params)
 
 
 legal_params = {
 	'command', 'files', 'directories', 'skip', 'save_dir', 'num_epochs',
-	'min_query_frequency', 'min_context_frequency', 
-	'min_entity_pair_frequency', 'noise_ratio', 
+	'min_query_frequency', 'min_context_frequency', 'noise_ratio', 
 	'batch_size', 'macrobatch_size',
 	'max_queue_size', 'num_embedding_dimensions', 'learning_rate',
 	'momentum', 'verbose', 'num_processes', 'read_data_async',
-	'context_embeddings_fname', 'load_dictionary_dir', 'signal_sample_mode',
-	'entity_noise_ratio', 'len_context', 'freeze_context'
+	'context_embeddings_fname', 'load_dictionary_dir', 'freeze_context'
 }
+
 
 def commandline2dict():
 	properties = {}
 	for arg in sys.argv[1:]:
-		try:
-			key, val = arg.split('=')
-		except ValueError:
-			raise ValueError(
-				'malformed arg: %s. Did you accidentally add a space?'
-				% arg
-			)
+		key, val = arg.split('=')
 
 		if key not in legal_params:
 			raise ValueError('Unrecognized argument: %s' % key)
@@ -180,7 +168,6 @@ if __name__ == '__main__':
 			'load_dictionary_dir': LOAD_DICT_DIR,
 			'min_query_frequency': MIN_QUERY_FREQUENCY,
 			'min_context_frequency': MIN_CONTEXT_FREQUENCY,
-			'min_entity_pair_frequency': MIN_ENTITY_PAIR_FREQUENCY,
 			'noise_ratio': NOISE_RATIO,
 			'batch_size': BATCH_SIZE,
 			'macrobatch_size': MACROBATCH_SIZE,
@@ -192,9 +179,6 @@ if __name__ == '__main__':
 			'num_processes': NUM_PROCESSES,
 			'read_data_async': READ_DATA_ASYNC,
 			'context_embeddings_fname': CONTEXT_EMBEDDINGS_FNAME,
-			'signal_sample_mode': SIGNAL_SAMPLE_MODE,
-			'entity_noise_ratio': ENTITY_NOISE_RATIO,
-			'len_context': LEN_CONTEXT,
 			'freeze_context': FREEZE_CONTEXT,
 		}
 
@@ -207,7 +191,7 @@ if __name__ == '__main__':
 		print_params(params)
 		print
 
-		# Run the dictionary preparation, recording total elapsed time
+		# Do training, recording total elapsed time
 		start = time.time()
 		train(params)
 		elapsed = time.time() - start
@@ -219,5 +203,6 @@ if __name__ == '__main__':
 			'got unexpected subcommand: %s\n' % command 
 			+ USAGE
 		)
+
 
 
