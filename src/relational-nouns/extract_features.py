@@ -111,13 +111,76 @@ def filter_seeds(words, dictionary):
 def get_classifier():
 	positive_seeds, negative_seeds = get_seeds()
 	features = load_features()
-	print len(features)
 	dictionary = get_dictionary(features)
 	positive_seeds = filter_seeds(positive_seeds, dictionary)
 	negative_seeds = filter_seeds(negative_seeds, dictionary)
 	classifier = make_classifier(
 		features, dictionary, positive_seeds, negative_seeds)
 	return classifier, dictionary
+
+
+def cross_val_positives():
+	positive_seeds, negative_seeds = get_seeds()
+	features = load_features()
+	dictionary = get_dictionary(features)
+	positive_seeds = filter_seeds(positive_seeds, dictionary)
+	negative_seeds = filter_seeds(negative_seeds, dictionary)
+
+	num_correct = 0
+	num_tested = 0
+	for test_item in positive_seeds:
+		positive_seeds_filtered = [
+			p for p in positive_seeds if p is not test_item
+		]
+		classifier = make_classifier(
+			features, dictionary, positive_seeds_filtered, negative_seeds
+		)
+
+		num_tested += 1
+		prediction = classifier.predict(dictionary.get_id(test_item))[0]
+		if prediction:
+			num_correct += 1
+
+		padding = 40 - len(test_item)
+		print test_item, ' ' * padding, 'correct' if prediction else '-'
+
+	print (
+		'\n' + '-'*70 + '\n\n' +
+		'true positives / positives = %f' 
+		% (num_correct / float(num_tested))
+	)
+
+
+def cross_val_negatives():
+	positive_seeds, negative_seeds = get_seeds()
+	features = load_features()
+	dictionary = get_dictionary(features)
+	positive_seeds = filter_seeds(positive_seeds, dictionary)
+	negative_seeds = filter_seeds(negative_seeds, dictionary)
+
+	num_correct = 0
+	num_tested = 0
+	for test_item in negative_seeds:
+		negative_seeds_filtered = [
+			n for n in negative_seeds if n is not test_item
+		]
+		classifier = make_classifier(
+			features, dictionary, positive_seeds, negative_seeds_filtered
+		)
+
+		num_tested += 1
+		prediction = classifier.predict(dictionary.get_id(test_item))[0]
+		if not prediction:
+			num_correct += 1
+
+		padding = 40 - len(test_item)
+		print test_item, ' ' * padding, '-' if prediction else 'correct'
+
+	print (
+		'\n' + '-'*70 + '\n\n' +
+		'true negatives / negatives = %f' 
+		% (num_correct / float(num_tested))
+	)
 
 
 def make_classifier(features, dictionary, positive_seeds, negative_seeds):
