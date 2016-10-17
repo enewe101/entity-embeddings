@@ -1,0 +1,7 @@
+GIGAWORD_DIR = '/home/rldata/gigaword/'
+DATA_DIR = '/home/ndg/users/enewel3/entity-embeddings/data'
+SCRATCH_DIR = '/gs/scratch/enewel3/entity-embeddings'
+COOCCURRENCE_DIR = '/home/ndg/users/enewel3/entity-embeddings/data/cooccurrence'
+RELATIONAL_NOUN_SEEDS_PATH = '/home/ndg/users/enewel3/entity-embeddings/src/relational-nouns/relational_nouns.txt'
+NONRELATIONAL_NOUN_SEEDS_PATH = '/home/ndg/users/enewel3/entity-embeddings/src/relational-nouns/nonrelational_nouns.txt'
+FEATURES_PATH = '/home/ndg/users/enewel3/entity-embeddings/data/features.json'
