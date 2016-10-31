@@ -8,9 +8,17 @@ import utils
 
 GREP_RESULT_PATH = os.path.join(DATA_DIR, 'grep-result.html')
 
-def grep_giga_for_relational_nouns():
+def grep_giga_for_relational_nouns(limit=100, path=GREP_RESULT_PATH):
 	positives, negatives = utils.get_training_sets()
-	grep_giga(positives, limit=None)
+	grep_giga(positives, limit=limit, path=path)
+
+
+def load_article(article_id):
+	subdir = article_id[:3]
+	path = os.path.join(
+		GIGAWORD_DIR, 'data', subdir, 'CoreNLP', '%s.txt.xml' % article_id
+	)
+	return AnnotatedText(open(path).read())
 
 
 def gigaword(limit=100):
@@ -20,13 +28,43 @@ def gigaword(limit=100):
 
 	return [(fname, AnnotatedText(open(fname).read())) for fname in fnames]
 
+
+def load_from_def(article_def):
+	article_id, sentence_id = [s.strip() for s in article_def.split(':')]
+	sentence_id = int(sentence_id)
+	article = load_article(article_id)
+	sentence = article.sentences[sentence_id]
+	return article, sentence
+
+
+def show(article_def):
+	article, sentence = load_from_def(article_def)
+	print sentence
+
+
+def ctree(article_def):
+	'''
+	Print a representation of the constituency parse tree.
+	'''
+	article, sentence = load_from_def(article_def)
+	article.print_tree(sentence['c_root'])
+
+
+def dtree(article_def):
+	'''
+	Print a representation of the dependency parse tree.
+	'''
+	article, sentence = load_from_def(article_def)
+	print sentence.dep_tree_str()
+
+
 def get_article_id(path):
 	fname = path.split('/')[-1]
 	article_id = fname.split('.')[0]
 	return article_id
 
 
-def grep_giga(target_lemmas, limit=100, fname=GREP_RESULT_PATH):
+def grep_giga(target_lemmas, limit=100, path=GREP_RESULT_PATH):
 	'''
 	Search through `limit` number of gigaword articles, finding sentences
 	that match the lemmas listed in `target_lemmas` (a set of strings), 
@@ -34,8 +72,8 @@ def grep_giga(target_lemmas, limit=100, fname=GREP_RESULT_PATH):
 	matched text highlighted
 	'''
 
-	if fname is not None:
-		out_file = open(fname, 'w')
+	if path is not None:
+		out_file = open(path, 'w')
 
 	markup = ''
 	for fname, article in gigaword(limit=limit):
@@ -56,7 +94,7 @@ def grep_giga(target_lemmas, limit=100, fname=GREP_RESULT_PATH):
 	markup = '<html>%s<body>%s</body></html>' % (get_html_head(), markup)
 
 	# Write markup to file (if given)
-	if fname is not None:
+	if path is not None:
 		out_file.write(markup)
 
 	# Return the markup
@@ -103,6 +141,38 @@ def grep_article(target_lemmas, annotated_text):
 
 	return marked_up_sentences
 
+'ignore occurrences of verbs'
+
+patterns = {
+	'PRP$ nounphrase-with-head(NNS?)': [],
+	'WP$ noun': ['9fd68017af26898c : 20'],
+	'demonym nounphrase-with-head(NNS?)': ['9fd0a4ee9f097d72 : 11',
+		'9fd637e46710f28e : 14'],
+
+	'is a <noun> of NP': ['9fd22ab41e0e5ae9 : 3'],
+	'<noun> of NP': [
+		'9fd0a4ba93b96249 : 9', '9fd0e375e8355175 : 66'],
+	'as [a] <noun>': ['9fd0af9b8725e34c : 52', '9fd3717d0477a5b7 : 13',
+		'9fd57c371f384ec4 : 14'],
+	'a noun to noun (e.g. a brother to me)': [],
+	'<noun> to NNP': ['9fd500920273bea6 : 0'],
+	'at the end of a noun catenary': ['9fd0a6aae6576477 : 13'],
+	'at the end of a noun catenary, preceeded by NNP': [
+		'9fd1017387fe1274 : 42'],
+	'at beginning of noun phrase, preceeding NNP': [
+		'9fd387a122e7d0c8 : 17', '9fd425bc42a69688 : 3', 
+		'9fd583fd4a3586ad : 19'],
+	'x has a noun': [],
+	'candidate for': ['9fd297b4c671fe0f : 9', '9fd706a241e8995a : 14'],
+	'other': ['9fd26f6f33891f2f : 10'],
+	'use of "the" determiner, but never "a" except before "of" or appos': [
+		'9fd2d2494cea4d73 : 12'],
+	'having an appositive': [
+		'9fd3d817389fee39 : 14', '9fd4101bfdccba4d : 7', 
+		'9fd4a5506e1c5bca : 49'],
+	'compound': ['9fd4d43d76bd7805 : 2'],
+	'preceeded by NNP that is country or company, preceeding NNP that is person': [],
+}
 
 def get_html_head():
 	return ' '.join([
@@ -122,4 +192,5 @@ def get_html_head():
 
 
 if __name__ == '__main__':
-	grep_giga_for_relational_nouns()
+	grep_giga_for_relational_nouns(
+		limit=100, path='../../data/grep-relational-nouns100.html')
