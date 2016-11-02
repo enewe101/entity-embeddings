@@ -74,7 +74,7 @@ def extract_and_save_features(
 
 
 def extract_and_save_features_from_archive(archive_path):
-	extract = extract_all_features(archive_path)
+	extract = extract_all_features_from_archive(archive_path)
 	this_archive = os.path.basename(archive_path)[:-4]
 
 	# Save each of the features
