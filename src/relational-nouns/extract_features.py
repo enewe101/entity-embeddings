@@ -74,8 +74,14 @@ def extract_and_save_features(
 
 
 def extract_and_save_features_from_archive(archive_path):
-	extract = extract_all_features_from_archive(archive_path)
+
+	# Open a log file where errors will be put in case archive is corrupted
 	this_archive = os.path.basename(archive_path)[:-4]
+	log_path = os.path.join(
+		RELATIONAL_NOUN_FEATURES_DIR, this_archive, 'log')
+	log_file = open(log_path, 'w')
+
+	extract = extract_all_features_from_archive(archive_path, log)
 
 	# Save each of the features
 	dependency_features_path = os.path.join(
@@ -101,7 +107,7 @@ def extract_and_save_features_from_archive(archive_path):
 	extract['dictionary'].save(dictionary_dir)
 
 
-def extract_all_features_from_archive(archive_path):
+def extract_all_features_from_archive(archive_path, log=None):
 
 	start = time.time()
 
@@ -110,16 +116,29 @@ def extract_all_features_from_archive(archive_path):
 	fnames_q = IterableQueue()
 	fnames_producer = fnames_q.get_producer()
 	archive = tarfile.open(archive_path)
-	for member in archive:
 
-		# Extract the contents of the corenlp files, putting the text
-		# for each file directly onto the queue
-		if member.name.endswith('xml'):
-			fnames_producer.put((
-				member.name,
-				archive.extractfile(member).read()
-			))
+	# Extract each member, putting it's path and contents on the queue
+	try:
+		for member in archive:
 
+			# Extract the contents of the corenlp files, putting the text
+			# for each file directly onto the queue
+			if member.name.endswith('xml'):
+				fnames_producer.put((
+					member.name,
+					archive.extractfile(member).read()
+				))
+
+	# If we encounter corruption in the archive, log or print a warning
+	# and proceed with the processing of what was extracted so far.
+	except IOError, e:
+		message = '%s\tlast file was: %s' % (str(e), member.name)
+		if log:
+			log.write(message)
+		else:
+			print message
+
+	# We're done adding files to the queue
 	fnames_producer.close()
 
 	# Make a queue to hold feature stats (results), and a consumer to 
@@ -137,16 +156,17 @@ def extract_all_features_from_archive(archive_path):
 		)
 		process.start()
 
-	# Close the iterable queues
+	# We're done making endpoints for the queues
 	fnames_q.close()
 	features_q.close()
 
-	# Accumulate the results.  This blocks until workers are finished
+	# We're going to accumulate the results.  Make some containers for that.
 	dep_tree_features = defaultdict(Counter)
 	baseline_features = defaultdict(Counter)
 	hand_picked_features = defaultdict(Counter)
 	dictionary = UnigramDictionary()
 
+	# Accumulate the results.  This blocks until workers are finished
 	for extract in features_consumer:
 		dictionary.add_dictionary(extract['dictionary'])
 		for key in extract['dep_tree_features']:
@@ -157,9 +177,11 @@ def extract_all_features_from_archive(archive_path):
 			hand_picked_features[key] += (
 				extract['hand_picked_features'][key])
 
+	# Print a message about how long it all took
 	elapsed = time.time() - start
 	print 'elapsed', elapsed
 
+	# Return the accumulated features
 	return {
 		'dep_tree_features':dep_tree_features, 
 		'baseline_features': baseline_features, 
