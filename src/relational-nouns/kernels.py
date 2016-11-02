@@ -7,7 +7,10 @@ from nltk.corpus import wordnet, wordnet_ic
 
 INFORMATION_CONTENT_FILE = 'ic-treebank-resnik-add1.dat'
 LEGAL_SIMILARITIES = [
-	None, 'jcn', 'wup', 'res', 'path', 'lin', 'lch' 
+	'jcn', 'wup', 'res', 'path', 'lin', 'lch' 
+]
+LEGAL_SYNTACTIC_SIMILARITIES = [
+	'hand_picked', 'dep_tree', 'both'
 ]
 
 
@@ -24,9 +27,9 @@ def bind_dist(features, dictionary):
 
 
 def bind_kernel(
-	features,
 	dictionary,
-	syntactic_similarity=True,
+	features=None, # Must be provided if syntactic_similarity is True
+	syntactic_similarity='dep_tree',
 	semantic_similarity=None,
 	syntactic_multiplier=1.0,
 	semantic_multiplier=1.0,
@@ -37,18 +40,35 @@ def bind_kernel(
 	lookup bound to its scope.
 	'''
 
-	if semantic_similarity not in LEGAL_SIMILARITIES:
+	# Validate that a sensible value for semantic similarity was provided
+	semantic_similarity_is_valid = (
+		semantic_similarity in LEGAL_SIMILARITIES 
+		or semantic_similarity is None
+	)
+	if not semantic_similarity_is_valid:
 		raise ValueError(
 			'semantic_similarity must be one of the following: '
-			+ ', '.join(LEGAL_SIMILARITIES)
+			+ ', '.join(LEGAL_SIMILARITIES) 
+			+ '.  Got %s.' % repr(semantic_similarity)
 		)
 
+	# Validate that a sensible value for syntactic similarity was provided
+	syntactic_similarity_is_valid = (
+		syntactic_similarity in LEGAL_SYNTACTIC_SIMILARITIES 
+		or syntactic_similarity is None
+	)
+	if not syntactic_similarity_is_valid:
+		raise ValueError(
+			'syntactic_similarity must be one of the following: '
+			+ ', '.join(LEGAL_SYNTACTIC_SIMILARITIES) 
+			+ '.  Got %s.' % repr(syntactic_similarity)
+		)
+
+	# Semantic similarity functions need an "information content" file 
+	# to calculate similarity values.
 	if semantic_similarity is not None:
 		information_content = wordnet_ic.ic(INFORMATION_CONTENT_FILE)
 		
-
-	#wordnet_features = WordnetFeatures()
-
 	def kernel(A,B):
 		'''
 		Custom kernel function.  This counts how often the links incident on
@@ -67,8 +87,13 @@ def bind_kernel(
 			token_a = dictionary.get_token(int(a[0]))
 
 			# Get token_a's dependency tree features
-			if syntactic_similarity:
-				features_a = features[token_a]
+			if syntactic_similarity is not None:
+				if syntactic_similarity == 'both':
+					features_a = features['hand_picked'][token_a]
+					features_a.update(features['dep_tree'][token_a])
+
+				else:
+					features_a = features[syntactic_similarity][token_a]
 
 			# Get the token_a's synset if semantic similarity is being used
 			if semantic_similarity is not None:
@@ -84,15 +109,16 @@ def bind_kernel(
 				kernel_score = 0
 
 				# Calculate the dependency tree kernel
-				if syntactic_similarity:
-					features_b = features[token_b]
+				if syntactic_similarity is not None:
+					if syntactic_similarity == 'both':
+						features_b = features['hand_picked'][token_b]
+						features_b.update(features['dep_tree'][token_b])
+
+					else:
+						features_b = features[syntactic_similarity][token_b]
+
 					kernel_score += syntactic_multiplier * dict_dot(
 						features_a, features_b)
-
-				# Calculate the hypernym overlap kernel
-				#if use_wordnet:
-				#	kernel_score += wordnet_features.wordnet_kernel(
-				#		token_a, token_b)
 
 				# Calculate semantic similarity is being used
 				if semantic_similarity is not None:

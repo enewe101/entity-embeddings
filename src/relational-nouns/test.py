@@ -37,10 +37,6 @@ class TestKernel(TestCase):
 		# Next test each of the semantic similarities
 		for similarity_type in k.LEGAL_SIMILARITIES:
 
-			# Skip the "None" similarity type
-			if similarity_type is None:
-				continue
-
 			kernel = k.bind_kernel(
 				features,
 				dictionary,

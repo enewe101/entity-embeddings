@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import tarfile
 from word2vec import UnigramDictionary
 import json
 from iterable_queue import IterableQueue
@@ -12,7 +13,8 @@ from subprocess import check_output
 from collections import defaultdict, Counter, deque
 from SETTINGS import (
 	GIGAWORD_DIR, DICTIONARY_DIR, DATA_DIR, DEPENDENCY_FEATURES_PATH,
-	BASELINE_FEATURES_PATH, HAND_PICKED_FEATURES_PATH
+	BASELINE_FEATURES_PATH, HAND_PICKED_FEATURES_PATH,
+	RELATIONAL_NOUN_FEATURES_DIR
 )
 from nltk.corpus import wordnet
 
@@ -70,6 +72,100 @@ def extract_and_save_features(
 	# Save the dictionary
 	extract['dictionary'].save(dictionary_dir)
 
+
+def extract_and_save_features_from_archive(archive_path):
+	extract = extract_all_features(archive_path)
+	this_archive = os.path.basename(archive_path)[:-4]
+
+	# Save each of the features
+	dependency_features_path = os.path.join(
+		RELATIONAL_NOUN_FEATURES_DIR, this_archive, 'dependency.json')
+	open(dependency_features_path, 'w').write(json.dumps(
+		extract['dep_tree_features']))
+
+	baseline_features_path = os.path.join(
+		RELATIONAL_NOUN_FEATURES_DIR, this_archive, 'baseline.json')
+	open(baseline_features_path, 'w').write(json.dumps(
+		extract['baseline_features']))
+
+	hand_picked_features_path = os.path.join(
+		RELATIONAL_NOUN_FEATURES_DIR, this_archive, 'hand-picked.json')
+	open(hand_picked_features_path, 'w').write(json.dumps(
+		extract['hand_picked_features']))
+
+	# Save the dictionary
+	dictionary_dir = os.path.join(
+		RELATIONAL_NOUN_FEATURES_DIR, this_archive, 
+		'lemmatized-noun-dictionary'
+	)
+	extract['dictionary'].save(dictionary_dir)
+
+
+def extract_all_features_from_archive(archive_path):
+
+	start = time.time()
+
+	# First, make an iterable queue.  Extract all the corenlp files from the
+	# archive and load them onto it
+	fnames_q = IterableQueue()
+	fnames_producer = fnames_q.get_producer()
+	archive = tarfile.open(archive_path)
+	for member in archive:
+
+		# Extract the contents of the corenlp files, putting the text
+		# for each file directly onto the queue
+		if member.name.endswith('xml'):
+			fnames_producer.put((
+				member.name,
+				archive.extractfile(member).read()
+			))
+
+	fnames_producer.close()
+
+	# Make a queue to hold feature stats (results), and a consumer to 
+	# receive completed feature stats objects from workers
+	features_q = IterableQueue()
+	features_consumer = features_q.get_consumer()
+
+	# Create workers that consume filenames and produce feature counts.
+	for p in range(NUM_ARTICLE_LOADING_PROCESSES):
+		fnames_consumer = fnames_q.get_consumer()
+		features_producer = features_q.get_producer()
+		process = Process(
+			target=extract_features_from_articles,
+			args=(fnames_consumer, features_producer, 'content')
+		)
+		process.start()
+
+	# Close the iterable queues
+	fnames_q.close()
+	features_q.close()
+
+	# Accumulate the results.  This blocks until workers are finished
+	dep_tree_features = defaultdict(Counter)
+	baseline_features = defaultdict(Counter)
+	hand_picked_features = defaultdict(Counter)
+	dictionary = UnigramDictionary()
+
+	for extract in features_consumer:
+		dictionary.add_dictionary(extract['dictionary'])
+		for key in extract['dep_tree_features']:
+			dep_tree_features[key] += extract['dep_tree_features'][key]
+		for key in extract['baseline_features']:
+			baseline_features[key] += extract['baseline_features'][key]
+		for key in extract['hand_picked_features']:
+			hand_picked_features[key] += (
+				extract['hand_picked_features'][key])
+
+	elapsed = time.time() - start
+	print 'elapsed', elapsed
+
+	return {
+		'dep_tree_features':dep_tree_features, 
+		'baseline_features': baseline_features, 
+		'hand_picked_features': hand_picked_features,
+		'dictionary': dictionary
+	}
 
 
 def extract_all_features(limit=100):
@@ -129,19 +225,34 @@ def extract_all_features(limit=100):
 	}
 
 
-def extract_features_from_articles(fnames_consumer, features_producer):
+def extract_features_from_articles(
+	files_consumer, features_producer, has_content='True'
+):
+	'''
+	Extracts features from articles on `files_consumer`, and puts 
+	featres onto `features_producer`.  If `has_content` is 'true', then
+	each item is a tuple containing path and a string representing the
+	file contents.  Otherwise, only the path is provided, and the file
+	will be opened and read here.
+	'''
 
 	dep_tree_features = defaultdict(Counter)
 	baseline_features =  defaultdict(Counter)
 	hand_picked_features = defaultdict(Counter)
 	dictionary = UnigramDictionary()
 
-	# Read articles named in fnames_consumer, accumulate features from them
-	for fname in fnames_consumer:
+	# Read articles named in files_consumer, accumulate features from them
+	for item in files_consumer:
+
+		if has_content:
+			fname, content = item
+		else:
+			fname = item
+			content = open(fname).read()
 
 		print 'processing', fname, '...'
 		# Get features from this article
-		article = AnnotatedText(open(fname).read())
+		article = AnnotatedText(content)
 		extract = extract_features_from_article(article)
 
 		# Accumulate the features

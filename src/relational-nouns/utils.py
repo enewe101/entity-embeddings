@@ -1,9 +1,12 @@
 import sys
 sys.path.append('..')
-from word2vec import UNK
+import json
+from word2vec import UNK, UnigramDictionary
 from SETTINGS import (
 	TRAIN_NEGATIVE_PATH, TRAIN_POSITIVE_PATH,
-	TEST_NEGATIVE_PATH, TEST_POSITIVE_PATH
+	TEST_NEGATIVE_PATH, TEST_POSITIVE_PATH,
+	DICTIONARY_DIR, DEPENDENCY_FEATURES_PATH,
+	BASELINE_FEATURES_PATH, HAND_PICKED_FEATURES_PATH
 )
 
 
@@ -32,6 +35,24 @@ def get_test_sets():
 	positives = read_seed_file(TEST_POSITIVE_PATH)
 	negatives = read_seed_file(TEST_NEGATIVE_PATH)
 	return positives, negatives
+
+
+def get_dictionary():
+	dictionary = UnigramDictionary()
+	dictionary.load(DICTIONARY_DIR)
+	return dictionary
+
+
+def load_feature_file(path):
+	return json.loads(open(path).read())
+
+
+def get_features():
+	return {
+		'dep_tree': load_feature_file(DEPENDENCY_FEATURES_PATH),
+		'baseline': load_feature_file(BASELINE_FEATURES_PATH),
+		'hand_picked': load_feature_file(HAND_PICKED_FEATURES_PATH)
+	}
 
 
 def filter_seeds(words, dictionary):
