@@ -75,35 +75,39 @@ def extract_and_save_features(
 
 def extract_and_save_features_from_archive(archive_path):
 
-	# Open a log file where errors will be put in case archive is corrupted
+	# Create a folder for features extracted from this archive
 	this_archive = os.path.basename(archive_path)[:-4]
-	log_path = os.path.join(
-		RELATIONAL_NOUN_FEATURES_DIR, this_archive, 'log')
-	log_file = open(log_path, 'w')
+	this_archive_features_dir = os.path.join(
+		RELATIONAL_NOUN_FEATURES_DIR, this_archive)
+	if not os.path.exists(this_archive_features_dir):
+		os.makedirs(this_archive_features_dir)
 
+	# Open a log file where errors will be put in case archive is corrupted
+	log_path = os.path.join(this_archive_features_dir, 'log')
+	log = open(log_path, 'w')
+
+	# Extract all the features
 	extract = extract_all_features_from_archive(archive_path, log)
 
 	# Save each of the features
 	dependency_features_path = os.path.join(
-		RELATIONAL_NOUN_FEATURES_DIR, this_archive, 'dependency.json')
+		this_archive_features_dir, 'dependency.json')
 	open(dependency_features_path, 'w').write(json.dumps(
 		extract['dep_tree_features']))
 
 	baseline_features_path = os.path.join(
-		RELATIONAL_NOUN_FEATURES_DIR, this_archive, 'baseline.json')
+		this_archive_features_dir, 'baseline.json')
 	open(baseline_features_path, 'w').write(json.dumps(
 		extract['baseline_features']))
 
 	hand_picked_features_path = os.path.join(
-		RELATIONAL_NOUN_FEATURES_DIR, this_archive, 'hand-picked.json')
+		this_archive_features_dir, 'hand-picked.json')
 	open(hand_picked_features_path, 'w').write(json.dumps(
 		extract['hand_picked_features']))
 
 	# Save the dictionary
 	dictionary_dir = os.path.join(
-		RELATIONAL_NOUN_FEATURES_DIR, this_archive, 
-		'lemmatized-noun-dictionary'
-	)
+		this_archive_features_dir, 'lemmatized-noun-dictionary')
 	extract['dictionary'].save(dictionary_dir)
 
 
