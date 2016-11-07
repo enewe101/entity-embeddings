@@ -15,6 +15,7 @@ from nltk.stem import WordNetLemmatizer
 
 UNRECOGNIZED_TOKENS_PATH = os.path.join(DATA_DIR, 'unrecognized-tokens.txt')
 
+
 def load_dictionary(dictionary_dir=DICTIONARY_DIR):
 	dictionary = UnigramDictionary(on_unk=SILENT)
 	dictionary.load(dictionary_dir)

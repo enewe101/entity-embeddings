@@ -3,7 +3,7 @@ import sys
 sys.path.append('..')
 from word2vec import UnigramDictionary
 from nltk.corpus import wordnet, wordnet_ic
-
+import utils as u
 
 INFORMATION_CONTENT_FILE = 'ic-treebank-resnik-add1.dat'
 LEGAL_SIMILARITIES = [
@@ -84,7 +84,7 @@ def bind_kernel(
 		result = []
 		for a in A:
 
-			token_a = dictionary.get_token(int(a[0]))
+			token_a = u.ensure_unicode(dictionary.get_token(int(a[0])))
 
 			# Get token_a's dependency tree features
 			if syntactic_similarity is not None:
@@ -104,7 +104,7 @@ def bind_kernel(
 			for b in B:
 
 				# Get token_b
-				token_b = dictionary.get_token(int(b[0]))
+				token_b = u.ensure_unicode(dictionary.get_token(int(b[0])))
 
 				kernel_score = 0
 

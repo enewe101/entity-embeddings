@@ -1,3 +1,4 @@
+import os
 import random
 import t4k
 import numpy as np
@@ -8,7 +9,7 @@ import sys
 sys.path.append('..')
 from word2vec import UnigramDictionary, UNK, SILENT
 from collections import Counter, deque
-from SETTINGS import DEPENDENCY_FEATURES_PATH, BASELINE_FEATURES_PATH
+from SETTINGS import FEATURES_DIR
 from kernels import bind_kernel, bind_dist
 from utils import (
 	read_seed_file, get_train_sets, filter_seeds, ensure_unicode,
@@ -22,6 +23,8 @@ def make_classifier(
 	kind='svm',	# available: 'svm', 'knn', 'wordnet', 'basic_syntax'
 	on_unk=False,
 	features=None,
+	positives=None,
+	negatives=None,
 
 	# SVM options
 	syntactic_similarity='dep_tree',
@@ -36,20 +39,25 @@ def make_classifier(
 	Convenience method to create a RelationalNounClassifier using
 	default seed data and feature data
 	'''
-	positive_seeds, negative_seeds = get_train_sets()
-	if features is None:
-		features = get_features()
-	positive_seeds = filter_seeds(positive_seeds, dictionary)
-	negative_seeds = filter_seeds(negative_seeds, dictionary)
+	# Load positive and negative training sets (unless supplied)
+	if positives is None or negatives is None:
+		positives, negatives = get_train_sets()
 
+	# Load features sets (unless supplied)
+	if features is None:
+		features = get_features(
+			os.path.join(FEATURES_DIR, 'small-features'))
+
+	positives = filter_seeds(positives, features['dictionary'])
+	negatives = filter_seeds(negatives, features['dictionary'])
 
 	# The proposed most-performant classifier
 	if kind == 'svm':
 		return SvmNounClassifier(
-			positive_seeds=positive_seeds,
-			negative_seeds=negative_seeds,
+			positive_seeds=positives,
+			negative_seeds=negatives,
 			# SVM options
-			dictionary=dictionary,
+			dictionary=features['dictionary'],
 			features=features,
 			on_unk=False,
 			syntactic_similarity=syntactic_similarity,
@@ -62,11 +70,11 @@ def make_classifier(
 	# A runner up, using KNN as the learner
 	elif kind == 'knn':
 		return KnnNounClassifier(
-			positive_seeds,
-			negative_seeds,
+			positives,
+			negatives,
 			# KNN options
 			features['dep_tree'],
-			dictionary,
+			features['dictionary'],
 			on_unk=False,
 			k=3
 		)
@@ -74,7 +82,7 @@ def make_classifier(
 
 	# Simple rule: returns true if query is hyponym of known relational noun
 	elif kind == 'wordnet':
-		return WordnetClassifier(positive_seeds, negative_seeds)
+		return WordnetClassifier(positives, negatives)
 
 
 	# Classifier using basic syntax cues
@@ -82,10 +90,11 @@ def make_classifier(
 		get_features_func = arm_get_basic_syntax_features(
 			features['baseline'])
 		return BalancedLogisticClassifier(
-			positive_seeds,
-			negative_seeds,
+			positives,
+			negatives,
 			get_features=get_features_func
 		)
+
 
 def balance_samples(populations, target='largest'):
 
@@ -114,7 +123,6 @@ def balance_samples(populations, target='largest'):
 	return resampled_populations
 
 
-
 def resample(population, sample_size):
 
 	# If the sample needs to be smaller, just subsample without replacement
@@ -134,7 +142,6 @@ def resample(population, sample_size):
 			for i in range(sample_size - len(population))
 		])
 		return population
-
 
 
 def arm_get_basic_syntax_features(features):
@@ -578,6 +585,8 @@ class SvmNounClassifier(object):
 			return func(ids)
 
 		# If we get a ValueError, try to report the offending word
+		except UnicodeDecodeError:
+			raise
 		except ValueError as e:
 			try:
 				offending_lemma = lemmas[e.offending_idx]

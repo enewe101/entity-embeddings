@@ -17,22 +17,40 @@ def read_seed_file(path):
 	])
 
 
-def get_seed_set(path):
+def get_seed_set(path, with_aspectual=False):
 	'''
 	Get a set of positive (relational) words and a set of negative 
 	(non-relational) words, to be used as a training set
 	'''
-	positives = (
-		read_seed_file(os.path.join(path, 'positives.txt'))
-		| read_seed_file(os.path.join(path, 'aspectual.txt'))
-	)
-	negatives = (
-		read_seed_file(os.path.join(path, 'negatives.txt'))
-		| read_seed_file(os.path.join(path, 'role.txt'))
-		| read_seed_file(os.path.join(path, 'relationship.txt'))
-		| read_seed_file(os.path.join(path, 'verb-derived.txt'))
-	)
+	if with_aspectual:
+		positives = (
+			read_seed_file(os.path.join(path, 'positive.txt'))
+			| read_seed_file(os.path.join(path, 'aspectual.txt'))
+		)
+		negatives = (
+			read_seed_file(os.path.join(path, 'negative.txt'))
+			| read_seed_file(os.path.join(path, 'role.txt'))
+			| read_seed_file(os.path.join(path, 'relationship.txt'))
+			| read_seed_file(os.path.join(path, 'verb-derived.txt'))
+		)
+	else:
+		positives = (
+			read_seed_file(os.path.join(path, 'positive.txt'))
+		)
+		negatives = (
+			read_seed_file(os.path.join(path, 'negative.txt'))
+			| read_seed_file(os.path.join(path, 'role.txt'))
+			| read_seed_file(os.path.join(path, 'relationship.txt'))
+			| read_seed_file(os.path.join(path, 'verb-derived.txt'))
+			| read_seed_file(os.path.join(path, 'aspectual.txt'))
+		)
 	return positives, negatives
+
+
+def get_dictionary(path):
+	dictionary = UnigramDictionary()
+	dictionary.load(path)
+	return dictionary
 
 
 def get_train_sets():
@@ -40,7 +58,7 @@ def get_train_sets():
 	Get a set of positive (relational) words and a set of negative 
 	(non-relational) words, to be used as a training set
 	'''
-	positives, negatives = get_seed_set(TRAIN_PATH)
+	positives, negatives = get_seed_set(TRAIN_DIR)
 	return positives, negatives
 
 
@@ -49,7 +67,7 @@ def get_test_sets():
 	Get a set of positive (relational) words and a set of negative 
 	(non-relational) words, to be used as a test set
 	'''
-	positives, negatives = get_seed_set(TEST_PATH)
+	positives, negatives = get_seed_set(TEST_DIR)
 	return positives, negatives
 
 
