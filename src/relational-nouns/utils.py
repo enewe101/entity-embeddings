@@ -53,12 +53,6 @@ def get_test_sets():
 	return positives, negatives
 
 
-def get_dictionary(path=DICTIONARY_DIR):
-	dictionary = UnigramDictionary()
-	dictionary.load(path)
-	return dictionary
-
-
 def load_feature_file(path):
 	return cjson.decode(open(path).read())
 

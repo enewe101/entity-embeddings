@@ -11,7 +11,7 @@ from collections import Counter, deque
 from SETTINGS import DEPENDENCY_FEATURES_PATH, BASELINE_FEATURES_PATH
 from kernels import bind_kernel, bind_dist
 from utils import (
-	read_seed_file, get_training_sets, filter_seeds, ensure_unicode,
+	read_seed_file, get_train_sets, filter_seeds, ensure_unicode,
 	get_dictionary, get_features
 )
 from nltk.stem import WordNetLemmatizer
@@ -21,6 +21,7 @@ from nltk.corpus import wordnet as w
 def make_classifier(
 	kind='svm',	# available: 'svm', 'knn', 'wordnet', 'basic_syntax'
 	on_unk=False,
+	features=None,
 
 	# SVM options
 	syntactic_similarity='dep_tree',
@@ -35,10 +36,9 @@ def make_classifier(
 	Convenience method to create a RelationalNounClassifier using
 	default seed data and feature data
 	'''
-	positive_seeds, negative_seeds = get_training_sets()
-	features = get_features()
-	dictionary = get_dictionary()
-	dictionary.prune(min_frequency=5)
+	positive_seeds, negative_seeds = get_train_sets()
+	if features is None:
+		features = get_features()
 	positive_seeds = filter_seeds(positive_seeds, dictionary)
 	negative_seeds = filter_seeds(negative_seeds, dictionary)
 
@@ -920,18 +920,6 @@ class KNN(object):
 
 
 ###	Helper functions
-
-
-#def load_features(path=DEPENDENCY_FEATURES_PATH):
-#	return json.loads(open(path).read())
-
-
-
-#def get_dictionary(features):
-#	counts = Counter({token:features[token]['count'] for token in features})
-#	dictionary = UnigramDictionary(on_unk=SILENT)
-#	dictionary.update(counts.elements())
-#	return dictionary
 
 def get_all_synsets(tokens):
 	return set(t4k.flatten([
