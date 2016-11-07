@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import tarfile
-from word2vec import UnigramDictionary
+from word2vec import UnigramDictionary, UNK
 import json
 from iterable_queue import IterableQueue
 from multiprocessing import Process
@@ -23,7 +23,113 @@ GAZETTEER_DIR = os.path.join(DATA_DIR, 'gazetteers')
 GAZETTEER_FILES = [
 	'country', 'city', 'us-state', 'continent', 'subcontinent'
 ]
+MIN_FREQUENCY = 5
 	
+
+def coalesce_features(limit=None):
+
+	# Get a list of all the archives
+	archives = [
+		os.path.join(RELATIONAL_NOUN_FEATURES_DIR, archive) for archive in
+		check_output(['ls', RELATIONAL_NOUN_FEATURES_DIR]).split()
+		if len(archive) == 3
+	]
+	archives.sort()
+
+	# Make containers in which to aggregate results
+	features = {
+		'dep_tree_features': defaultdict(Counter),
+		'baseline_features': defaultdict(Counter),
+		'hand_picked_features': defaultdict(Counter),
+		'dictionary': UnigramDictionary()
+	}
+
+	# Read in the features for each individual archive and accumulate
+	last_processed_successfully = None
+	for archive in archives[:limit]:
+		print 'processing %s...' % os.path.basename(archive)
+
+		try:
+			add_baseline_features = json.loads(open(
+				os.path.join(archive, 'baseline.json')).read())
+			add_nested_counter_inplace(
+				features['baseline_features'], add_baseline_features)
+
+			add_dep_tree_features = json.loads(open(
+				os.path.join(archive, 'dependency.json')).read())
+			add_nested_counter_inplace(
+				features['dep_tree_features'], add_dep_tree_features)
+
+			add_hand_picked_features = json.loads(open(
+				os.path.join(archive, 'hand-picked.json')).read())
+			add_nested_counter_inplace(
+				features['hand_picked_features'], add_hand_picked_features)
+
+			add_dictionary = UnigramDictionary()
+			add_dictionary.load(os.path.join(
+				archive, 'lemmatized-noun-dictionary'))
+			features['dictionary'].add_dictionary(add_dictionary)
+
+			last_processed_successfully = os.path.basename(archive)
+
+		# Tolerate errors reading or json parsing
+		except (IOError, ValueError), e:
+			print 'problem with archive %d: %s' % (archive, str(e))
+			pass
+
+	# Prune the features
+	print 'prunning...'
+	prune_features(features)
+
+	# Make the dir in which to write results if it doesn't already exist
+	coalesced_dirname = '%s-%s' % (archives[0], last_processed_successfully)
+	coalesced_dir = os.path.join(
+		RELATIONAL_NOUN_FEATURES_DIR, coalesced_dirname)
+	if not os.path.exists(coalesced_dir):
+		os.makedirs(coalesced_dir)
+
+	# Write out all the features
+	print 'writing...'
+	write_features(features, coalesced_dir)
+
+	return features
+
+
+def prune_features(features, min_frequency=MIN_FREQUENCY):
+	'''
+	Prune the features for tokens that occur less than min_frequency
+	number of times.  Note, this operates through side effects.
+	'''
+
+	# Prune tokens that have a low frequency from the dictionary
+	discarded_tokens = features['dictionary'].prune(
+		min_frequency=min_frequency)
+
+	# Go through each feature, and prune out features for tokens nolonger
+	# in the dictionary
+	for feature_type in features:
+
+		# Skip the dictionary, it's already pruned
+		if feature_type == 'dictionary':
+			continue
+
+		# Remove all the discarded tokens from the feature listings
+		for token in discarded_tokens:
+			try:
+				del features[feature_type][token]
+			except KeyError:
+				pass
+
+
+
+def add_nested_counter_inplace(accumulating_counter, dict_to_add):
+	for outer_key in dict_to_add:
+		for inner_key in dict_to_add[outer_key]:
+			accumulating_counter[outer_key][inner_key] += (
+				dict_to_add[outer_key][inner_key])
+
+	return accumulating_counter
+
 
 def load_gazetteers():
 	# Read a the gazetteer files, and save each as a set.
@@ -61,16 +167,23 @@ def extract_and_save_features(
 	# Extract all the features and a dictionary
 	extract = extract_all_features(limit)
 
+	# Write the features to disk
+	write_features(extract, RELATIONAL_NOUN_FEATURES_DIR)
+
+
+def write_features(features, path):
+
 	# Save each of the features
-	open(dependency_features_path, 'w').write(json.dumps(
-		extract['dep_tree_features']))
-	open(baseline_features_path, 'w').write(json.dumps(
-		extract['baseline_features']))
-	open(hand_picked_features_path, 'w').write(json.dumps(
-		extract['hand_picked_features']))
+	open(os.path.join(path, 'dependency.json'), 'w').write(json.dumps(
+		features['dep_tree_features']))
+	open(os.path.join(path, 'baseline.json'), 'w').write(json.dumps(
+		features['baseline_features']))
+	open(os.path.join(path, 'hand_picked.json'), 'w').write(json.dumps(
+		features['hand_picked_features']))
 
 	# Save the dictionary
-	extract['dictionary'].save(dictionary_dir)
+	features['dictionary'].save(os.path.join(
+		path, 'lemmatized-noun-dictionary'))
 
 
 def extract_and_save_features_from_archive(archive_path):
@@ -90,25 +203,27 @@ def extract_and_save_features_from_archive(archive_path):
 	extract = extract_all_features_from_archive(archive_path, log)
 
 	# Save each of the features
-	dependency_features_path = os.path.join(
-		this_archive_features_dir, 'dependency.json')
-	open(dependency_features_path, 'w').write(json.dumps(
-		extract['dep_tree_features']))
+	write_features(extract, this_archive_features_dir)
 
-	baseline_features_path = os.path.join(
-		this_archive_features_dir, 'baseline.json')
-	open(baseline_features_path, 'w').write(json.dumps(
-		extract['baseline_features']))
+	#dependency_features_path = os.path.join(
+	#	this_archive_features_dir, 'dependency.json')
+	#open(dependency_features_path, 'w').write(json.dumps(
+	#	extract['dep_tree_features']))
 
-	hand_picked_features_path = os.path.join(
-		this_archive_features_dir, 'hand-picked.json')
-	open(hand_picked_features_path, 'w').write(json.dumps(
-		extract['hand_picked_features']))
+	#baseline_features_path = os.path.join(
+	#	this_archive_features_dir, 'baseline.json')
+	#open(baseline_features_path, 'w').write(json.dumps(
+	#	extract['baseline_features']))
 
-	# Save the dictionary
-	dictionary_dir = os.path.join(
-		this_archive_features_dir, 'lemmatized-noun-dictionary')
-	extract['dictionary'].save(dictionary_dir)
+	#hand_picked_features_path = os.path.join(
+	#	this_archive_features_dir, 'hand-picked.json')
+	#open(hand_picked_features_path, 'w').write(json.dumps(
+	#	extract['hand_picked_features']))
+
+	## Save the dictionary
+	#dictionary_dir = os.path.join(
+	#	this_archive_features_dir, 'lemmatized-noun-dictionary')
+	#extract['dictionary'].save(dictionary_dir)
 
 
 def extract_all_features_from_archive(archive_path, log=None):
