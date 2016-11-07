@@ -18,6 +18,7 @@ from SETTINGS import (
 )
 from nltk.corpus import wordnet
 
+
 NUM_ARTICLE_LOADING_PROCESSES = 12
 GAZETTEER_DIR = os.path.join(DATA_DIR, 'gazetteers')
 GAZETTEER_FILES = [

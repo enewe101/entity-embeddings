@@ -3,8 +3,7 @@ sys.path.append('..')
 import json
 from word2vec import UNK, UnigramDictionary
 from SETTINGS import (
-	TRAIN_NEGATIVE_PATH, TRAIN_POSITIVE_PATH,
-	TEST_NEGATIVE_PATH, TEST_POSITIVE_PATH,
+	TRAIN_DIR, TEST_DIR,
 	DICTIONARY_DIR, DEPENDENCY_FEATURES_PATH,
 	BASELINE_FEATURES_PATH, HAND_PICKED_FEATURES_PATH
 )
@@ -17,23 +16,39 @@ def read_seed_file(path):
 	])
 
 
-def get_training_sets():
+def get_seed_set(path):
 	'''
 	Get a set of positive (relational) words and a set of negative 
 	(non-relational) words, to be used as a training set
 	'''
-	positives = read_seed_file(TRAIN_POSITIVE_PATH)
-	negatives = read_seed_file(TRAIN_NEGATIVE_PATH)
+	positives = (
+		read_seed_file(os.path.join(path, 'positives.txt'))
+		|| read_seed_file(os.path.join(path, 'aspectual.txt'))
+	)
+	negatives = (
+		read_seed_file(os.path.join(path, 'negatives.txt'))
+		|| read_seed_file(os.path.join(path, 'role.txt'))
+		|| read_seed_file(os.path.join(path, 'relationship.txt'))
+		|| read_seed_file(os.path.join(path, 'verb-derived.txt'))
+	)
+	return positives, negatives
+
+
+def get_train_sets():
+	'''
+	Get a set of positive (relational) words and a set of negative 
+	(non-relational) words, to be used as a training set
+	'''
+	positives, negatives = get_seed_set(TRAIN_PATH)
 	return positives, negatives
 
 
 def get_test_sets():
 	'''
 	Get a set of positive (relational) words and a set of negative 
-	(non-relational) words, to be used as a training set
+	(non-relational) words, to be used as a test set
 	'''
-	positives = read_seed_file(TEST_POSITIVE_PATH)
-	negatives = read_seed_file(TEST_NEGATIVE_PATH)
+	positives, negatives = get_seed_set(TEST_PATH)
 	return positives, negatives
 
 
