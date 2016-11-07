@@ -1,7 +1,7 @@
 import os
 import sys
 sys.path.append('..')
-import json
+import cjson
 from word2vec import UNK, UnigramDictionary
 from SETTINGS import (
 	TRAIN_DIR, TEST_DIR,
@@ -24,13 +24,13 @@ def get_seed_set(path):
 	'''
 	positives = (
 		read_seed_file(os.path.join(path, 'positives.txt'))
-		|| read_seed_file(os.path.join(path, 'aspectual.txt'))
+		| read_seed_file(os.path.join(path, 'aspectual.txt'))
 	)
 	negatives = (
 		read_seed_file(os.path.join(path, 'negatives.txt'))
-		|| read_seed_file(os.path.join(path, 'role.txt'))
-		|| read_seed_file(os.path.join(path, 'relationship.txt'))
-		|| read_seed_file(os.path.join(path, 'verb-derived.txt'))
+		| read_seed_file(os.path.join(path, 'role.txt'))
+		| read_seed_file(os.path.join(path, 'relationship.txt'))
+		| read_seed_file(os.path.join(path, 'verb-derived.txt'))
 	)
 	return positives, negatives
 
@@ -60,7 +60,7 @@ def get_dictionary(path=DICTIONARY_DIR):
 
 
 def load_feature_file(path):
-	return json.loads(open(path).read())
+	return cjson.decode(open(path).read())
 
 
 def get_features(path):
