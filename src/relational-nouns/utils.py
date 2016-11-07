@@ -1,3 +1,4 @@
+import os
 import sys
 sys.path.append('..')
 import json
@@ -52,9 +53,9 @@ def get_test_sets():
 	return positives, negatives
 
 
-def get_dictionary():
+def get_dictionary(path=DICTIONARY_DIR):
 	dictionary = UnigramDictionary()
-	dictionary.load(DICTIONARY_DIR)
+	dictionary.load(path)
 	return dictionary
 
 
@@ -62,11 +63,16 @@ def load_feature_file(path):
 	return json.loads(open(path).read())
 
 
-def get_features():
+def get_features(path):
 	return {
-		'dep_tree': load_feature_file(DEPENDENCY_FEATURES_PATH),
-		'baseline': load_feature_file(BASELINE_FEATURES_PATH),
-		'hand_picked': load_feature_file(HAND_PICKED_FEATURES_PATH)
+		'dep_tree': load_feature_file(os.path.join(
+			path, 'dependency.json')),
+		'baseline': load_feature_file(os.path.join(
+			path, 'baseline.json')),
+		'hand_picked': load_feature_file(os.path.join(
+			path, 'hand_picked.json')),
+		'dictionary': get_dictionary(os.path.join(
+			path, 'lemmatized-noun-dictionary'))
 	}
 
 
