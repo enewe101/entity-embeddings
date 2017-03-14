@@ -8,7 +8,7 @@ from word2vec import UnigramDictionary, SILENT
 import classifier as c
 DICTIONARY_DIR = os.path.join(DATA_DIR, 'dictionary')
 from utils import (
-	read_seed_file, get_training_sets, filter_seeds, ensure_unicode,
+	read_seed_file, get_train_sets, filter_seeds, ensure_unicode,
 	get_test_sets
 )
 from nltk.stem import WordNetLemmatizer
@@ -139,7 +139,7 @@ def get_map_evaluator(
 		semantic_multiplier=semantic_multiplier,
 		k=k,
 	)
-	train_positives, train_negatives = get_training_sets()
+	train_positives, train_negatives = get_train_sets()
 	test_positives, test_negatives = get_test_sets()
 	evaluator = RelationalNounMapEvaluator(
 		classifier, train_positives, train_negatives, test_positives,
@@ -313,7 +313,7 @@ class MapEvaluator(object):
 
 
 def cross_val_positives(classifier='svm', clf_kwargs={}, use_wordnet=False):
-	positive_seeds, negative_seeds = get_training_sets()
+	positive_seeds, negative_seeds = get_train_sets()
 	features = load_features()
 	dictionary = get_dictionary(features)
 	positive_seeds = filter_seeds(positive_seeds, dictionary)
@@ -353,7 +353,7 @@ def cross_val_positives(classifier='svm', clf_kwargs={}, use_wordnet=False):
 
 
 def cross_val_negatives(classifier='svm', clf_kwargs={}, use_wordnet=False):
-	positive_seeds, negative_seeds = get_training_sets()
+	positive_seeds, negative_seeds = get_train_sets()
 	features = load_features()
 	dictionary = get_dictionary(features)
 	positive_seeds = filter_seeds(positive_seeds, dictionary)
