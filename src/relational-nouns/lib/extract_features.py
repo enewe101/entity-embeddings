@@ -1,6 +1,9 @@
 #!/usr/bin/env python
+import shutil
+import t4k
+import subprocess
 import tarfile
-from word2vec import UnigramDictionary, UNK
+#from word2vec import UnigramDictionary, UNK
 import json
 from iterable_queue import IterableQueue
 from multiprocessing import Process
@@ -8,7 +11,6 @@ import time
 import os
 from corenlp_xml_reader import AnnotatedText, Token, Sentence
 import sys
-from subprocess import check_output
 from collections import defaultdict, Counter, deque
 from SETTINGS import (
 	GIGAWORD_DIR, DICTIONARY_DIR, DATA_DIR, DEPENDENCY_FEATURES_PATH,
@@ -31,7 +33,7 @@ def coalesce_features(limit=None):
 	# Get a list of all the archives
 	archives = [
 		os.path.join(RELATIONAL_NOUN_FEATURES_DIR, archive) for archive in
-		check_output(['ls', RELATIONAL_NOUN_FEATURES_DIR]).split()
+		subprocess.check_output(['ls', RELATIONAL_NOUN_FEATURES_DIR]).split()
 		if len(archive) == 3
 	]
 	archives.sort()
@@ -157,26 +159,33 @@ def load_gazetteers():
 GAZETTEERS = load_gazetteers()
 
 
-def extract_and_save_features(path, untar=True, limit=None):
+def extract_and_save_features(
+	article_archive_dir, dictionary_path, untar=True, limit=None
+):
 
 	# If ``untar`` is true, then untar the path first
-	if tarred:
-		subprocess.call(['tar', '-zxf', path])
-		if path.endswith('.tgz'):
-			path = path[:-4]
+	if untar:
+		untarred_article_dir = article_archive_dir[:-len('.tgz')]
+		dirname = os.path.basename(untarred_article_dir)
+		print 'untarring %s' % (dirname)
+		containing_dir = os.path.dirname(article_archive_dir)
+		subprocess.check_output([
+			'tar', '-zxf', article_archive_dir, '-C', containing_dir])
+	else:
+		untarred_article_dir = article_archive_dir
 
 	# Extract all the features and a dictionary
-	feature_accumulator = extract_all_features(path, limit)
-
-	dirname = os.path.basename(path)
-	write_path = os.path.join(RELATIONAL_NOUN_FEATURES_DIR, dirname)
+	feature_accumulator = extract_all_features(
+		untarred_article_dir, dictionary_path, limit)
 
 	# Write the features to disk
+	dirname = os.path.basename(untarred_article_dir)
+	write_path = os.path.join(RELATIONAL_NOUN_FEATURES_DIR, dirname)
 	feature_accumulator.write(write_path)
 
 	# If we untarred the file, then delete the untarred copy
-	if tarred:
-		shutil.rmtree(path)
+	if untar:
+		shutil.rmtree(untarred_article_dir)
 
 
 
@@ -372,7 +381,7 @@ def extract_features_from_articles(
 			content = open(fname).read()
 
 		# Get features from this article
-		print 'processing', fname, '...'
+		t4k.out('.')
 		feature_accumulator.extract(AnnotatedText(content))
 
 	# Put the accumulated features onto the producer queue then close it
@@ -433,6 +442,8 @@ class FeatureAccumulator(object):
 
 	def write(self, path):
 
+		t4k.ensure_exists(path)
+
 		# Save each of the features
 		open(os.path.join(path, 'dependency.json'), 'w').write(json.dumps(
 			self.dep_tree_features))
@@ -443,7 +454,7 @@ class FeatureAccumulator(object):
 
 
 	# TODO: go to arbitrary depth recursivley
-	def get_dep_tree_features(token):
+	def get_dep_tree_features(self, token, depth=3):
 		'''
 		Extracts a set of features based on the dependency tree relations
 		for the given token.  Each feature describes one dependency tree 
@@ -452,21 +463,67 @@ class FeatureAccumulator(object):
 		relation type is (e.g. nsubj, prep:for, etc), and what the pos of the 
 		target is.
 		'''
+		add_features = self.get_dep_tree_features_recurse(token, depth)
+		self.dep_tree_features[token['lemma']].update(add_features)
+
+
+	def get_dep_tree_features_recurse(self, token, depth=3, prev_token=None):
+		"""
+		Recursively construct dependency tree features.  A feature is a
+		specific path along the dependency tree, characterized by the type of
+		relation, whether it's a parent node or child node, and the part of
+		speach of a node.
+
+		Paths starting from the given ``token`` are recorded for up to
+		``depth`` hops.  ``prev_token`` ensures that a path doesn't go back on
+		itself during recursive calls.
+		"""
+
+		features = []
+
+		# The call generates features so long as depth is greater than 0
+		if depth < 1:
+			return features
 
 		# Record all parent signatures
-		for relation, token in token['parents']:
-			signature = '%s:%s:%s' % ('parent', relation, token['pos'])
-			#signature = '%s:%s:%s' % ('parent', relation, token['ner'])
-			self.dep_tree_features[signature] += 1
+		for relation, parent_token in token['parents']:
+
+			# Don't back-track in traversal of dep-tree
+			if parent_token == prev_token:
+				continue
+
+			feature = '%s:%s:%s' % ('parent', relation, parent_token['pos'])
+			features.append(feature)
+
+			recurse_features = self.get_dep_tree_features_recurse(
+				parent_token, depth=depth-1, prev_token=token)
+			features.extend([
+				'%s-%s' % (feature, rfeature) 
+				for rfeature in recurse_features
+			])
 
 		# Record all child signatures
-		for relation, token in token['children']:
-			signature = '%s:%s:%s' % ('child', relation, token['pos'])
-			#signature = '%s:%s:%s' % ('child', relation, token['ner'])
-			self.dep_tree_features[signature] += 1
+		for relation, child_token in token['children']:
+
+			# Don't back-track in traversal of dep-tree
+			if child_token == prev_token:
+				continue
+
+			feature = '%s:%s:%s' % ('child', relation, child_token['pos'])
+			features.append(feature)
+
+			recurse_features = self.get_dep_tree_features_recurse(
+				child_token, depth=depth-1, prev_token=token)
+			features.extend([
+				'%s-%s' % (feature, rfeature) 
+				for rfeature in recurse_features
+			])
+
+		return features
 
 
-	def get_baseline_features(token):
+
+	def get_baseline_features(self, token):
 		'''
 		Looks for specific syntactic relationships that are indicative of
 		relational nouns.  Keeps track of number of occurrences of such
@@ -476,16 +533,16 @@ class FeatureAccumulator(object):
 		# Record all parent signatures
 		for relation, child_token in token['children']:
 			if relation == 'nmod:of' and child_token['pos'].startswith('NN'):
-				self.baseline_features['nmod:of:NNX'] += 1
+				self.baseline_features[token['lemma']]['nmod:of:NNX'] += 1
 			if relation == 'nmod:poss':
-				self.baseline_features['nmod:poss'] += 1
+				self.baseline_features[token['lemma']]['nmod:poss'] += 1
 
 	
 	# IDEA: look at mention property of tokens to see if it in a coref chain
 	# 	with named entity, demonym, placename, etc.
 	#
 	# IDEA: ability to infer in cases where conj:and e.g. '9fd7d0a5189bb351 : 2'
-	def get_hand_picked_features(token):
+	def get_hand_picked_features(self, token):
 		'''
 		Looks for a specific set of syntactic relationships that are
 		indicative of relational nouns.  It's a lot more thourough than 
@@ -506,33 +563,33 @@ class FeatureAccumulator(object):
 
 			# Note the sibling's POS
 			key = 'sibling(%d):pos(%s)' % (rel_idx, sibling_token['pos'])
-			self.hand_picked_features[key] += 1
+			self.hand_picked_features[token['lemma']][key] += 1
 
 			# Note if the sibling is a noun of some kind
 			if sibling_token['pos'].startswith('NN'):
-				self.hand_picked_features['sibling(%d):pos(NNX)' % rel_idx] += 1
+				self.hand_picked_features[token['lemma']]['sibling(%d):pos(NNX)' % rel_idx] += 1
 
 			# Note the sibling's named entity type
 			key = 'sibling(%d):ner(%s)' % (rel_idx, sibling_token['ner'])
-			self.hand_picked_features[key] += 1
+			self.hand_picked_features[token['lemma']][key] += 1
 
 			# Note if the sibling is a named entity of any type
 			if sibling_token['ner'] is not None:
-				self.hand_picked_features['sibling(%d):ner(x)' % rel_idx] += 1
+				self.hand_picked_features[token['lemma']]['sibling(%d):ner(x)' % rel_idx] += 1
 
 			# Note if the sibling is a demonym
 			if sibling_token['word'] in GAZETTEERS['demonyms']:
-				self.hand_picked_features['sibling(%d):demonym' % rel_idx] += 1
+				self.hand_picked_features[token['lemma']]['sibling(%d):demonym' % rel_idx] += 1
 
 			# Note if the sibling is a place name
 			if sibling_token['word'] in GAZETTEERS['names']:
-				self.hand_picked_features[
+				self.hand_picked_features[token['lemma']][
 					'sibling(%d):place-name' % rel_idx
 				] += 1
 
 		# Note if the noun is plural
 		if token['pos'] == 'NNS':
-			self.hand_picked_features['plural'] += 1
+			self.hand_picked_features[token['lemma']]['plural'] += 1
 
 		# Detect construction "is a <noun> of"
 		children = {
@@ -551,36 +608,36 @@ class FeatureAccumulator(object):
 		# In this section we accumulate various combinations of having
 		# a copula, a prepositional phrase, a posessive, and a determiner.
 		if nmod:
-			self.hand_picked_features['<noun>-prp'] += 1
-			self.hand_picked_features['<noun>-%s' % nmod] += 1
+			self.hand_picked_features[token['lemma']]['<noun>-prp'] += 1
+			self.hand_picked_features[token['lemma']]['<noun>-%s' % nmod] += 1
 
 		if poss:
-			self.hand_picked_features['poss-<noun>'] += 1
+			self.hand_picked_features[token['lemma']]['poss-<noun>'] += 1
 
 		if cop and nmod:
-			self.hand_picked_features['is-<noun>-prp'] += 1
-			self.hand_picked_features['is-<noun>-%s' % nmod] += 1
+			self.hand_picked_features[token['lemma']]['is-<noun>-prp'] += 1
+			self.hand_picked_features[token['lemma']]['is-<noun>-%s' % nmod] += 1
 			if det:
-				self.hand_picked_features['is-%s-<noun>-prp' % det] += 1
+				self.hand_picked_features[token['lemma']]['is-%s-<noun>-prp' % det] += 1
 
 		if det and nmod:
-			self.hand_picked_features['%s-<noun>-prp' % det] += 1
-			self.hand_picked_features['%s-<noun>-%s' % (det, nmod)] += 1
+			self.hand_picked_features[token['lemma']]['%s-<noun>-prp' % det] += 1
+			self.hand_picked_features[token['lemma']]['%s-<noun>-%s' % (det, nmod)] += 1
 
 		if cop and poss:
-			self.hand_picked_features['is-poss-<noun>'] += 1
+			self.hand_picked_features[token['lemma']]['is-poss-<noun>'] += 1
 
 		if det and poss:
-			self.hand_picked_features['%s-poss-<noun>' % det] += 1
+			self.hand_picked_features[token['lemma']]['%s-poss-<noun>' % det] += 1
 
 		if det and not nmod and not poss:
-			self.hand_picked_features['%s-<noun>' % det] += 1
+			self.hand_picked_features[token['lemma']]['%s-<noun>' % det] += 1
 		
 		if cop and det and poss:
-			self.hand_picked_features['is-det-poss-<noun>'] += 1
+			self.hand_picked_features[token['lemma']]['is-det-poss-<noun>'] += 1
 
 		if cop and det and nmod:
-			self.hand_picked_features['is-det-<noun>-prp'] += 1
+			self.hand_picked_features[token['lemma']]['is-det-<noun>-prp'] += 1
 
 		# Next we consider whether the propositional phrase has a named
 		# entity, demonym, or place name in it
@@ -601,20 +658,20 @@ class FeatureAccumulator(object):
 				# Add feature counts for ner types in the NP tokens
 				ner_types = set([t['ner'] for t in NP_tokens])
 				for ner_type in ner_types:
-					self.hand_picked_features[
+					self.hand_picked_features[token['lemma']][
 						'prp(%s)-ner(%s)' % (prep_type, ner_type)
 					] += 1
 
 				# Add feature counts for demonyms 
 				lemmas = [t['lemma'] for t in NP_tokens]
 				if any([l in GAZETTEERS['demonyms'] for l in lemmas]):
-					self.hand_picked_features[
+					self.hand_picked_features[token['lemma']][
 						'prp(%s)-demonyms' % prep_type
 					] += 1
 
 				# Add feature counts for place names 
 				if any([l in GAZETTEERS['names'] for l in lemmas]):
-					self.hand_picked_features['prp(%s)-place' % prep_type] += 1 
+					self.hand_picked_features[token['lemma']]['prp(%s)-place' % prep_type] += 1 
 		
 		# Next we consider whether the posessor noun phrase has a named
 		# entity, demonym, or place name in it
@@ -626,16 +683,16 @@ class FeatureAccumulator(object):
 			# Add feature counts for ner types in the NP tokens
 			ner_types = set([t['ner'] for t in NP_tokens])
 			for ner_type in ner_types:
-				self.hand_picked_features['poss-ner(%s)' % ner_type] += 1
+				self.hand_picked_features[token['lemma']]['poss-ner(%s)' % ner_type] += 1
 
 			# Add feature counts for demonyms 
 			lemmas = [t['lemma'] for t in NP_tokens]
 			if any([l in GAZETTEERS['demonyms'] for l in lemmas]):
-				self.hand_picked_features['poss-demonyms'] += 1
+				self.hand_picked_features[token['lemma']]['poss-demonyms'] += 1
 
 			# Add feature counts for place names 
 			if any([l in GAZETTEERS['names'] for l in lemmas]):
-				self.hand_picked_features['poss-place'] += 1 
+				self.hand_picked_features[token['lemma']]['poss-place'] += 1 
 
 
 
@@ -668,7 +725,7 @@ def get_constituent_tokens(constituent, recursive=True):
 	
 def get_fnames(path):
 	corenlp_path = os.path.join(path, 'CoreNLP')
-	return t4k.ls(absolute=True)
+	return t4k.ls(corenlp_path, absolute=True)
 	return fnames
 
 

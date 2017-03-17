@@ -9,7 +9,7 @@ import sys
 sys.path.append('..')
 from word2vec import UnigramDictionary, UNK, SILENT
 from collections import Counter, deque
-from SETTINGS import FEATURES_DIR
+from SETTINGS import RELATIONAL_NOUN_FEATURES_DIR
 from kernels import bind_kernel, bind_dist
 from utils import (
 	read_seed_file, get_train_sets, filter_seeds, ensure_unicode,

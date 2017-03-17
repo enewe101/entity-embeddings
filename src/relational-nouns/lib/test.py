@@ -2,7 +2,65 @@ import numpy as np
 import kernels as k
 from nltk.corpus import wordnet, wordnet_ic
 import classifier
+import extract_features
 from unittest import TestCase, main
+
+class TestFeatureAccumulator(TestCase):
+
+    def test_get_dep_tree_features(self):
+        # Make a mock (empty) dictionary (does not affect test, but needed to 
+        # create the feature accumulator).
+        dictionary = set()
+
+        # Make a mock dependency tree
+        F = {
+            'parents':[],
+            'children':[],
+            'pos':'pos_F'
+        }
+        E = {
+            'parents':[('rel_F', F)],
+            'children':[],
+            'pos':'pos_E'
+        }
+        D = {
+            'parents':[],
+            'children':[],
+            'pos':'pos_D'
+        }
+        C = {
+            'parents':[('rel_E', E)],
+            'children':[('rel_D', D)],
+            'pos':'pos_C'
+        }
+        B = {
+            'parents':[],
+            'children':[],
+            'pos':'pos_B'
+        }
+        BB = {
+            'parents':[],
+            'children':[],
+            'pos':'pos_BB'
+        }
+        A = {
+            'parents':[('rel_C', C)],
+            'children':[('rel_B', B), ('rel_BB', BB)],
+            'pos':'pos_A'
+        }
+
+        accumulator = extract_features.FeatureAccumulator(dictionary)
+        features = accumulator.get_dep_tree_features_recurse(A, depth=2)
+
+        # Note that because we called it with depth=2, no feature is made for 
+        # token F
+        expected_features = [
+            'parent:rel_C:pos_C', 'parent:rel_C:pos_C-parent:rel_E:pos_E',
+            'parent:rel_C:pos_C-child:rel_D:pos_D', 'child:rel_B:pos_B',
+            'child:rel_BB:pos_BB'
+        ]
+
+        self.assertItemsEqual(features, expected_features)
 
 
 class TestKernel(TestCase):
