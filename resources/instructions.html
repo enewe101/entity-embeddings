@@ -1,0 +1,1063 @@
+<html>
+	<head>
+		<script
+			src="https://code.jquery.com/jquery-3.1.1.slim.min.js"
+			integrity="sha256-/SIrNqv8h6QGKDuNoLGA4iret+kyesCkHGzVUUV0shc="
+			crossorigin="anonymous">
+		</script>
+		<script>
+			$(document).ready(function(){
+
+				function capitalize(string) {
+					return string.charAt(0).toUpperCase() + string.slice(1);
+				}
+
+				var relational_message = (
+					' is relational. Notice how the first sentence '
+					+ "seems to be missing something (the reference object)"
+					+ ' but the second sentence makes sense.'
+				);
+
+				var non_relational_message = (
+					' is non-relational. Notice how the first sentence '
+					+ "makes sense, but the second sentence sounds odd."
+				);
+
+				function arm_button(button, is_correct, message, quiz) {
+					var button = $(button);
+					var response = quiz.find('.response');
+					console.log(response);
+
+					var prefix;
+					var class_to_add;
+					var class_to_remove;
+
+					if(is_correct) {
+						prefix = 'Correct! ';
+						class_to_add = 'correct';
+						class_to_remove = 'incorrect';
+
+					} else {
+						prefix = 'Whoops! ';
+						class_to_add = 'incorrect';
+						class_to_remove = 'correct';
+					}
+
+					button.on('click', function(){
+						response.text(prefix + message);
+						quiz.addClass(class_to_add);
+						quiz.removeClass(class_to_remove);
+						console.log(class_to_add);
+					});
+				}
+
+				function arm_quiz(i){
+					var that = $(this);
+
+					var query = capitalize(that.find('.query-word').text());
+					var correct = that.find('.correct-answer').text();
+					var is_relational = (correct == 'relational');
+
+					if(is_relational) {
+						var message = query + relational_message;
+					} else {
+						var message = query + non_relational_message;
+					}
+
+					var buttons = that.find('button');
+					arm_button(buttons[0], 0^is_relational, message, that);
+					arm_button(buttons[1], 1^is_relational, message, that);
+
+				}
+
+				var quizes = $('.quiz');
+				quizes.each(arm_quiz);
+
+			});
+		</script>
+		<style type="text/css">
+
+			.correct-answer {
+				display: none;
+			}
+
+			.quote {
+				padding: 8px 0 8px 12px;
+				margin: 10px 0 10px 20px;
+				background: url('quote.png') no-repeat;
+				display: inline-block;
+			}
+
+			.hoverpane {
+				display: block;
+				background: white;
+				margin-top: 30px;
+				padding: 1px 20px 20px 20px;
+				border-radius: 16px;
+				box-shadow: 0.5px 0.5px 2px rgba(0,0,0,0.4);
+			}
+
+			.main-relnoun {
+				background: #d7ff93;
+				padding: 2px 4px;
+				border-radius: 4px;
+				box-shadow: 0.5px 0.5px 2px rgba(0,0,0,0.4);
+			}
+
+			.main-nonrelnoun {
+				background: #fccea4;
+				padding: 2px 4px;
+				border-radius: 4px;
+				box-shadow: 0.5px 0.5px 2px rgba(0,0,0,0.4);
+			}
+
+			.nowrap {
+				white-space: nowrap;
+			}
+
+			.query-word {
+				background: white;
+				padding: 2px 4px;
+				border-radius: 4px;
+				box-shadow: 0.5px 0.5px 2px rgba(0,0,0,0.4);
+			}
+
+			.relnoun {
+				background: #caffbd;
+				padding: 2px 4px;
+				border-radius: 4px;
+				box-shadow: 0.5px 0.5px 2px rgba(0,0,0,0.4);
+			}
+
+			.nonrelnoun {
+				background: #f4cccc;
+				padding: 2px 4px;
+				border-radius: 4px;
+				box-shadow: 0.5px 0.5px 2px rgba(0,0,0,0.4);
+			}
+
+			.query {
+				display: inline-block;
+				min-width: 200px;
+				margin-right: 20px;
+			}
+
+			.queryline {
+				display: block;
+			}
+
+			.more-space {
+				padding-left: 40px;
+			}
+
+			.has-arrow {
+				background: 108px 38px url('arrow.png') no-repeat;
+				background-size: 90px 38px;
+			}
+
+			.center {
+				text-align: center;
+			}
+
+			.centered {
+				margin: auto;
+			}
+
+			.spaced {
+				display: inline-block;
+				margin: 4px 10px 4px 10px;
+			}
+
+			.examples {
+				display: inline-block;
+				width: 40%;
+				vertical-align: middle;
+			}
+
+			.quiz {
+				display: block;
+				margin-bottom: 10px;
+			}
+
+			.quiz .response {
+				display: none;
+				padding: 20px;
+				width: 50%;
+				vertical-align: middle;
+				border-radius: 8px;
+			}
+
+			.quiz .responseline {
+				display: none;
+				margin: 30px;
+			}
+
+			.quiz.correct .responseline, .quiz.incorrect .responseline {
+				display: block;
+			}
+
+			.quiz.correct .response {
+				display: inline-block;
+				box-shadow: 0px 0px 8px rgb(128,255,128);
+			}
+
+			.quiz.incorrect .response {
+				display: inline-block;
+				box-shadow: 0px 0px 8px rgb(255,128,128);
+			}
+
+
+			.refobj {
+				text-decoration: underline;
+				font-style: italic;
+			}
+
+			.refobj-demo {
+				margin-left: 200px;
+			}
+
+			.bold {
+				font-weight: bold;
+			}
+
+			.italic {
+				font-style: italic;
+			}
+
+			.indented {
+				display: inline;
+				margin-left: 20px;
+			}
+
+			.page {
+				display: block;
+				max-width: 700px;
+				margin: auto;
+			}
+
+			.infobox {
+				box-shadow: 0px 0px 8px rgb(128,255,128);
+				border-radius: 8px;
+				width: 70%;
+				max-width: 600px;
+				margin: auto;
+				margin-top: 20px;
+				margin-bottom: 20px;
+				display: block;
+				padding: 20px;
+				/*border: solid 1px black;
+				background: #caffbd;*/
+			}
+
+			li {
+				margin: 20px 0 20px 20px;
+			}
+
+			.floatlist li {
+				float: left; 
+				margin-left: 60px;
+			}
+
+			.horiz-40 {
+				display: inline-block;
+				vergical-align: middle;
+				width: 40px;
+			}
+
+			.clearfix {
+				clear: both;
+			}
+
+			.example-table td {
+				padding: 6px 40px;
+			}
+
+		</style>
+	</head>
+	<body>
+ 		<div class="page">
+ 			<h1>Overview</h1>
+ 			<p>
+ 				In this task, our aim is to find 
+ 				<span class="italic">relational nouns</span>. 
+ 				Relational nouns 
+ 				<span class="italic">establish a relationship</span>. 
+ 			</p>
+ 
+ 			<p>
+ 			To demonstrate the difference between relational nouns
+ 			and non-relational nouns, let's look at a few examples:
+ 			</p>
+ 
+ 			<table class="center example-table">
+ 				<tr>
+ 					<td class="bold">
+ 						Relational nouns
+ 					</td>
+ 					<td class="bold">
+ 						Non-relational nouns
+ 					</td>
+ 				</tr>
+ 				<tr>
+ 					<td>
+ 						<span class="relnoun spaced">
+ 							sister
+ 						</span>
+ 
+ 						<span class="relnoun spaced">
+ 							enemy
+ 						</span>
+ 
+ 						<span class="relnoun spaced">
+ 							classmate
+ 						</span>
+ 
+ 						<span class="relnoun spaced">
+ 							replacement
+ 						</span>
+ 
+ 						<span class="relnoun spaced">
+ 							predecessor
+ 						</span>
+ 
+ 						<span class="relnoun spaced">
+ 							colleague
+ 						</span>
+ 					</td>
+ 
+ 					<td>
+ 						<span class="nonrelnoun spaced">
+ 							fever
+ 						</span>
+ 
+ 						<span class="nonrelnoun spaced">
+ 							bread
+ 						</span>
+ 
+ 						<span class="nonrelnoun spaced">
+ 							astronaut
+ 						</span>
+ 
+ 						<span class="nonrelnoun spaced">
+ 							book
+ 						</span>
+ 
+ 						<span class="nonrelnoun spaced">
+ 							wheel
+ 						</span>
+ 
+ 						<span class="nonrelnoun spaced">
+ 							wire
+ 						</span>
+ 
+ 						<span class="nonrelnoun spaced">
+ 							flavour
+ 						</span>
+ 					</td>
+ 				</tr>
+ 			</table>
+ 
+ 			<span class="infobox">
+ 				<span class="bold">
+ 					Notice:
+ 				</span>
+ 				<div class="center">
+ 					Relational nouns characterize a thing by 
+ 					<span class="italic">
+ 						how it relates to something else</span>.
+ 				</div>
+ 			</span>
+ 
+ 			<h1>Reference objects</h1>
+ 
+ 			<p>
+ 				As we noted above,
+ 				relational nouns describe a thing by how it relates to
+ 				<span class="refobj">something else</span>. 
+ 				We call that something else the 
+ 				<span class="refobj">reference object</span>.
+ 				Have a look at the example sentences below. Notice how
+ 				the ones with relational nouns also contain a reference
+ 				object.
+ 			</p>
+ 
+ 			<table>
+ 				<tr class="bold center">
+ 					<td>Relational</td>
+ 					<td class="more-space">Non-relational</td>
+ 				</tr>
+ 				<tr>
+ 					<td class="has-arrow">
+ 
+ 						<span class="quote">
+ 							<span class="innerquote">
+ 								Alice is 
+ 								<span class="refobj">Bob's</span>
+ 								<span class="relnoun">sister</span>.
+ 							</span>
+ 						</span>
+ 
+ 						<div class="refobj-demo">
+ 							reference object
+ 						</div>
+ 
+ 						<span class="quote">
+ 							<span class="innerquote">
+ 								Alice is the 
+ 								<span class="relnoun">sister</span>
+ 								<span class="refobj">of Bob</span>.
+ 							</span>
+ 						</span>
+ 
+ 					</td>
+ 
+ 					<td class="more-space">
+ 
+ 						<span class="quote">
+ 							<span class="innerquote">
+ 								Alice is a 
+ 								<span class="nonrelnoun">carpenter</span>.
+ 							</span>
+ 						</span>
+ 
+ 						<div class="refobj-demo">
+ 							no reference object!
+ 						</div>
+ 
+ 						<span class="quote">
+ 							<span class="innerquote">
+ 								Alice is a 
+ 								<span class="nonrelnoun">woman</span>. 
+ 							</span>
+ 						</span>
+ 
+ 					</td>
+ 				</tr>
+ 			</table>
+ 
+ 			<p>
+ 				Take note of these 2 important things:
+ 			</p>
+ 
+ 			<ol>
+ 				<li>
+ 					Saying that Alice is Bob's sister doesn't tell us about 
+ 					Alice <span class="italic">herself</span>, rather, it 
+ 					tells us how Alice is 
+ 					<span class="italic">related</span>
+ 					to Bob (the reference object).
+ 					But saying that Alice is a woman or carpenter does 
+ 					tell us about Alice <span class="italic">herself</span>.
+ 				</li>
+ 				<li>
+ 					It wouldn't really make sense to just say "Alice is a 
+ 					sister" without making it clear 
+ 					<span class="italic">who</span>
+ 					she is the sister 
+ 					<span class="italic">of</span>. In other words, 
+ 					relational nouns <span class="italic">need</span>
+ 					a reference object to make sense.
+ 					But non-relational nouns like woman and carpenter
+ 				  	don't take a reference object.
+ 				</li>
+ 			</ol>
+ 
+ 			<span class="infobox">
+				<span class="bold">Notice:</span>
+ 
+ 					<br>Relational nouns need a 
+ 					<span class="refobj">reference object</span>
+ 					to complete their meaning.
+ 					<br>The easiest way to tell if a noun is relational 
+ 					is to 
+  					think
+  					about how it's used, and to try to figure out what the 
+  					reference object would be.
+ 			</span>
+ 
+ 			<h1>Can you guess which nouns are relational?</h1>
+ 			<p>
+ 			Let's try a couple examples so you can see if you're 
+ 			catching on. Look at the
+ 			words below, and try to decide if they are relational or not.
+ 			Think: if the word is relational, what would the reference
+ 			object be? It usually helps to imagine how you would use
+ 			the word in a sentence.
+ 			(Don't worry, your
+ 			guesses here won't be recorded!)
+ 			</p>
+ 			<span class="quiz">
+ 				<span class="queryline">
+ 					<span class="query">
+ 					Is <span class="query-word">partner</span> relational?
+ 					</span>
+ 					<span class="correct-answer">relational</span>
+ 					<button>relational</button>
+ 					<button>non-relational</button>
+ 				</span>
+ 
+ 				<span class="responseline">
+ 					<span class="examples">
+ 						<example>
+ 							<incorrect/>
+ 							<span class="quote"><span class="innerquote">
+ 							Alice is a <span class="relnoun">partner</span>.
+ 							</span></span>
+ 						</example>
+ 						<example>
+ 							<correct/>
+ 							<span class="quote"><span class="innerquote">
+ 							Alice is <span class="refobj">Bob's</span>
+ 							<span class="relnoun">partner</span>.
+ 							</span></span>
+ 						</example>
+ 					</span>
+ 					<span class="response">
+ 					</span>
+ 				</span>
+ 			</span>
+ 
+ 			<span class="quiz">
+ 				<span class="queryline">
+ 					<span class="query">
+ 					Is <span class="query-word">assistant</span> relational?
+ 					</span>
+ 					<span class="correct-answer">relational</span>
+ 					<button>relational</button>
+ 					<button>non-relational</button>
+ 				</span>
+ 
+ 				<span class="responseline">
+ 					<span class="examples">
+ 						<example>
+ 							<incorrect/>
+ 							<span class="quote"><span class="innerquote">
+ 							Alice is an <span class="relnoun">assistant</span>.
+ 							</span></span>
+ 						</example>
+ 						<example>
+ 							<correct/>
+ 							<span class="quote"><span class="innerquote">
+ 							Alice is <span class="refobj">Bob's</span>
+ 							<span class="relnoun">assistant</span>.
+ 							</span></span>
+ 						</example>
+ 					</span>
+ 					<span class="response">
+ 					</span>
+ 				</span>
+ 			</span>
+ 
+ 			<span class="quiz">
+ 				<span class="queryline">
+ 					<span class="query">
+ 					Is <span class="query-word">mathematician</span> relational?
+ 					</span>
+ 					<span class="correct-answer">nonrelational</span>
+ 					<button>relational</button>
+ 					<button>non-relational</button>
+ 				</span>
+ 
+ 				<span class="responseline">
+ 					<span class="examples">
+ 						<example>
+ 							<incorrect/>
+ 							<span class="quote"><span class="innerquote">
+ 							Alice is a 
+ 							<span class="nonrelnoun">mathematician</span>.
+ 							</span></span>
+ 						</example>
+ 						<example>
+ 							<correct/>
+ 							<span class="quote"><span class="innerquote">
+ 							Alice is <span class="refobj">Bob's</span>
+ 							<span class="nonrelnoun">mathematician</span>.
+ 							</span></span>
+ 						</example>
+ 					</span>
+ 					<span class="response">
+ 					</span>
+ 				</span>
+ 			</span>
+ 
+ 			<span class="quiz">
+ 				<span class="queryline">
+ 					<span class="query">
+ 					Is <span class="query-word">athlete</span> relational?
+ 					</span>
+ 					<span class="correct-answer">nonrelational</span>
+ 					<button>relational</button>
+ 					<button>non-relational</button>
+ 				</span>
+ 
+ 				<span class="responseline">
+ 					<span class="examples">
+ 						<example>
+ 							<incorrect/>
+ 							<span class="quote"><span class="innerquote">
+ 							Alice is an
+ 							<span class="nonrelnoun">athlete</span>.
+ 							</span></span>
+ 						</example>
+ 						<example>
+ 							<correct/>
+ 							<span class="quote"><span class="innerquote">
+ 							Alice is <span class="refobj">Bob's</span>
+ 							<span class="nonrelnoun">athlete</span>.
+ 							</span></span>
+ 						</example>
+ 					</span>
+ 					<span class="response">
+ 					</span>
+ 				</span>
+ 			</span>
+ 
+ 			<span class="quiz">
+ 				<span class="queryline">
+ 					<span class="query">
+ 					Is <span class="query-word">scientist</span> relational?
+ 					</span>
+ 					<span class="correct-answer">nonrelational</span>
+ 					<button>relational</button>
+ 					<button>non-relational</button>
+ 				</span>
+ 
+ 				<span class="responseline">
+ 					<span class="examples">
+ 						<example>
+ 							<incorrect/>
+ 							<span class="quote"><span class="innerquote">
+ 							Alice is a 
+ 							<span class="nonrelnoun">scientist</span>.
+ 							</span></span>
+ 						</example>
+ 						<example>
+ 							<correct/>
+ 							<span class="quote"><span class="innerquote">
+ 							Alice is <span class="refobj">Bob's</span>
+ 							<span class="nonrelnoun">scientist</span>.
+ 							</span></span>
+ 						</example>
+ 					</span>
+ 					<span class="response">
+ 					</span>
+ 				</span>
+ 			</span>
+ 
+ 			<span class="quiz">
+ 				<span class="queryline">
+ 					<span class="query">
+ 					Is <span class="query-word">predecessor</span> relational?
+ 					</span>
+ 					<span class="correct-answer">relational</span>
+ 					<button>relational</button>
+ 					<button>non-relational</button>
+ 				</span>
+ 
+ 				<span class="responseline">
+ 					<span class="examples">
+ 						<example>
+ 							<incorrect/>
+ 							<span class="quote"><span class="innerquote">
+ 							Alice is a 
+ 							<span class="relnoun">predecessor</span>.
+ 							</span></span>
+ 						</example>
+ 						<example>
+ 							<correct/>
+ 							<span class="quote"><span class="innerquote">
+ 							Alice is <span class="refobj">Bob's</span>
+ 							<span class="relnoun">predecessor</span>.
+ 							</span></span>
+ 						</example>
+ 					</span>
+ 					<span class="response">
+ 					</span>
+ 				</span>
+ 			</span>
+ 
+ 			<span class="quiz">
+ 				<span class="queryline">
+ 					<span class="query">
+ 					Is <span class="query-word">mayor</span> relational?
+ 					</span>
+ 					<span class="correct-answer">relational</span>
+ 					<button>relational</button>
+ 					<button>non-relational</button>
+ 				</span>
+ 
+ 				<span class="responseline">
+ 					<span class="examples">
+ 						<example>
+ 							<incorrect/>
+ 							<span class="quote"><span class="innerquote">
+ 							Alice is a 
+ 							<span class="relnoun">mayor</span>.
+ 							</span></span>
+ 						</example>
+ 						<example>
+ 							<correct/>
+ 							<span class="quote"><span class="innerquote">
+ 							Alice is the 
+ 							<span class="relnoun">mayor</span>
+ 							of <span class="refobj">New York</span>.
+ 							</span></span>
+ 						</example>
+ 					</span>
+ 					<span class="response">
+ 					</span>
+ 				</span>
+ 			</span>
+ 
+ 			<span class="quiz">
+ 				<span class="queryline">
+ 					<span class="query">
+ 					Is <span class="query-word">blacksmith</span> relational?
+ 					</span>
+ 					<span class="correct-answer">nonrelational</span>
+ 					<button>relational</button>
+ 					<button>non-relational</button>
+ 				</span>
+ 
+ 				<span class="responseline">
+ 					<span class="examples">
+ 						<example>
+ 							<incorrect/>
+ 							<span class="quote"><span class="innerquote">
+ 							Alice is a 
+ 							<span class="nonrelnoun">blacksmith</span>.
+ 							</span></span>
+ 						</example>
+ 						<example>
+ 							<correct/>
+ 							<span class="quote"><span class="innerquote">
+ 							Alice is <span class="refobj">Bob's</span>
+ 							<span class="nonrelnoun">blacksmith</span>.
+ 							</span></span>
+ 						</example>
+ 					</span>
+ 					<span class="response">
+ 					</span>
+ 				</span>
+ 			</span>
+ 
+ 			<h1>Implicit reference objects</h1>
+ 			<p>
+ 				Sometimes the <span class="refobj">reference object</span> is implied,
+ 				and isn't stated explicitly. This makes the task a bit
+ 				more tricky.
+ 			</p>
+ 			<p>
+ 				The relational noun <span class="relnoun">stranger</span> provides
+ 				a good example. Suppose that <span class="refobj">Bob</span>
+ 			  	said the following:
+ 			</p>
+ 			<span class="quote"><span class="innerquote">
+ 				Alice is a <span class="relnoun">stranger</span>.
+ 				</span></span>
+ 			<p>
+ 				Here Bob himself is the reference object (i.e. Alice is a 
+ 				stranger <span class="refobj">to Bob</span>), even though Bob isn't
+ 				mentioned in the sentence. It's implied because he's 
+ 				the speaker.
+ 			</p>
+ 			<p>
+ 				Let's look at a few more examples
+ 			</p>
+ 			<span class="quote"><span class="innerquote">
+ 				The man was a <span class="relnoun">foreigner</span>.
+ 				</span></span>
+ 			<p>
+ 			Foreigner is a relationship relative to a particular country.
+ 			Usually the country isn't mentioned, and is assumed to be 
+ 			whatever country the speaker is in.</p>
+ 			<span class="quote"><span class="innerquote">
+ 				We went to Paris because it's the 
+ 				<span class="relnoun">capital</span>.
+ 				</span></span>
+ 			<p>
+ 				Here again, the reference object is 
+ 				implied. The speaker could have said "... because it's the
+ 				capital <span class="refobj">of France</span>", but they decided to
+ 				omit it, probably because Paris is well-known to be the 
+ 				capital of France.
+ 			</p>
+ 
+ 			<span class="infobox">
+ 				<span class="bold">Notice:</span>
+ 
+ 				<div class="center">
+ 				If the context makes it clear, reference objects might not
+ 				be explicitly stated.
+ 				</div>
+ 
+ 			</span>
+ 
+ 			<h1>
+ 				What is <span class="italic">not</span> 
+ 				a relational noun
+ 			</h1>
+ 			<p>
+ 			There are many nouns which name relationships directly, for
+ 			example "friendship". While "friend" is relational, 
+ 			"friendship" is not! The difference is that "friend" stands
+ 			for one of the members of the relationship, whereas 
+ 			"friendship"
+ 			signifies the relationship itself. A key feature of relational 
+ 			nouns is that they always
+ 			stand for one of the members of the relationship!
+ 			</p>
+ 
+ 			<p>
+ 			So, if the relationship between Alice and Bob is one of 
+ 			siblinghood, we can say that Alice is Bob's sister, and 
+ 			Bob is Alice's brother. But notice that we can't say something
+ 			like: 
+ 			</p>
+ 			<span class="quote"><span class="innerquote">
+ 				Alice is Bob's <span class="nonrelnoun">siblinghood</span>.
+ 				</span></span>
+ 			<p>
+ 			This sounds wrong, because <span class="nonrelnoun">siblinghood</span>
+ 			stands for the relationship itself, rather than standing for
+ 			one of the members of the relationship. The drawings below
+ 			show the idea:
+ 			</p>
+ 			<div>
+ 			<img src="https://s3.amazonaws.com/crowdflower-make-cloud/images%2F1480793093656-sister_siblinghood.png" style="width: 300px;" class="example-image fr-dii"><img src="https://s3.amazonaws.com/crowdflower-make-cloud/images%2F1480793083463-friend_friendship.png" style="width: 300px;" class="example-image shim fr-dii">&nbsp;
+ 			</div>
+ 			<p>
+ 			<span class="relnoun">brother</span>, <span class="relnoun">sister</span>,
+ 			and <span class="relnoun">friend</span> are relational, but 
+ 			<span class="nonrelnoun">sibnlinghood</span> and 
+ 			<span class="nonrelnoun">friendship</span> are not.
+ 			</p>
+ 			
+ 			<span class="infobox">
+ 				<span class="bold">Notice:</span>
+ 				Relational nouns stand for one of the members of the 
+ 				relationship.
+ 			</span>
+ 
+ 			<table class="centered center example-table">
+ 				<tr>
+ 					<td class="bold">
+ 						Relational nouns
+ 					</td>
+ 					<td class="bold">
+ 						Non-relational nouns
+ 					</td>
+ 				</tr>
+ 				<tr>
+ 					<td>
+ 						<span class="relnoun spaced">
+ 							sister
+ 						</span>
+ 						<span class="relnoun spaced">
+ 							brother
+ 						</span>
+ 					</td>
+ 					<td>
+ 						<span class="nonrelnoun spaced">
+ 							siblinghood
+ 						</span>
+ 					</td>
+ 				</tr>
+ 				<tr>
+ 					<td>
+ 						<span class="relnoun spaced">
+ 							friend
+ 						</span>
+ 					</td>
+ 					<td>
+ 						<span class="nonrelnoun spaced">
+ 							friendship
+ 						</span>
+ 					</td>
+ 				</tr>
+ 				<tr>
+ 					<td>
+ 						<span class="relnoun spaced">
+ 							mentor
+ 						</span>
+ 					</td>
+ 					<td>
+ 						<span class="nonrelnoun spaced">
+ 							mentorship
+ 						</span>
+ 					</td>
+ 				</tr>
+ 				<tr>
+ 					<td>
+ 						<span class="relnoun spaced">
+ 							substitute
+ 						</span>
+ 					</td>
+ 					<td>
+ 						<span class="nonrelnoun spaced">
+ 							substitution
+ 						</span>
+ 					</td>
+ 				</tr>
+ 				<tr>
+ 					<td>
+ 						<span class="relnoun spaced">
+ 							ally
+ 						</span>
+ 					</td>
+ 					<td>
+ 						<span class="nonrelnoun spaced">
+ 							alliance
+ 						</span>
+ 					</td>
+ 				</tr>
+ 			</table>
+ 
+ 			<h1>Borderline cases</h1>
+ 			<p>
+ 			Words often have multiple meanings, and sometimes a noun has
+ 			both a relational <span class="italic">and</span>
+ 			a non-relational meaning.
+ 			</p>
+ 			<p>
+ 			As an example, consider <span class="query-word">teacher</span>.
+ 			Teacher can signify a relationship of mentorship and guidance,
+ 			as in: 
+ 			</p>
+ 			<span class="quote"><span class="innerquote">
+ 				He became my <span class="relnoun">teacher</span>.
+ 				</span></span>
+ 			<p>
+ 			Or it can simply signify the profession:
+ 			</p>
+ 			<span class="quote"><span class="innerquote">
+ 				He has been a <span class="nonrelnoun">teacher</span> 
+ 				for fifteen years.
+ 				</span></span>
+ 			<p>
+ 			When faced with a borderline case, think about whether the 
+ 			noun is more likely to be used relationally or non-relationally.
+ 			</p>
+ 			<p>
+ 			Let's see a few examples of borderline cases, along with
+ 			what we think is the right answer:
+ 			</p>
+ 
+ 			<table class="nowrap center centered">
+ 				<tr>
+ 					<td>
+ 						<span class="bold">Word</span>
+ 					</td>
+ 					<td>
+ 						<span class="bold">Relational usage </span>
+ 					</td>
+ 					<td>
+ 						<span class="bold">Non-relational usage</span>
+ 					</td>
+ 					<td>
+ 						<span class="bold">Correct answer</span>
+ 					</td>
+ 				</tr>
+ 
+ 				<tr>
+ 					<td>
+ 						<span class="query-word">CEO</span>
+ 					</td>
+ 					<td>
+ 						<span class="quote"><span class="innerquote">
+ 						Alice is the <span class="relnoun">CEO</span> 
+ 						<span class="refobj">of Shell</span>.
+ 						</span></span>
+ 					</td>
+ 					<td>
+ 						<span class="quote"><span class="innerquote">
+ 						Alice is a <span class="nonrelnoun">CEO</span>.
+ 						</span></span>
+ 					</td>
+ 					<td>
+ 						<span class="main-relnoun">mainly relational</span>
+ 					</td>
+ 				</tr>
+ 
+ 				<tr>
+ 					<td>
+ 						<span class="query-word">victim</span>
+ 					</td>
+ 					<td>
+ 						<span class="quote"><span class="innerquote">
+ 						Alice was the <span class="relnoun">victim</span>
+ 						<span class="refobj">of the robbery</span>.
+ 						</span></span>
+ 					</td>
+ 					<td>
+ 						<span class="quote"><span class="innerquote">
+ 						Alice is playing the 
+ 						<span class="nonrelnoun">victim</span>.
+ 						</span></span>
+ 					</td>
+ 					<td>
+ 						<span class="main-relnoun">mainly relational</span>
+ 					</td>
+ 				</tr>
+ 
+ 				<tr>
+ 					<td>
+ 						<span class="query-word">guitarist</span>
+ 					</td>
+ 					<td>
+ 						<span class="quote"><span class="innerquote">
+ 						Alice is the <span class="relnoun">guitarist</span>
+ 						<span class="refobj">for Oasis</span>.
+ 						</span></span>
+ 					</td>
+ 					<td>
+ 						<span class="quote"><span class="innerquote">
+ 						Alice wants to be a 
+ 						<span class="nonrelnoun">guitarist</span>.
+ 						</span></span>
+ 					</td>
+ 					<td class="nowrap">
+ 						<span class="main-nonrelnoun">mainly non-relational</span>
+ 					</td>
+ 				</tr>
+ 
+ 
+ 				<tr>
+ 					<td>
+ 						<span class="query-word">supplier</span>
+ 					</td>
+ 					<td>
+ 						<span class="quote"><span class="innerquote">
+ 						Acme is a <span class="relnoun">supplier</span> 
+ 						<span class="refobj">for Toyota</span>.
+ 						</span></span>
+ 					</td>
+ 					<td>
+ 						<span class="quote"><span class="innerquote">
+ 						Acme is a parts 
+ 						<span class="nonrelnoun">supplier</span>.
+ 						</span></span>
+ 					</td>
+ 					<td class="nowrap">
+ 						<span class="main-nonrelnoun">mainly non-relational</span>
+ 					</td>
+ 				</tr>
+ 
+ 			</table>
+ 			<div class="hoverpane">
+ 				<h1>You're ready to go!</h1>
+ 				Ok you're ready to start the task. 
+ 				Think about how each of the following words are normally
+ 				used. Then decide whether they are
+ 				<span class="relnoun">relational</span>, 
+ 				<span class="main-relnoun">mainly-relational</span>,
+ 				<span class="main-nonrelnoun">mainly non-relational</span>, or
+ 				<span class="nonrelnoun">non-relational</span>.
+ 				<div class="center bold">
+ 				Don't worry if most words seem non-relational: relational 
+ 				nouns can be quite rare.
+ 				</div>
+ 			</div>
+ 		</div>
+ 	</body>
+</html>
