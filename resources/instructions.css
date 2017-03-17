@@ -1,0 +1,526 @@
+.page label {
+  display: inline;
+}
+
+.page input[type=radio] {
+  margin-left:4px;
+  margin-right: 4px;
+}
+
+.option {
+  display: inline-block;
+}
+
+.option input, .option label {
+	cursor: pointer;
+}
+
+
+.option-wrapper {
+  display: inline-block;
+}
+
+.non-relational-option, .relational-option, .partly-relational-option, .property-option, .part-option, .role-option, .verblike-option, .connection-option {
+  background: #caffbd;
+	padding: 2px 4px 5px 2px;
+	border-radius: 4px;
+	box-shadow: 0.5px 0.5px 2px rgba(0,0,0,0.4);
+	margin-right: 6px;
+}
+
+.partly-relational-option {
+  background: #fff9a8;
+}
+.non-relational-option {
+	background: #f4cccc;
+}
+
+.cml_field {
+  display: inline-block;
+}
+
+.cml {
+  max-width: 800px;
+  background: none;
+  margin: 0 0 0 0;
+  margin: auto;
+  padding: 0 0 0 0;
+  line-height: 30px;
+  border: none;
+}
+
+.cml_row{
+  display: inline-block;
+  margin-left:  20px;
+}
+
+.width250 {
+  width: 250px;
+  display: inline-block;
+}
+
+.grey {
+  color: rgb(180,180,180);
+}
+
+.correct-answer {
+	display: none;
+}
+
+.quote {
+	padding: 8px 0 8px 12px;
+	margin: 10px 0 10px 20px;
+	background: url('https://s3.amazonaws.com/crowdflower-make-cloud/images%2F1480793088321-quote.png') no-repeat;
+	display: inline-block;
+}
+
+#assignment-instructions {
+  margin-bottom: 70px;
+}
+
+
+.hoverpane {
+	display: block;
+	background: white;
+	margin-top: 30px;
+	padding: 20px 20px 20px 20px;
+	border-radius: 16px;
+	box-shadow: 0.5px 0.5px 2px rgba(0,0,0,0.4);
+	line-height: 30px;
+}
+
+
+.cml_row:nth-last-child(3), .main-partrelnoun {
+	background: #f4cccc;;
+	padding: 2px 8px 2px 4px;
+	border-radius: 4px;
+	box-shadow: 0.5px 0.5px 2px rgba(0,0,0,0.4);
+	margin-right:4px;
+	display: inline-block;
+	vertical-align: middle;
+	min-height: 24px;
+	margin-left: 30px;
+}
+
+.cml_row:nth-last-child(2), .main-nonrelnoun {
+	background: #fff9a8;
+	padding: 2px 8px 2px 4px;
+	border-radius: 4px;
+	box-shadow: 0.5px 0.5px 2px rgba(0,0,0,0.4);
+	margin-right:4px;
+	margin-left: 0px;
+	display: inline-block;
+	vertical-align: middle;
+	min-height: 24px;
+}
+
+.cml_row:nth-last-child(1) {
+	background: #caffbd;
+	padding: 2px 8px 2px 4px;
+	border-radius: 4px;
+	box-shadow: 0.5px 0.5px 2px rgba(0,0,0,0.4);
+	margin-right:4px;
+	margin-left:0;
+	display: inline-block;
+	vertical-align: middle;
+	min-height: 24px;
+}
+
+.relnoun, .nonrelnoun, .partrelnoun, .noun {
+	padding: 0px 4px;
+	border-radius: 4px;
+	box-shadow: 0.5px 0.5px 2px rgba(0,0,0,0.4);
+	margin-right:4px;
+	margin-left:0;
+	display: inline-block;
+	vertical-align: middle;
+}
+
+h3 {
+  font-weight: bold;
+}
+
+.noun {
+  background: white;
+}
+
+.relnoun {
+	background: #caffbd;
+}
+.nonrelnoun {
+	background: #f4cccc;
+}
+.partrelnoun {
+  background: #fff9a8;
+}
+
+.nowrap {
+	white-space: nowrap;
+}
+
+
+.query-word {
+  display: inline-block;
+  background: white;
+	padding: 2px 4px;
+	border-radius: 4px;
+	box-shadow: 0.5px 0.5px 2px rgba(0,0,0,0.4);
+	min-width: 120px;
+	text-align: center;
+	display: inline-block;
+}
+
+
+
+.page li {
+	margin-top: 4px;
+	margin-bottom: 4px;
+}
+
+.page ul {
+  margin-bottom: 20px;
+  padding-left: 20px;
+}
+
+
+.query {
+	display: inline-block;
+	margin-right: 30px;
+}
+
+.non-relational {
+  margin-right: 20px;
+}
+
+.queryline {
+	display: block;
+}
+
+.more-space {
+	padding-left: 40px;
+}
+
+.has-arrow {
+	background: 120px 48px url('https://s3.amazonaws.com/crowdflower-make-cloud/images%2F1480793078876-arrow.png') no-repeat;
+	background-size: 90px 38px;
+}
+
+.center {
+	text-align: center;
+}
+
+.thin-info-box {
+	width: 320px;
+}
+
+.important {
+	color: rgb(80,80,255);
+	font-weight: bold;
+}
+
+.centered {
+	margin: auto;
+}
+
+.spaced {
+	display: inline-block;
+	margin: 4px 10px 4px 10px;
+}
+
+.examples {
+	display: inline-block;
+	width: 40%;
+	vertical-align: middle;
+}
+
+.example-image {
+  margin: 10px 0 40px 30px;
+  display: inline-block;
+}
+
+.example-image.shim {
+  margin-top: 12px;
+}
+
+.quiz {
+	display: block;
+	margin-bottom: 20px;
+}
+
+.quiz .response {
+	display: none;
+	padding: 20px;
+	width: 80%;
+	margin: auto;
+	vertical-align: middle;
+	border-radius: 8px;
+}
+
+.quiz .responseline {
+	display: none;
+	margin: 30px;
+}
+
+.quiz.correct .responseline, .quiz.incorrect .responseline {
+	display: block;
+}
+
+.quiz.correct .response {
+	display: inline-block;
+	box-shadow: 0px 0px 8px rgb(128,255,128);
+}
+
+.quiz.incorrect .response {
+	display: inline-block;
+	box-shadow: 0px 0px 8px rgb(255,128,128);
+}
+
+
+.refobj {
+	text-decoration: underline;
+	font-style: italic;
+}
+
+.refobj-demo {
+	margin: 2px 0 0 213px;
+	font-size: 13px;
+}
+
+.bold {
+	font-weight: bold;
+}
+
+.italic {
+	font-style: italic;
+}
+
+.indented {
+	display: inline;
+	margin-left: 20px;
+}
+
+.page {
+	display: block;
+	max-width: 760px;
+	margin: auto;
+	margin-top: 40px;
+	margin-bottom: 40px;
+	line-height: 1.4em;
+}
+
+.infobox {
+	box-shadow: 0px 0px 8px rgb(128,255,128);
+	border-radius: 8px;
+	width: 70%;
+	max-width: 600px;
+	margin: auto;
+	margin-top: 20px;
+	margin-bottom: 20px;
+	display: block;
+	padding: 20px;
+	/*border: solid 1px black;
+	background: #caffbd;*/
+}
+
+
+.floatlist li {
+	float: left; 
+	margin-left: 60px;
+}
+
+.horiz-40 {
+	display: inline-block;
+	vergical-align: middle;
+	width: 40px;
+}
+
+.clearfix {
+	clear: both;
+}
+
+.example-table td {
+	padding: 6px 40px;
+}
+
+.plus-minus {
+  display: inline-block;
+  vertical-align: top;
+  margin-top: 4px;
+  margin-left: 4px;
+  height: 16px;
+  width: 16px;
+  color: black;
+}
+
+.expandable {
+  display: none;
+  padding-left: 20px;
+  background: rgb(248, 247, 245);
+  border-left: solid 1px rgb(220, 215, 120);
+  padding-top: 10px;
+  margin-top: -10px;
+}
+
+.expand-example h3 {
+  cursor: pointer;
+  margin-bottom:0;
+}
+
+.expandable.expanded {
+  display: block;
+}
+
+.hidden-relatum{
+  width: calc(100% - 10em);
+  display: inline-block;
+  vertical-align: middle;
+  line-height: 2em;
+}
+
+.show-relatum {
+  display: inline-block;
+  background: #568cf7;
+  color: white;
+  font-weight: bold;
+  border-radius: 6px;
+	box-shadow: inset 2px 2px 2px rgba(255,255,255,0.4), inset -2px -2px 2px rgba(0,0,0,0.4);
+	padding: 4px 8px;
+	cursor: pointer;
+	margin-left: 12px;
+}
+
+.vert-space {
+  margin-bottom: 30px;
+}
+
+.refobj-target {
+  position: relative;
+}
+
+.refobj-target.active {
+  text-decoration: underline;
+  font-weight: bold;
+  color: #568cf7;
+}
+
+.outer-refobj-tag {
+  position: absolute;
+  top: 0.8em;
+  left: 50%;
+  font-size: 0.8em;
+  color: #568cf7;
+}
+
+.inner-refobj-tag {
+  position: relative;
+  left: -50%;
+}
+
+.refobj-target .outer-refobj-tag {
+  display: none;
+
+}
+
+.refobj-target.active .outer-refobj-tag {
+  display: block;
+}
+
+.lower-alpha {
+  list-style-type: lower-alpha;
+}
+
+page ol {
+  margin: 0 0 1.5em;
+  padding: 0;
+  counter-reset: item;
+}
+
+page ol > li {
+  margin: 0;
+  padding: 0 0 0 2em;
+  text-indent: -2em;
+  list-style-type: none;
+  counter-increment: item;
+}
+
+page ol > li:before {
+  display: inline-block;
+  width: 1em;
+  padding-right: 0.5em;
+  font-weight: bold;
+  text-align: right;
+  content: counter(item) ".";
+}
+
+.cheatsheet {
+  color: black;
+	display: block;
+	position: fixed;
+	bottom:0;
+	left:0;
+	background: white;
+	border-radius: 0 16px 0 0;
+	box-shadow: 0.5px 0.5px 14px rgba(0,0,0,0.1);
+	line-height: 20px;
+	max-height: calc(100% - 40px);
+  margin-top: 30px;
+	padding: 20px 20px 20px 20px;
+}
+
+.cheatsheet.shown {
+  width: calc(100% - 40px);
+}
+
+#cheatsheet li {
+ margin-top:4px;
+ margin-bottom:4px;
+ padding-top:0;
+ padding-bottom:0;
+}
+
+.hideable-cheatsheet {
+  display: none;
+}
+.cheatsheet.shown .hideable-cheatsheet{
+  display: block; 
+}
+
+.toggle-cheat {
+  cursor: pointer;
+}
+
+.hideable-cheatsheet {
+  font-size: 0.8em;
+}
+
+.hideable-cheatsheet hr {
+  margin: 4px;
+}
+
+.hideable-cheatsheet p {
+  margin: 4px;
+}
+
+.toggle-cheat {
+  background: rgb(252, 245, 179);
+  width: 140px;
+  padding: 0 10px;
+}
+
+.kill-cheat {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  cursor: pointer;
+}
+
+.vert4 {
+  height: 4px;
+}
+.vert8 {
+  height: 8px;
+}
+
+.underlined {
+	text-decoration: underline;
+}

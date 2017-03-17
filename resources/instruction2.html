@@ -1,0 +1,3187 @@
+<html>
+<head>
+	<script src="https://code.jquery.com/jquery-3.1.1.min.js"></script>
+	<script src="instructions.js"></script>
+	<link rel="stylesheet" href="instructions.css" />
+</head>
+
+<body>
+<div class="page">
+
+	<h1>Overview</h1>
+
+	<p>Thanks for helping us with our research!  In this task, you’ll be
+	searching for <span class="important">relational nouns</span>.  Let’s 
+	learn about relational nouns through
+	examples.
+	</p>
+
+	<h1>Anatomy of a relationship</h1>
+
+	<p>Alice and Bob are siblings.  We can depict their relationship like
+	this:</p>
+
+	<div class="center"><img src="anatomy.png"/></div>
+
+	<p>In this task, we’ll refer to the members of a relationship (e.g. Alice
+	and
+	Bob) as the <span class="important">relata</span> (singlar: 
+	<span class="important">relatum</span>).  So in this case, the relationship
+	is siblinghood, and the relata are Alice and Bob.</p>
+
+	<h1>What is a relational noun?</h1>
+
+	<p>Relational nouns are a common way of expressing a relationship.  For
+	example, to express the relationship between Alice and Bob we can use the
+	relational noun <span class="relnoun">sister</span>:</p>
+
+	<p><span class="quote"><span class="innerquote">Alice is the <span class="relnoun">sister</span> of Bob.</span>
+
+	<p>Notice how <span class="relnoun">sister</span> establishes the
+	relationship between Alice and Bob, but it actually 
+	<span class="important">refers to one of the relata</span> specifically,
+	Alice.  That's a key feature of relational nouns: they invoke a
+	relationship between two relata, while actually referring to 
+	<span class="italic">one</span> of them.</p>
+
+	<span class="infobox padding40">
+		<div class="centered thin-info-box">
+			<b>Note:</b> A noun is relational if it:
+			<ol>
+				<li>establishes a relationship, and</li>
+				<li>refers specifically to one of the relata.</li>
+			</ol>
+		</div>
+	</span>
+
+	<p>Now consider the two sentences below.  Is the word “ally” relational?
+	What about “alliance”?</p>
+
+		<p><span class="quote"><span class="innerquote">Eve is Graham's <span
+				class="relnoun">ally</span>.</span>
+		<p><span class="quote"><span class="innerquote">Eve and Graham have
+			   an <span class="nonrelnoun">alliance</span>.</span>
+
+	<p>Both “ally” and “alliance” depict the same relationship.  But 
+	&ldquo;ally&rdquo; refers to one of the relata (Eve), whereas 
+	&ldquo;alliance&rdquo; does not (it refers to the relationship itself).
+	So, <span class="relnoun">ally</span> meets the two criteria for being a 
+	relational noun, but <span class="nonrelnoun">alliance</span> does not.
+
+	<h1>Try these examples</h1>
+	<p>Try guessing whether each of the words below is relational or not.
+	You'll get some wrong at first, but don't worry!  Just try to understand
+	the reasons given and you'll get the hang of it.
+	</p>
+
+
+<div>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">friendship</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.0.0" name="basic_examples.0" type="radio"/>
+					<label for="basic_examples.0.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.0.1" name="basic_examples.0" type="radio"/>
+					<label for="basic_examples.0.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Friendship&rdquo; does express a relationship, but it does not refer to one of the relata.  It refers to the relationship itself, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">bus</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.1.0" name="basic_examples.1" type="radio"/>
+					<label for="basic_examples.1.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.1.1" name="basic_examples.1" type="radio"/>
+					<label for="basic_examples.1.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Bus&rdquo; does not express a relationship, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">entourage</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.2.0" name="basic_examples.2" type="radio"/>
+					<label for="basic_examples.2.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.2.1" name="basic_examples.2" type="radio"/>
+					<label for="basic_examples.2.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Entourage&rdquo; expresses a relationship between a person (usually a celebrity) and their friends and assistants who travel with them.  It refers to one of the relata (the friends and assistants as a group), so it is relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">friend</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.3.0" name="basic_examples.3" type="radio"/>
+					<label for="basic_examples.3.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.3.1" name="basic_examples.3" type="radio"/>
+					<label for="basic_examples.3.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Friend&rdquo; expresses the friendship relationship and refers to one of the relata, therefore it is relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">confidante</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.4.0" name="basic_examples.4" type="radio"/>
+					<label for="basic_examples.4.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.4.1" name="basic_examples.4" type="radio"/>
+					<label for="basic_examples.4.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Confidante&rdquo; expresses a relationship between one person and another with whom they share personal or sensitive information.  Also, it refers to one of the relata (the recipient of the information), therefore it is relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">coworker</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.5.0" name="basic_examples.5" type="radio"/>
+					<label for="basic_examples.5.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.5.1" name="basic_examples.5" type="radio"/>
+					<label for="basic_examples.5.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Coworker&rdquo; expresses the relationship between peers working in the same place, and refers to one of the relata, therefore it is relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">book</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.6.0" name="basic_examples.6" type="radio"/>
+					<label for="basic_examples.6.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.6.1" name="basic_examples.6" type="radio"/>
+					<label for="basic_examples.6.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Book&rdquo; does not express a relationship, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">relative</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.7.0" name="basic_examples.7" type="radio"/>
+					<label for="basic_examples.7.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.7.1" name="basic_examples.7" type="radio"/>
+					<label for="basic_examples.7.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Relative&rdquo; expresses a generic blood-relative relationship, and refers to one of the relata, therefore it is relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">mannequin</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.8.0" name="basic_examples.8" type="radio"/>
+					<label for="basic_examples.8.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.8.1" name="basic_examples.8" type="radio"/>
+					<label for="basic_examples.8.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Mannequin&rdquo; does not express a relationship, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">conflict</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.9.0" name="basic_examples.9" type="radio"/>
+					<label for="basic_examples.9.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.9.1" name="basic_examples.9" type="radio"/>
+					<label for="basic_examples.9.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Conflict&rdquo; does express a relationship, but it doesn't refer to one of the relata of that relationship. It refers to the relationship itself, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">bread</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.10.0" name="basic_examples.10" type="radio"/>
+					<label for="basic_examples.10.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.10.1" name="basic_examples.10" type="radio"/>
+					<label for="basic_examples.10.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Bread&rdquo; does not express a relationship, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">mentor</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.11.0" name="basic_examples.11" type="radio"/>
+					<label for="basic_examples.11.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.11.1" name="basic_examples.11" type="radio"/>
+					<label for="basic_examples.11.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Mentor&rdquo; expresses the mentor-mentee relationship and refers to one of the relata, therefore it is relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">nephew</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.12.0" name="basic_examples.12" type="radio"/>
+					<label for="basic_examples.12.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.12.1" name="basic_examples.12" type="radio"/>
+					<label for="basic_examples.12.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Nephew&rdquo; expresses a aunt-nephew or uncle-nephew relationship, and refers to one of the relata, therefore it is relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">box</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.13.0" name="basic_examples.13" type="radio"/>
+					<label for="basic_examples.13.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.13.1" name="basic_examples.13" type="radio"/>
+					<label for="basic_examples.13.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Box&rdquo; does not express a relationship, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">agreement</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.14.0" name="basic_examples.14" type="radio"/>
+					<label for="basic_examples.14.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.14.1" name="basic_examples.14" type="radio"/>
+					<label for="basic_examples.14.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Agreement&rdquo; does express a relationship, but it doesn't refer to one of the relata of that relationship. It refers to the relationship itself, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">husband</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.15.0" name="basic_examples.15" type="radio"/>
+					<label for="basic_examples.15.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.15.1" name="basic_examples.15" type="radio"/>
+					<label for="basic_examples.15.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Husband&rdquo; expresses a spousal relationship, and refers to one of the relata, therefore it is relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">fever</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.16.0" name="basic_examples.16" type="radio"/>
+					<label for="basic_examples.16.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.16.1" name="basic_examples.16" type="radio"/>
+					<label for="basic_examples.16.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Fever&rdquo; does not express a relationship, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">connection</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.17.0" name="basic_examples.17" type="radio"/>
+					<label for="basic_examples.17.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.17.1" name="basic_examples.17" type="radio"/>
+					<label for="basic_examples.17.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Connection&rdquo; does express a relationship, but it doesn't refer to one of the relata of the relationship. It refers to the relationship itself, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">flower</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.18.0" name="basic_examples.18" type="radio"/>
+					<label for="basic_examples.18.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.18.1" name="basic_examples.18" type="radio"/>
+					<label for="basic_examples.18.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Flower&rdquo; does not express a relationship, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">sibling</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.19.0" name="basic_examples.19" type="radio"/>
+					<label for="basic_examples.19.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.19.1" name="basic_examples.19" type="radio"/>
+					<label for="basic_examples.19.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Sibling&rdquo; expresses the siblinghood relationship between brothers and / or sisters, and when used it refers to one of the relata, therefore it is relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">mother</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.20.0" name="basic_examples.20" type="radio"/>
+					<label for="basic_examples.20.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.20.1" name="basic_examples.20" type="radio"/>
+					<label for="basic_examples.20.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Mother&rdquo; expresses the mother-child relationship and refers to one of the relata (the mother), therefore it is relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">aunt</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.21.0" name="basic_examples.21" type="radio"/>
+					<label for="basic_examples.21.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.21.1" name="basic_examples.21" type="radio"/>
+					<label for="basic_examples.21.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Aunt&rdquo; expresses the aunt-nephew or aunt-niece relationship and refers to one of the relata (the aunt), therefore it is relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">direction</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="basic_examples.22.0" name="basic_examples.22" type="radio"/>
+					<label for="basic_examples.22.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="basic_examples.22.1" name="basic_examples.22" type="radio"/>
+					<label for="basic_examples.22.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Direction&rdquo; does not express a relationship, so it is non-relational.
+			</span>
+		</span>
+	</span>
+</div>
+
+	<h1>What counts as a relationship?</h1>
+	<p>Remember that there are two criteria for a noun being relational.</p>
+	<ul>
+		<li>It has to refer to one of the relata, and</li>
+		<li>it has to establish a 
+			<span class="underlined">relationship</span>.</li>
+	</ul>
+
+	<p>So, what counts as a relationship?</p>
+
+	<p>Let’s get the obvious cases out of the way first.  Kinship relationships
+	are easy to spot: things like 
+	<span class="relnoun">brother</span>, 
+	<span class="relnoun">sister</span>, 
+	<span class="relnoun">uncle</span>, or 
+	<span class="relnoun">relative</span>.  Social
+	relationships are also fairly easy to spot, things like 
+	<span class="relnoun">assistant</span>, 
+	<span class="relnoun">boss</span>,
+	<span class="relnoun">confidante</span>, 
+	<span class="relnoun">employee</span>, 
+	<span class="relnoun">enemy</span>, etc.  Other kinds of relationships are
+	a bit less obvious.  We’ll discuss 
+	<span class="italic">properties</span>, 
+	<span class="italic">functional relationships</span>,
+	<span class="italic">relative parts</span>, and 
+	<span class="italic">roles</span> below, so that you’ll know what to do
+	when you see them in the task.</p>
+
+	<h2>Properties aren’t relational!</h2>
+	<p>Properties are actually a group of nouns that we 
+	<span class="italic">don’t</span> count as
+	relational&mdash;we want to point them out so you know to label them as
+	non-relational!</p>
+	<p>Properties include things like:</p>
+	<span class="nonrelnoun">flavour</span>,
+	<span class="nonrelnoun">colour</span>,
+	<span class="nonrelnoun">weight</span>,
+	<span class="nonrelnoun">speed</span>,
+	<span class="nonrelnoun">texture</span>,
+	<!--span class="nonrelnoun">purpose</span>,-->
+	<span class="nonrelnoun">redness</span>,
+	<span class="nonrelnoun">creativity</span>,
+	<span class="nonrelnoun">excellence</span>,
+	<span class="nonrelnoun">size</span>,
+	<span class="nonrelnoun">temperature</span>.
+
+	<p>You'll have the chance to test out your ability to spot properties in
+	the final bunch of examples.</p>
+
+
+	<h2>Functional relationships</h2>
+	<p>Think about the word “cure”&mdash;is that a relational noun?  Well, every
+	cure is a cure for some disease.  A cure is inherently defined in relation
+	to the disease, being the agent that removes the disease.  Also, the word
+	“cure” refers to one of the relata in that relationship, so 
+	<span class="relnoun">cure</span> meets the criteria for being a relational
+	noun.</p>
+
+	<p>Let’s have a look at several more examples that show how a noun can
+	establish a functional relationship between relata.  Again, you may get 
+	several of these wrong, but it's OK&mdash;this is training!  Read the
+	reasons given and you'll get the hang of it!</p>
+
+
+<div>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">roof</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="functional_relationships.0.0" name="functional_relationships.0" type="radio"/>
+					<label for="functional_relationships.0.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="functional_relationships.0.1" name="functional_relationships.0" type="radio"/>
+					<label for="functional_relationships.0.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Roof&rdquo; doesn't express a relationship so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">delivery</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="functional_relationships.1.0" name="functional_relationships.1" type="radio"/>
+					<label for="functional_relationships.1.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="functional_relationships.1.1" name="functional_relationships.1" type="radio"/>
+					<label for="functional_relationships.1.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Delivery&rdquo; doesn't express a relationship, but rather expresses either the act of delivering, as in &quot;She went home after she finished her delivery&quot;, or a performance (usually a show or presentation), as in &quot;Her delivery was smooth and well-practiced&quot;. Since delivery does not express a relationship, it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">solution</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="functional_relationships.2.0" name="functional_relationships.2" type="radio"/>
+					<label for="functional_relationships.2.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="functional_relationships.2.1" name="functional_relationships.2" type="radio"/>
+					<label for="functional_relationships.2.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Solution&rdquo; expresses the relationship between some problem and the agent or technique that solves it. It refers to one of the relata, so it's a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">replacement</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="functional_relationships.3.0" name="functional_relationships.3" type="radio"/>
+					<label for="functional_relationships.3.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="functional_relationships.3.1" name="functional_relationships.3" type="radio"/>
+					<label for="functional_relationships.3.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Replacement&rdquo; expresses a relationship between an original object and a secondary object that substitutes the original.  It refers to one of the relata (the substitute) so it's a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">adherence</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="functional_relationships.4.0" name="functional_relationships.4" type="radio"/>
+					<label for="functional_relationships.4.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="functional_relationships.4.1" name="functional_relationships.4" type="radio"/>
+					<label for="functional_relationships.4.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				While &ldquo;adherence&rdquo; can, in a a sense, be used to express a relationship (as in &quot;the adherence of the stickers to the page&quot;) it doesn't refer to one of the relata, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">successor</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="functional_relationships.5.0" name="functional_relationships.5" type="radio"/>
+					<label for="functional_relationships.5.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="functional_relationships.5.1" name="functional_relationships.5" type="radio"/>
+					<label for="functional_relationships.5.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Successor&rdquo; expresses a relationship between one object and second that follows in some kind of lineage.  It refers to one of the relata (the secondary object), so it is a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">heir</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="functional_relationships.6.0" name="functional_relationships.6" type="radio"/>
+					<label for="functional_relationships.6.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="functional_relationships.6.1" name="functional_relationships.6" type="radio"/>
+					<label for="functional_relationships.6.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Heir&rdquo; expresses the relationship between a person and their inheritance.  It refers to one of those relata (the person), so it is a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">girder</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="functional_relationships.7.0" name="functional_relationships.7" type="radio"/>
+					<label for="functional_relationships.7.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="functional_relationships.7.1" name="functional_relationships.7" type="radio"/>
+					<label for="functional_relationships.7.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Girder&rdquo; doesn't express a relationship so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">organization</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="functional_relationships.8.0" name="functional_relationships.8" type="radio"/>
+					<label for="functional_relationships.8.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="functional_relationships.8.1" name="functional_relationships.8" type="radio"/>
+					<label for="functional_relationships.8.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Organization&rdquo; doesn't express a relationship. It expresses the act of organizing, the manner in which something is organized, or it expresses an administrative body like a company or institution.  Since it doesn't express a relationship, it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">distribution</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="functional_relationships.9.0" name="functional_relationships.9" type="radio"/>
+					<label for="functional_relationships.9.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="functional_relationships.9.1" name="functional_relationships.9" type="radio"/>
+					<label for="functional_relationships.9.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Distribution&rdquo; does not express a relationship. It expresses either the act of distributing something, or the manner in which it has been distributed.  Since it doesn't express a relationship, it isn't a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">building</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="functional_relationships.10.0" name="functional_relationships.10" type="radio"/>
+					<label for="functional_relationships.10.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="functional_relationships.10.1" name="functional_relationships.10" type="radio"/>
+					<label for="functional_relationships.10.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Building&rdquo; either refers to a permanent construction made to hold people and physical objects, or the act of constructing something.  Neither meaning expresses a relationship, so &ldquo;building&rdquo; is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">legacy</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="functional_relationships.11.0" name="functional_relationships.11" type="radio"/>
+					<label for="functional_relationships.11.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="functional_relationships.11.1" name="functional_relationships.11" type="radio"/>
+					<label for="functional_relationships.11.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Legacy&rdquo; expresses a relationship between a person and the set of notable things that they will be remembered for.  It refers to one of the relata (the person) so it's a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">author</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="functional_relationships.12.0" name="functional_relationships.12" type="radio"/>
+					<label for="functional_relationships.12.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="functional_relationships.12.1" name="functional_relationships.12" type="radio"/>
+					<label for="functional_relationships.12.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Author&rdquo; is typically used to establish a relationship between a written work and its creator.  Since it refers to one of the relata (the creator) it's a relational  noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">hole</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="functional_relationships.13.0" name="functional_relationships.13" type="radio"/>
+					<label for="functional_relationships.13.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="functional_relationships.13.1" name="functional_relationships.13" type="radio"/>
+					<label for="functional_relationships.13.1">relational</label>
+					</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Hole&rdquo; expresses the relationship between some self-connected entity and an enclosed gap in that entity. It refers to one of the relata (the gap) so it is a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">province</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="functional_relationships.14.0" name="functional_relationships.14" type="radio"/>
+					<label for="functional_relationships.14.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="functional_relationships.14.1" name="functional_relationships.14" type="radio"/>
+					<label for="functional_relationships.14.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Province&rdquo; expresses a relationship between a one geo-political entity and another that subsumes it. It refers to one of the relata (the subsumed geo-political entity) so it's a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">passenger</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="functional_relationships.15.0" name="functional_relationships.15" type="radio"/>
+					<label for="functional_relationships.15.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="functional_relationships.15.1" name="functional_relationships.15" type="radio"/>
+					<label for="functional_relationships.15.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Passenger&rdquo; is inherently defined in terms of a relationship between a person and a mode of transport. Since it refers to one of the relata of that relationship, it's a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">subsidiary</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="functional_relationships.16.0" name="functional_relationships.16" type="radio"/>
+					<label for="functional_relationships.16.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="functional_relationships.16.1" name="functional_relationships.16" type="radio"/>
+					<label for="functional_relationships.16.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Subsidiary&rdquo; expresses the relationship between a parent company and another company owned by the parent. It refers to one of the relata (the owned company), so it is a relational noun.
+			</span>
+		</span>
+	</span>
+</div>
+
+
+
+	<h2>Relative parts</h2>
+	<p>A noun is a &ldquo;relative part&rdquo; if it singles out some part of 
+	a whole based on how it relates (usually physically) to the whole.  
+	For example:</p>
+
+	<p><span class="quote"><span class="innerquote">Tofino is near the 
+	<span class="relnoun">tip</span> of Vancouver Island.</span>
+
+	<p><span class="quote"><span class="innerquote">There is a chalet at the
+	<span class="relnoun">base</span> of the mountain.</span>
+
+	<p>These examples meet the criteria for being relational nouns
+	because they establish a relationship between the part and the
+	whole, and they refer to one of the relata (the part).</p>
+
+	<p>Now, we need to be careful when thinking about parts.  Just because
+	something is typically a part of something else, doesn’t mean its
+	relational.  It has to be a <span class="italic">relative part</span>,
+	which means that it is defined in terms of a relationship to the whole.
+	Consider “wheel”.  Although wheels happen to often be part of a larger
+	object (like a vehicle), the word <span class="nonrelnoun">wheel</span>
+	doesn’t actually establish a relationship as such.</p>
+
+	<p>Try these examples, and see if you can get the hang of what kinds
+	of parts count as relational nouns and what do not (remember, this
+	is just training!):</p>
+
+
+<div>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">wire</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="relative_parts.0.0" name="relative_parts.0" type="radio"/>
+					<label for="relative_parts.0.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="relative_parts.0.1" name="relative_parts.0" type="radio"/>
+					<label for="relative_parts.0.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				Although a &ldquo;wire&rdquo; is typically part of another object, the meaning of &ldquo;wire&rdquo; doesn't specifically denote such a relationship, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">cord</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="relative_parts.1.0" name="relative_parts.1" type="radio"/>
+					<label for="relative_parts.1.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="relative_parts.1.1" name="relative_parts.1" type="radio"/>
+					<label for="relative_parts.1.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				Although a &ldquo;cord&rdquo; is typically part of another object, the meaning of &ldquo;cord&rdquo; doesn't specifically denote such a relationship, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">front</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="relative_parts.2.0" name="relative_parts.2" type="radio"/>
+					<label for="relative_parts.2.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="relative_parts.2.1" name="relative_parts.2" type="radio"/>
+					<label for="relative_parts.2.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Front&rdquo; identifies part of an object based on its physical relationship to the whole, so it is a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">edge</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="relative_parts.3.0" name="relative_parts.3" type="radio"/>
+					<label for="relative_parts.3.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="relative_parts.3.1" name="relative_parts.3" type="radio"/>
+					<label for="relative_parts.3.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Edge&rdquo; identifies part of an object in terms of its physical relationship to the whole, so it is a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">wheel</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="relative_parts.4.0" name="relative_parts.4" type="radio"/>
+					<label for="relative_parts.4.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="relative_parts.4.1" name="relative_parts.4" type="radio"/>
+					<label for="relative_parts.4.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				Although a &ldquo;wheel&rdquo; is usually part of another object, the meaning of wheel doesn't specifically denote such a relationship, so &ldquo;wheel&rdquo; is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">stern</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="relative_parts.5.0" name="relative_parts.5" type="radio"/>
+					<label for="relative_parts.5.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="relative_parts.5.1" name="relative_parts.5" type="radio"/>
+					<label for="relative_parts.5.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Stern&rdquo; identifies a part of a ship based on its spatial relationship to the rest of the ship, so it's a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">door</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="relative_parts.6.0" name="relative_parts.6" type="radio"/>
+					<label for="relative_parts.6.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="relative_parts.6.1" name="relative_parts.6" type="radio"/>
+					<label for="relative_parts.6.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				Although a &ldquo;door&rdquo; is usually part of another object, the meaning of &ldquo;door&rdquo; doesn't specifically denote such a relationship, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">stirrup</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="relative_parts.7.0" name="relative_parts.7" type="radio"/>
+					<label for="relative_parts.7.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="relative_parts.7.1" name="relative_parts.7" type="radio"/>
+					<label for="relative_parts.7.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Stirrup&rdquo; does not denote a relationship, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">outside</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="relative_parts.8.0" name="relative_parts.8" type="radio"/>
+					<label for="relative_parts.8.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="relative_parts.8.1" name="relative_parts.8" type="radio"/>
+					<label for="relative_parts.8.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Outside&rdquo; identifies a region based on its relationship to some object, so it is a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">rail</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="relative_parts.9.0" name="relative_parts.9" type="radio"/>
+					<label for="relative_parts.9.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="relative_parts.9.1" name="relative_parts.9" type="radio"/>
+					<label for="relative_parts.9.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				Although a &ldquo;rail&rdquo; can part of another object, the meaning of &ldquo;rail&rdquo; doesn't specifically denote such a relationship, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">clip</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="relative_parts.10.0" name="relative_parts.10" type="radio"/>
+					<label for="relative_parts.10.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="relative_parts.10.1" name="relative_parts.10" type="radio"/>
+					<label for="relative_parts.10.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				Although a &ldquo;clip&rdquo; is typically part of another object, the meaning of &ldquo;clip&rdquo; doesn't specifically denote such a relationship, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">shelf</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="relative_parts.11.0" name="relative_parts.11" type="radio"/>
+					<label for="relative_parts.11.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="relative_parts.11.1" name="relative_parts.11" type="radio"/>
+					<label for="relative_parts.11.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				Although a &ldquo;shelf&rdquo; can a be part of another object, the meaning of &ldquo;shelf&rdquo; doesn't specifically denote such a relationship, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">middle</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="relative_parts.12.0" name="relative_parts.12" type="radio"/>
+					<label for="relative_parts.12.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="relative_parts.12.1" name="relative_parts.12" type="radio"/>
+					<label for="relative_parts.12.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Middle&rdquo; identifies a part of an object extended in space or time based on it's spatial or temporal relationship to the whole.  Since it establishes a relationship while referring to one of the relata, it's a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">crust</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="relative_parts.13.0" name="relative_parts.13" type="radio"/>
+					<label for="relative_parts.13.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="relative_parts.13.1" name="relative_parts.13" type="radio"/>
+					<label for="relative_parts.13.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Crust&rdquo; identifies part of an object (usually a baked good that is firmer, crunchier, and/or more cooked One could make the argument that the physical relationship of a crust to the rest of the object is the salient aspect of the word's meaning, and that it is therefore a relational noun.  We consider it simply to be defined in terms of its properties, and that the fact that it is typically located at the outer surface or edge of baked food to be a typical property of crust but not the essential meaning, so we consider &ldquo;crust&rdquo; to be non-relational. Nevertheless, a good argument could be made to consider it relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">part</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="relative_parts.14.0" name="relative_parts.14" type="radio"/>
+					<label for="relative_parts.14.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="relative_parts.14.1" name="relative_parts.14" type="radio"/>
+					<label for="relative_parts.14.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Part&rdquo; expresses the whole-part relationship, and refers to one of the relata in that relationship (the part), so it's a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">corner</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="relative_parts.15.0" name="relative_parts.15" type="radio"/>
+					<label for="relative_parts.15.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="relative_parts.15.1" name="relative_parts.15" type="radio"/>
+					<label for="relative_parts.15.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Corner&rdquo; identifies a part of a physical object where edges or faces meet to form a sharp protrusion It establishes a physical / geometric relationship between the part to which it refers (a relatum) and the whole object so it is a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">strap</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="relative_parts.16.0" name="relative_parts.16" type="radio"/>
+					<label for="relative_parts.16.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="relative_parts.16.1" name="relative_parts.16" type="radio"/>
+					<label for="relative_parts.16.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				Although a &ldquo;strap&rdquo; is usually part of another object, the meaning of strap doesn't specifically denote such a relationship, so &ldquo;strap&rdquo; is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">handle</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="relative_parts.17.0" name="relative_parts.17" type="radio"/>
+					<label for="relative_parts.17.0">non-relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="relative_parts.17.1" name="relative_parts.17" type="radio"/>
+					<label for="relative_parts.17.1">relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				Although a &ldquo;handle&rdquo; is typically part of another object, the meaning of &ldquo;handle&rdquo; doesn't specifically denote such a relationship, so it is non-relational.
+			</span>
+		</span>
+	</span>
+</div>
+
+
+	<h2>Roles</h2>
+	<p>Roles are nouns that can indicate a vocation or a position in a group or
+	organization.  For example, “baker”, “director”, “CEO”, and “blacksmith” are
+	roles.  Sometimes roles are relational, sometimes they are not.</p>
+
+	<p>Consider the role “CEO”&mdash;is it relational?  It seems like it is: CEO
+	establishes a relationship between a company and its chief leader, and
+	it refers to one of those relata (the leader).  But CEO can also be
+	used non-relationally.  For example, in the sentence “CEO salaries have
+	skyrocketed in recent years,” CEO is not being used to establish a
+	relationship.  That’s what makes roles trickier.</p>
+
+	<p>Faced with examples like that, your job is to exercise your judgment
+	and decide whether it’s more common for the noun to be used
+	relationally, or not.  We’ll look at some examples together, but first,
+	let’s talk more about how we’ll handle grey areas in general.</p>
+
+	<h1>Grey area</h1>
+	<p>The truth is, many words can be used both relationally and
+	non-relationally.  To handle those cases, we let you choose from three
+	labels: <span class="relnoun">usually relational</span>, 
+	<span class="partrelnoun">occasionally relational</span>,
+	<span class="nonrelnoun">almost never relational</span>.  
+	Here’s how to use the labels:</p>
+
+	<ol>
+		<li>If you think the word is used relationally more than 50% of the time,
+		choose <span class="relnoun">usually relational</span>;</li>
+		<li>If the word can’t be used relationally, or if such a usage seems a 
+		bit unnatural or is confined to a very specific context, choose
+		<span class="nonrelnoun">almost never relational</span>;</li>
+		<li>If using the word relationally seems perfectly natural, but using it
+		non-relationally is more common, then choose
+		<span class="partrelnoun">occasionally relational</span>.</li>
+	</ol>
+
+	<h2>Revisiting roles</h2>
+	<p>Now let’s come back to the question of roles, and the example of “CEO”.
+	We think that when that word is used, it is usually used to talk about
+	the leadership relation to a particular company, rather than the job
+	title (without reference to a particular company).  In other words, we
+	think it's more often used relationally.  So we would label that word as
+	<span class="relnoun">usually-relational</span>.</p>
+
+	<p>In contrast, if we consider the role “janitor”, although it is possible
+	that it can be used to describe a relationship (i.e. “Mr. X is a
+	janitor for Cleaning Services Inc.”), that usage seems rare.  In the
+	case of Janitor, we think that the decision lies between the options
+	<span class="partrelnoun">occasionally relational</span> and 
+	<span class="nonrelnoun">almost never relational</span>.  In this
+	case, we would choose 
+	<span class="nonrelnoun">almost never relational</span>, but a good
+	argument could be made for the other; it’s a matter of judgment.</p>
+
+	<p>Here are some examples of roles.  Some of these illustrate the grey 
+	area by having a relational usage that isn't the most common usage.
+	Notice that we try not to over-use the 
+	<span class="partrelnoun">occasionally relational</span> label, and only
+	use it when the other labels don't apply.</p>
+
+	<p>Many of these examples are open to debate, so you may find your
+	answers often don't match ours here.  That's OK.  Try to understand our
+	reasoning so that you can apply a similar standard during the task.</p>
+
+
+<div>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">purchaser</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="roles.0.0" name="roles.0" type="radio"/>
+					<label for="roles.0.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="roles.0.1" name="roles.0" type="radio"/>
+					<label for="roles.0.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="roles.0.2" name="roles.0" type="radio"/>
+					<label for="roles.0.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Purchaser&rdquo; identifies a particular vocation, or generally a person responsible for the act of purchasing but does not centrally express a relationship.  Therefore we consider &ldquo;purchaser&rdquo; to be a non-relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">planner</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="roles.1.0" name="roles.1" type="radio"/>
+					<label for="roles.1.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="roles.1.1" name="roles.1" type="radio"/>
+					<label for="roles.1.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="roles.1.2" name="roles.1" type="radio"/>
+					<label for="roles.1.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Planner&rdquo; identifies a person who determines a sequence of actions or allocation of resources to achieve some goal.  The meaning implies the undertaking of an activity, but doesn't centrally express a relationship. Therefore we consider &ldquo;planner&rdquo; to be a non-relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">pitcher</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="roles.2.0" name="roles.2" type="radio"/>
+					<label for="roles.2.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="roles.2.1" name="roles.2" type="radio"/>
+					<label for="roles.2.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="roles.2.2" name="roles.2" type="radio"/>
+					<label for="roles.2.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Pitcher&rdquo; identifies a role on a baseball team, as in &quot;Pitcher for the Mets&quot;.  We think the relational usage is most common, and judge &ldquo;pitcher&rdquo; to be a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">ambassador</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="roles.3.0" name="roles.3" type="radio"/>
+					<label for="roles.3.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="roles.3.1" name="roles.3" type="radio"/>
+					<label for="roles.3.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="roles.3.2" name="roles.3" type="radio"/>
+					<label for="roles.3.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Ambassador&rdquo; identifies a role, and is usually used to indicate a relationship between that person and either their country of nationality, and / or the foreign country in which they are posted, as in &quot;US Ambassador to France&quot;.  We think the relational usage is most common, and judge &ldquo;ambassador&rdquo; to be a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">gardener</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="roles.4.0" name="roles.4" type="radio"/>
+					<label for="roles.4.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="roles.4.1" name="roles.4" type="radio"/>
+					<label for="roles.4.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="roles.4.2" name="roles.4" type="radio"/>
+					<label for="roles.4.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;gardener&rdquo; identifies a particular vocation, but does not centrally express a relationship.  Therefore we consider &ldquo;gardener&rdquo; to be a non-relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">supervisor</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="roles.5.0" name="roles.5" type="radio"/>
+					<label for="roles.5.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="roles.5.1" name="roles.5" type="radio"/>
+					<label for="roles.5.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="roles.5.2" name="roles.5" type="radio"/>
+					<label for="roles.5.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Supervisor&rdquo; identifies a role, and is usually used to indicate a leadership and oversight relationship to another person or group of people, as in &quot;John's supervisor never lets him take breaks.&quot; We think the relational usage is most common, and judge &ldquo;supervisor&rdquo; to be a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">shareholder</span>
+			</span>
+			<span class="correct-answer">partly-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="roles.6.0" name="roles.6" type="radio"/>
+					<label for="roles.6.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="roles.6.1" name="roles.6" type="radio"/>
+					<label for="roles.6.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="roles.6.2" name="roles.6" type="radio"/>
+					<label for="roles.6.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Shareholder&rdquo; expresses the relationship between the owner of shares and the company or shares that are owned. But the word is also frequently used in a non-relational sense, meaning generically one who owns shares, without reference to the particular shares or company.  We don't think the relational usage is necessarily the most common, so we judge &ldquo;shareholder&rdquo; to be partly relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">president</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="roles.7.0" name="roles.7" type="radio"/>
+					<label for="roles.7.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="roles.7.1" name="roles.7" type="radio"/>
+					<label for="roles.7.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="roles.7.2" name="roles.7" type="radio"/>
+					<label for="roles.7.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;President&rdquo; identifies a role, and is usually used to indicate a leadership relationship to country as in &quot;President of Italy&quot;.  We think the relational usage is most common, and judge &ldquo;president&rdquo; to be a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">astronaut</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="roles.8.0" name="roles.8" type="radio"/>
+					<label for="roles.8.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="roles.8.1" name="roles.8" type="radio"/>
+					<label for="roles.8.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="roles.8.2" name="roles.8" type="radio"/>
+					<label for="roles.8.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Astronaut&rdquo; identifies a particular vocation, but does not centrally express a relationship.  Therefore we consider &ldquo;astronaut&rdquo; to be a non-relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">guitarist</span>
+			</span>
+			<span class="correct-answer">partly-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="roles.9.0" name="roles.9" type="radio"/>
+					<label for="roles.9.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="roles.9.1" name="roles.9" type="radio"/>
+					<label for="roles.9.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="roles.9.2" name="roles.9" type="radio"/>
+					<label for="roles.9.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Guitarist&rdquo; can identify a role in a band, as in &quot;Jimi Hendrix started as a guitarist for the Isley Brothers&quot;.  However, its non-relational usage, as in &quot;Jimi Hendrix is a legendary guitarist&quot; is also probably very common, and we judge &ldquo;guitarist&rdquo; to be partly relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">babysitter</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="roles.10.0" name="roles.10" type="radio"/>
+					<label for="roles.10.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="roles.10.1" name="roles.10" type="radio"/>
+					<label for="roles.10.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="roles.10.2" name="roles.10" type="radio"/>
+					<label for="roles.10.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Babysitter&rdquo; identifies a person that watches over children.  While it could be used relationally, establishing a relationship to the children, we think that its core of the meaning is about the performance of duty rather than the relationship it implies with the children. Therefore we judge &ldquo;babysitter&rdquo; to be non-relational, although an argument could be made otherwise.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">lawyer</span>
+			</span>
+			<span class="correct-answer">partly-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="roles.11.0" name="roles.11" type="radio"/>
+					<label for="roles.11.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="roles.11.1" name="roles.11" type="radio"/>
+					<label for="roles.11.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="roles.11.2" name="roles.11" type="radio"/>
+					<label for="roles.11.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Lawyer&rdquo; can refer to a particular vocation. But it is also often used to indicate the relationship between the lawyer and the person (s)he is representing, as in &quot;Julian Assange's lawyer was not available for comment.&quot; We don't think the relational usage is sufficiently common to consider &ldquo;lawyer&rdquo; a relational noun, so we judge it to be partly relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">director</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="roles.12.0" name="roles.12" type="radio"/>
+					<label for="roles.12.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="roles.12.1" name="roles.12" type="radio"/>
+					<label for="roles.12.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="roles.12.2" name="roles.12" type="radio"/>
+					<label for="roles.12.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Director&rdquo; identifies a role, and is usually used to indicate a leadership relationship to an organizational unit, as in &quot;Director of Finance&quot;. It can also be used in the sense of &quot;the director of the film&quot;, which is also a relational usage. Therefore, we judge &ldquo;director&rdquo; to be a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">CEO</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="roles.13.0" name="roles.13" type="radio"/>
+					<label for="roles.13.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="roles.13.1" name="roles.13" type="radio"/>
+					<label for="roles.13.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="roles.13.2" name="roles.13" type="radio"/>
+					<label for="roles.13.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;CEO&rdquo; identifies a role, and is usually used to indicate a leadership relationship to a company, as in &quot;The CEO of Walmart&quot;.  But, CEO can also be used in a generic non-relational sense, as in &ldquo;CEO salaries have skyrocketed.&rdquo; We think the relational usage is more common, and judge &ldquo;CEO&rdquo; to be a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">miner</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="roles.14.0" name="roles.14" type="radio"/>
+					<label for="roles.14.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="roles.14.1" name="roles.14" type="radio"/>
+					<label for="roles.14.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="roles.14.2" name="roles.14" type="radio"/>
+					<label for="roles.14.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;miner&rdquo; identifies a particular vocation, but does not centrally express a relationship.  Therefore we consider &ldquo;miner&rdquo; to be a non-relational noun.
+			</span>
+		</span>
+	</span>
+</div>
+
+
+
+	<h1>Test Questions</h1>
+	<p>In the actual task we include &ldquo;test questions&rdquo; every once in
+	a while so that we can tell if you're paying attention.  You won't be able
+	to tell which questions are tests, so label carefully!  However, we try to
+	be fair by using questions with clear correct answers as tests.
+	If you're average on test questions drops too low, you won't be able to do
+	any more questions.  But you'll always be paid for the work you did!</p>
+
+	<h1>Are you ready?</h1>
+	<p>OK, that's all we have to teach you about relational nouns.  Before you
+	begin the task, here are some more examples that pull together all the
+	different concepts so you can test your understanding.
+	When you're ready, move onto the real task below.</p>
+
+
+<div>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">mathematician</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.0.0" name="self_test.0" type="radio"/>
+					<label for="self_test.0.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.0.1" name="self_test.0" type="radio"/>
+					<label for="self_test.0.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.0.2" name="self_test.0" type="radio"/>
+					<label for="self_test.0.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				Mathematician is non-relational, it is not essentially defined as a relationship to something / someone else.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">neck</span>
+			</span>
+			<span class="correct-answer">partly-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.1.0" name="self_test.1" type="radio"/>
+					<label for="self_test.1.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.1.1" name="self_test.1" type="radio"/>
+					<label for="self_test.1.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.1.2" name="self_test.1" type="radio"/>
+					<label for="self_test.1.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Neck&rdquo; can mean the body part of an animal joining the head to the body, or it can mean an elongate constricted part of an object, such as a bottle or vase. The former usage is non-relational, while the latter is relational.  We think that the latter usage is less frequent, so we label &ldquo;neck&rdquo; as partly relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">contract</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.2.0" name="self_test.2" type="radio"/>
+					<label for="self_test.2.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.2.1" name="self_test.2" type="radio"/>
+					<label for="self_test.2.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.2.2" name="self_test.2" type="radio"/>
+					<label for="self_test.2.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Contract&rdquo; is a bridge-noun: &ldquo;the contract between the parties is binding&rdquo;. Therefore it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">energy</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.3.0" name="self_test.3" type="radio"/>
+					<label for="self_test.3.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.3.1" name="self_test.3" type="radio"/>
+					<label for="self_test.3.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.3.2" name="self_test.3" type="radio"/>
+					<label for="self_test.3.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Energy&rdquo; does not indicate a relationship, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">gender</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.4.0" name="self_test.4" type="radio"/>
+					<label for="self_test.4.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.4.1" name="self_test.4" type="radio"/>
+					<label for="self_test.4.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.4.2" name="self_test.4" type="radio"/>
+					<label for="self_test.4.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				Gender is a property, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">base</span>
+			</span>
+			<span class="correct-answer">occasionally relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.5.0" name="self_test.5" type="radio"/>
+					<label for="self_test.5.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.5.1" name="self_test.5" type="radio"/>
+					<label for="self_test.5.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.5.2" name="self_test.5" type="radio"/>
+					<label for="self_test.5.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Base&rdquo; can be a relative part, signifying the bottom part of an object, but it can also refer to an outpost where operatives are located.  We consider &ldquo;base&rdquo; to be occasionally relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">writer</span>
+			</span>
+			<span class="correct-answer">partly-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.6.0" name="self_test.6" type="radio"/>
+					<label for="self_test.6.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.6.1" name="self_test.6" type="radio"/>
+					<label for="self_test.6.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.6.2" name="self_test.6" type="radio"/>
+					<label for="self_test.6.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Writer&rdquo; has a few meanings: it can refer to the vocation, it can refer to the role at a newspaper company, or it can refer to the person who wrote the screenplay of a movie (although screenwriter isolates that meaning). The first non-relational usage is probably the most common. The latter two usages, as roles, can be used relationally, and it is not excessively rare to see them used that way. Therefore, we consider &ldquo;writer&rdquo; to be partly relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">mayor</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.7.0" name="self_test.7" type="radio"/>
+					<label for="self_test.7.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.7.1" name="self_test.7" type="radio"/>
+					<label for="self_test.7.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.7.2" name="self_test.7" type="radio"/>
+					<label for="self_test.7.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				Mayor is relational, expressing the relationship between a city and its administrative leader.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">dispute</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.8.0" name="self_test.8" type="radio"/>
+					<label for="self_test.8.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.8.1" name="self_test.8" type="radio"/>
+					<label for="self_test.8.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.8.2" name="self_test.8" type="radio"/>
+					<label for="self_test.8.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Dispute&rdquo; is a bridge-noun: &ldquo;the dispute between business partners would not be resolved easily.&rdquo; Therefore it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">predecessor</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.9.0" name="self_test.9" type="radio"/>
+					<label for="self_test.9.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.9.1" name="self_test.9" type="radio"/>
+					<label for="self_test.9.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.9.2" name="self_test.9" type="radio"/>
+					<label for="self_test.9.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				Predecessor is inherently relational, being defined as the thing which came before something else.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">noon</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.10.0" name="self_test.10" type="radio"/>
+					<label for="self_test.10.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.10.1" name="self_test.10" type="radio"/>
+					<label for="self_test.10.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.10.2" name="self_test.10" type="radio"/>
+					<label for="self_test.10.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				Noon is non-relational because it does not denote a relationship.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">investor</span>
+			</span>
+			<span class="correct-answer">partly-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.11.0" name="self_test.11" type="radio"/>
+					<label for="self_test.11.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.11.1" name="self_test.11" type="radio"/>
+					<label for="self_test.11.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.11.2" name="self_test.11" type="radio"/>
+					<label for="self_test.11.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Investor&rdquo; is a role. It can be used to designate someone who frequently invests in companies and projects generally, or it can be used to signify the relationship between the person who invests and the company / project in which she invests&mdash;the latter being a relational usage.  We think that the relational usage is roughly on par with the generic usage, and since it is not clearly more common, we choose to label &ldquo;investor&rdquo; as partly relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">pair</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.12.0" name="self_test.12" type="radio"/>
+					<label for="self_test.12.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.12.1" name="self_test.12" type="radio"/>
+					<label for="self_test.12.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.12.2" name="self_test.12" type="radio"/>
+					<label for="self_test.12.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Pair&rdquo; denotes a quantity or grouping, and doesn't express a relationship, so it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">tip</span>
+			</span>
+			<span class="correct-answer">partly-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.13.0" name="self_test.13" type="radio"/>
+					<label for="self_test.13.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.13.1" name="self_test.13" type="radio"/>
+					<label for="self_test.13.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.13.2" name="self_test.13" type="radio"/>
+					<label for="self_test.13.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				Tip is partly-relational.  It can describe the furthest point along some extended part of an object.  Or it can refer to pointers, as in &ldquo;tips and tricks&rdquo;.  We don't think the relational usage is the most common, so we judge tip to be partly relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">blacksmith</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.14.0" name="self_test.14" type="radio"/>
+					<label for="self_test.14.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.14.1" name="self_test.14" type="radio"/>
+					<label for="self_test.14.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.14.2" name="self_test.14" type="radio"/>
+					<label for="self_test.14.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				Blacksmith is non-relational.  Although it is a vocation, it isn't essentially defined in terms of a relationship to something else.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">loser</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.15.0" name="self_test.15" type="radio"/>
+					<label for="self_test.15.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.15.1" name="self_test.15" type="radio"/>
+					<label for="self_test.15.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.15.2" name="self_test.15" type="radio"/>
+					<label for="self_test.15.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Loser&rdquo; can be used relationally to designate an entrant in a competition that lost, as in: &ldquo;The losers were given a certificate for their participation as a consolation.&rdquo;, or it can be used in a pejorative, non-relationally way, as in &ldquo;What a bunch of losers, I'm embarrassed to be seen with them.&rdquo; We think the relational usage is more common, so judge &ldquo;loser&rdquo; to be relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">war</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.16.0" name="self_test.16" type="radio"/>
+					<label for="self_test.16.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.16.1" name="self_test.16" type="radio"/>
+					<label for="self_test.16.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.16.2" name="self_test.16" type="radio"/>
+					<label for="self_test.16.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;War&rdquo; is a bridge-noun: &ldquo;The war between the countries raged on for decades&rdquo;. Therefore it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">operator</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.17.0" name="self_test.17" type="radio"/>
+					<label for="self_test.17.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.17.1" name="self_test.17" type="radio"/>
+					<label for="self_test.17.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.17.2" name="self_test.17" type="radio"/>
+					<label for="self_test.17.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Operator&rdquo; is a role, designating someone controlling machinery or a production process. As a role, it is conceivable that it could be used relationally, however that seems like a stretch, and such a usage is probably very rare.  Therefore, we consider &ldquo;operator&rdquo; to be non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">delegate</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.18.0" name="self_test.18" type="radio"/>
+					<label for="self_test.18.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.18.1" name="self_test.18" type="radio"/>
+					<label for="self_test.18.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.18.2" name="self_test.18" type="radio"/>
+					<label for="self_test.18.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Delegate&rdquo; is relational, because a delegate is defined in terms of that which it is appointed for (e.g. a delegate of the internal committee).
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">reconnaissance</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.19.0" name="self_test.19" type="radio"/>
+					<label for="self_test.19.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.19.1" name="self_test.19" type="radio"/>
+					<label for="self_test.19.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.19.2" name="self_test.19" type="radio"/>
+					<label for="self_test.19.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Reconnaissance&rdquo; does not indicate a relationship.  Therefore it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">creation</span>
+			</span>
+			<span class="correct-answer">partly-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.20.0" name="self_test.20" type="radio"/>
+					<label for="self_test.20.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.20.1" name="self_test.20" type="radio"/>
+					<label for="self_test.20.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.20.2" name="self_test.20" type="radio"/>
+					<label for="self_test.20.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Creation&rdquo; can refer to the act of creating, or to the thing created, as in &ldquo;According to the Bible,&rsquo; the Universe is God&rsquo;s creation.&rdquo;  As shown, when it refers to the thing created, it can be used to establish the relationship between the creator and the thing created. We don't think the relational usage is dominant, so we judge creation to be only partly relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">scientist</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.21.0" name="self_test.21" type="radio"/>
+					<label for="self_test.21.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.21.1" name="self_test.21" type="radio"/>
+					<label for="self_test.21.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.21.2" name="self_test.21" type="radio"/>
+					<label for="self_test.21.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				Scientist is non-relational.  It is not essentially defined as a relationship to something / someone else.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">realization</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.22.0" name="self_test.22" type="radio"/>
+					<label for="self_test.22.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.22.1" name="self_test.22" type="radio"/>
+					<label for="self_test.22.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.22.2" name="self_test.22" type="radio"/>
+					<label for="self_test.22.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Realization&rdquo; does not indicate a relationship.  Therefore it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">rapport</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.23.0" name="self_test.23" type="radio"/>
+					<label for="self_test.23.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.23.1" name="self_test.23" type="radio"/>
+					<label for="self_test.23.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.23.2" name="self_test.23" type="radio"/>
+					<label for="self_test.23.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Rapport&rdquo; is a bridge-noun: &ldquo;the rapport between the students and teacher was breaking down.&rdquo;  Therefore it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">partner</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.24.0" name="self_test.24" type="radio"/>
+					<label for="self_test.24.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.24.1" name="self_test.24" type="radio"/>
+					<label for="self_test.24.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.24.2" name="self_test.24" type="radio"/>
+					<label for="self_test.24.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				Partner is inherently relational, describing a person who is cooperating with someone else.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">stranger</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.25.0" name="self_test.25" type="radio"/>
+					<label for="self_test.25.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.25.1" name="self_test.25" type="radio"/>
+					<label for="self_test.25.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.25.2" name="self_test.25" type="radio"/>
+					<label for="self_test.25.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Stranger&rdquo; expresses a relationship between people who are not familiar to each other, and when used it refers to one of those people (one of the relata).Therefore &ldquo;foreigner&rdquo; is a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">assistant</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.26.0" name="self_test.26" type="radio"/>
+					<label for="self_test.26.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.26.1" name="self_test.26" type="radio"/>
+					<label for="self_test.26.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.26.2" name="self_test.26" type="radio"/>
+					<label for="self_test.26.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				Assistant is inherently relational, describing a person who is supporting someone else.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">head</span>
+			</span>
+			<span class="correct-answer">partly-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.27.0" name="self_test.27" type="radio"/>
+					<label for="self_test.27.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.27.1" name="self_test.27" type="radio"/>
+					<label for="self_test.27.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.27.2" name="self_test.27" type="radio"/>
+					<label for="self_test.27.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Head&rdquo; has a few prominent meanings: it can signify the body part, it can signify a distal and bulbous part of an object, or it can signify a position of leadership.  The latter two meanings are relational, but the first meaning is probably more common.  We therefore label &ldquo;head&rdquo; as partly relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">reporter</span>
+			</span>
+			<span class="correct-answer">partly-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.28.0" name="self_test.28" type="radio"/>
+					<label for="self_test.28.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.28.1" name="self_test.28" type="radio"/>
+					<label for="self_test.28.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.28.2" name="self_test.28" type="radio"/>
+					<label for="self_test.28.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Reporter&rdquo; is a role, which can certainly be used non-relationally, as in : &ldquo;What do I do for a living? I'm a reporter.&rdquo; However, it is very often used to designate a person&rsquo;s affiliation to a particular news organization, as in: &ldquo;Neha Thirani Bagri is a reporter with The New York Times.&rdquo; It isn't clear which is more common, so we consider &ldquo;reporter&rdquo; to be partly relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">athlete</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.29.0" name="self_test.29" type="radio"/>
+					<label for="self_test.29.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.29.1" name="self_test.29" type="radio"/>
+					<label for="self_test.29.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.29.2" name="self_test.29" type="radio"/>
+					<label for="self_test.29.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				Athlete is non-relational.  It is not essentially defined as a relationship to something / someone else.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">discovery</span>
+			</span>
+			<span class="correct-answer">partly-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.30.0" name="self_test.30" type="radio"/>
+					<label for="self_test.30.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.30.1" name="self_test.30" type="radio"/>
+					<label for="self_test.30.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.30.2" name="self_test.30" type="radio"/>
+					<label for="self_test.30.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Discovery&rdquo; can refer to the act of discovering, as in &ldquo;The discover of Arsenic&rdquo;, or it can refer to the thing discovered, as in &ldquo;The law of the photoelectric effect is one of Einstein&rsquo;s important discoveries.&rdquo;. As shown, when used to refer to the thing discovered, it can be used to express the relationship between the person who did the discovering and the thing discovered. However, we think that the relational usage is not very common, and so judge &ldquo;discovery&rdquo; to be partly relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">nail</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.31.0" name="self_test.31" type="radio"/>
+					<label for="self_test.31.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.31.1" name="self_test.31" type="radio"/>
+					<label for="self_test.31.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.31.2" name="self_test.31" type="radio"/>
+					<label for="self_test.31.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Nail&rdquo; does not indicate a relationship.  Therefore it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">copper</span>
+			</span>
+			<span class="correct-answer">non-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.32.0" name="self_test.32" type="radio"/>
+					<label for="self_test.32.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.32.1" name="self_test.32" type="radio"/>
+					<label for="self_test.32.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.32.2" name="self_test.32" type="radio"/>
+					<label for="self_test.32.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Copper&rdquo; does not indicate a relationship.  Therefore it is non-relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">supplier</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.33.0" name="self_test.33" type="radio"/>
+					<label for="self_test.33.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.33.1" name="self_test.33" type="radio"/>
+					<label for="self_test.33.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.33.2" name="self_test.33" type="radio"/>
+					<label for="self_test.33.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Supplier&rdquo; is used to establish a relationship between companies, where the supplier supplies parts or materials to the other company (the relatum).  Therefore it is relational.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">manufacturer</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.34.0" name="self_test.34" type="radio"/>
+					<label for="self_test.34.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.34.1" name="self_test.34" type="radio"/>
+					<label for="self_test.34.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.34.2" name="self_test.34" type="radio"/>
+					<label for="self_test.34.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Manufacturer&rdquo; expresses the relationship between a product and the entity (usually a company) that makes it.  While that meaning is relational, &ldquo;manufacturer&rdquo; can also be used in a generic non-relational sense, as in &ldquo;Manufacturers and exporters will be negatively affected this quarter&rdquo;.  We think the relational usage is most common, and judge &ldquo;manufacturer&rdquo; to be a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">foreigner</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.35.0" name="self_test.35" type="radio"/>
+					<label for="self_test.35.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.35.1" name="self_test.35" type="radio"/>
+					<label for="self_test.35.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.35.2" name="self_test.35" type="radio"/>
+					<label for="self_test.35.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Foreigner&rdquo; expresses a relationship between a person and a country, wherein the person does not normally live in the country and was not born in the country. Since it expresses a relationship, and refers to one of the relata (the person), &ldquo;foreigner&rdquo; is a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">top</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.36.0" name="self_test.36" type="radio"/>
+					<label for="self_test.36.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.36.1" name="self_test.36" type="radio"/>
+					<label for="self_test.36.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.36.2" name="self_test.36" type="radio"/>
+					<label for="self_test.36.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Top&rdquo; can express a physical relationship between a whole object and its uppermost part.  It can also refer to a toy that played with by spinning it.  We think that the latter meaning, which satisfies the relational noun criteria is the most common meaning, so we consider &ldquo;top&rdquo; to be a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">producer</span>
+			</span>
+			<span class="correct-answer">relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.37.0" name="self_test.37" type="radio"/>
+					<label for="self_test.37.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.37.1" name="self_test.37" type="radio"/>
+					<label for="self_test.37.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.37.2" name="self_test.37" type="radio"/>
+					<label for="self_test.37.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Producer&rdquo; expresses the relationship between a product and the entity (usually a company) that produces it.  It can also describe the role in the creation of a film.  Both usages are relational.  While there is also a generic non-relational usage, as in &ldquo;Producers and consumers are co-dependent in the economy,&rdquo; we think the relational usages are most commonly used, and judge &ldquo;producer&rdquo; to be a relational noun.
+			</span>
+		</span>
+	</span>
+	<span class="quiz">
+		<span class="queryline">
+			<span class="query">
+				<span class="query-word">captain</span>
+			</span>
+			<span class="correct-answer">partly-relational</span>
+			<div class="option-wrapper">
+				<span class="non-relational-option option">
+					<input id="self_test.38.0" name="self_test.38" type="radio"/>
+					<label for="self_test.38.0">almost never relational</label>
+				</span>
+				<span class="partly-relational-option option">
+					<input id="self_test.38.1" name="self_test.38" type="radio"/>
+					<label for="self_test.38.1">occasionally relational</label>
+				</span>
+				<span class="relational-option option">
+					<input id="self_test.38.2" name="self_test.38" type="radio"/>
+					<label for="self_test.38.2">usually relational</label>
+				</span>
+			</div>
+		</span>
+		<span class="responseline">
+			<span class="response">
+				<span class="prefix">prefix</span>
+				&ldquo;Captain&rdquo; can either refer to the rank, or to the leadership position in command of a ship. The former usage is non-relational, while the latter is relational. The relational usage doesn't seem distinctly more common, so we label &ldquo;captain&rdquo; partly relational.
+			</span>
+		</span>
+	</span>
+</div>
+
+
+	<h1>OK, Go for it!</h1>
+	<p>The real task begins below.  Here are a few things to keep in mind:</p>
+	<ul>
+		<li>Relational nouns are a bit rare.  If most nouns seem
+		non-relational, you’re doing it right!</li>
+		<li>Don’t overuse the “occasionally-relational” option.</li>
+		<li>Good luck!</li>
+	</ul>
+
+</div>
+</body>
+</html>
