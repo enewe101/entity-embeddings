@@ -1,8 +1,8 @@
 #!/bin/bash
 #PBS -l nodes=1:ppn=12:gpus=1
 #PBS -l walltime=12:00:00
-#PBS -o /gs/project/eeg-641-aa/enewel3/entity-embeddings/src/embedder/pbs/entity-pair-pretrain-freeze-between.stdout
-#PBS -e /gs/project/eeg-641-aa/enewel3/entity-embeddings/src/embedder/pbs/entity-pair-pretrain-freeze-between.stderr
+#PBS -o /gs/project/eeg-641-aa/enewel3/entity-embeddings/src/embedder/pbs/ep-between-min1000-batch100-learn0.05.stdout
+#PBS -e /gs/project/eeg-641-aa/enewel3/entity-embeddings/src/embedder/pbs/ep-between-min1000-batch100-learn0.05.stderr
 #PBS -N ep-between-min1000-batch100-learn0.05
 
 # Load modules, go to source dir, activate virtualenv

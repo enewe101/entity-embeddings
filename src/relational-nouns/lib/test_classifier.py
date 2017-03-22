@@ -1,12 +1,16 @@
+import multiprocessing
+import iterable_queue as iq
+import itertools
 from functools import partial
 import json
 import os
 import sys
 sys.path.append('..')
 from SETTINGS import DATA_DIR
-from word2vec import UnigramDictionary, SILENT
+from t4k import UnigramDictionary, SILENT
 import classifier as c
 DICTIONARY_DIR = os.path.join(DATA_DIR, 'dictionary')
+import utils
 from utils import (
 	read_seed_file, get_train_sets, filter_seeds, ensure_unicode,
 	get_test_sets
@@ -16,15 +20,9 @@ from nltk.stem import WordNetLemmatizer
 UNRECOGNIZED_TOKENS_PATH = os.path.join(DATA_DIR, 'unrecognized-tokens.txt')
 
 
-def load_dictionary(dictionary_dir=DICTIONARY_DIR):
-	dictionary = UnigramDictionary(on_unk=SILENT)
-	dictionary.load(dictionary_dir)
-	return dictionary
-
-
 def get_MAP(n, ranks):
 	'''
-	Get ther Mean Average Precision for the first n relevant documents.
+	Get the Mean Average Precision for the first n relevant documents.
 	`ranks` should give the rank for each of the first n documents, 
 	zero-indexed.
 	'''
@@ -62,7 +60,7 @@ def get_top(
 	on_unk=False,
 
 	# SVM options
-	syntactic_similarity=True,
+	syntax_feature_types=['baseline', 'dependency', 'hand_picked'],
 	semantic_similarity=None,
 	syntactic_multiplier=1.0,
 	semantic_multiplier=1.0,
@@ -77,7 +75,7 @@ def get_top(
 	evaluator = get_map_evaluator(
 		kind=kind,
 		on_unk=on_unk,
-		syntactic_similarity=syntactic_similarity,
+		syntax_feature_types=syntax_feature_types,
 		semantic_similarity=semantic_similarity,
 		syntactic_multiplier=syntactic_multiplier,
 		semantic_multiplier=semantic_multiplier,
@@ -85,6 +83,232 @@ def get_top(
 	)
 	evaluator.get_scores()
 	print '\n'.join([s[1] for s in evaluator.scores[:n]])
+
+
+def generate_classifier_definitions(
+    parameter_ranges,
+    constants={}
+):
+    tagged_param_values = []
+    for param in parameter_ranges:
+        this_param_tagged_values = [
+            (param, val) for val in parameter_ranges[param]]
+        tagged_param_values.append(this_param_tagged_values)
+
+    definitions = []
+    for combo in itertools.product(*tagged_param_values):
+        new_def = dict(constants)
+        new_def.update(dict(combo))
+        definitions.append(new_def)
+
+    return definitions
+
+
+def optimize_classifier(
+    classifier_definitions,
+    features,
+    train_pos, train_neg,
+    test_pos, test_neg,
+    out_path,
+    num_procs=12
+):
+
+    # Open the file where we'll write the results
+    out_f = open(out_path, 'w')
+    
+    # Open queues to spread work and collect results
+    work_queue = iq.IterableQueue()
+    results_queue = iq.IterableQueue()
+
+    # Load all of the classifier definitions onto the work queue, then close it
+    work_producer = work_queue.get_producer()
+    for clf_def in classifier_definitions:
+        work_producer.put(clf_def)
+    work_producer.close()
+
+    # Start a bunch of workers, give them iterable queue endpoints.
+    for proc in range(num_procs):
+        p = multiprocessing.Process(
+            target=evaluate_classifiers,
+            args=(
+                work_queue.get_consumer(),
+                results_queue.get_producer(), 
+                features, 
+                train_pos, train_neg,
+                test_pos, test_neg
+            )
+        )
+        p.start()
+
+    # Get an endpoint for collecting the results
+    results_consumer = results_queue.get_consumer()
+
+    # We're done making queue endpoints
+    work_queue.close()
+    results_queue.close()
+
+    # Collect the results, and write them to disc
+    best_score, best_threshold, best_clf_def = None, None, None
+    for score, threshold, clf_def in results_consumer:
+
+        # Write the result to stdout and to disc
+        performance_record = '%f\t%f\t%s\n' % (score, threshold, str(clf_def))
+        print performance_record
+        out_f.write(performance_record)
+
+        # Keep track of the best classifier definition and its performance
+        if score > best_score:
+            best_score = score
+            best_threshold = threshold
+            best_clf_def = clf_def
+
+    # Write the best performance out to sdout and disc
+    best_performance_record = '%f\t%f\t%s\n' % (
+        best_score, best_threshold, str(best_clf_def))
+    print best_performance_record
+    out_f.write('\nBest:\n')
+    out_f.write(best_performance_record)
+
+
+def evaluate_classifiers(
+    classifier_definitions, results_queue, 
+    features, 
+    train_pos, train_neg,
+    test_pos, test_neg
+):
+
+    # Evaluate performance of classifier for each classifier definition, and
+    # put the results onto the result queue.
+    for clf_def in classifier_definitions:
+        best_f1, threshold = evaluate_classifier(
+            clf_def, features, 
+            train_pos, train_neg,
+            test_pos, test_neg,
+        )
+        results_queue.put((best_f1, threshold, clf_def))
+
+    # Close the results queue when no more work will be added
+    results_queue.close()
+    
+
+def evaluate_classifier(
+    classifier_definition,
+    features,
+    train_pos, train_neg,
+    test_pos, test_neg
+):
+    """
+    Assesses the performance of the classifier defined by the dictionary
+    ``classifier_definitions``.  That dictionary should provide the arguments
+    needed to construct the classifier when provided to the function
+    classifier.make_classifier.
+    """
+    print 'evaluating:', str(classifier_definition)
+    cls = c.make_classifier(
+        features=features,
+        positives=train_pos,
+        negatives=train_neg,
+        **classifier_definition
+    )
+
+    scored_typed = [
+        (cls.score(lemma)[0], 'pos') for lemma in test_pos
+    ] + [
+        (cls.score(lemma)[0], 'neg') for lemma in test_neg
+    ]
+
+    best_f1, threshold = calculate_best_score(scored_typed, metric='f1')
+
+    return best_f1, threshold
+
+
+def calculate_best_score(scored_typed, metric='f1'):
+    """
+    The best threshold score, above which items should be labelled positive and
+    below which items should be labelled negative, is found by maximizing the
+    f1-score or accuracy that would result.  The value of the metric is then 
+    returned, along with the threshold score.
+
+    INPUTS
+        ``scored_typed`` should be a list of tuples of scored items, where the
+        first element of the tuple is the score, and the second element is the
+        true class of the item, which should be 'pos' or 'neg'
+
+        ``metric`` can be 'f1' or 'accuracy'.
+
+    OUTPUTS 
+        ``(best_metric, threshold)`` where best_metric is the best value for
+        the chosen metric, achieved when threshold is used to label items
+        according to their assigned scores.
+    """
+
+    # sort all the scores, keeping their clasification bound to the score
+    sorted_scored_typed = sorted(scored_typed, reverse=True)
+
+    # We begin with the threshold score set at the max score, which means
+    # putting all items into the 'neg' class.  The number of correct
+    # classifications according to that threshold is the number of items that
+    # are actually in the neg class
+    true_pos = 0
+    labelled_pos = 0
+    num_pos = sum([st[1]=='pos' for st in sorted_scored_typed])
+    num_correct = sum([st[1]=='neg' for st in sorted_scored_typed])
+
+    best_f1 = 0
+    best_count = num_correct
+    best_pointer = -1
+
+    # Move down through the scored items, shifting each one up to the 'pos'
+    # class, and note the effect on the number of correct classifications
+    # keep track of the point at which we get the largest correct count.
+    for pointer in range(len(sorted_scored_typed)):
+        labelled_pos += 1
+        if sorted_scored_typed[pointer][1] == 'pos':
+            num_correct += 1
+            true_pos += 1
+        elif sorted_scored_typed[pointer][1] == 'neg':
+            num_correct -= 1
+
+        if metric == 'f1':
+            precision = true_pos / float(labelled_pos)
+            recall = true_pos / float(num_pos)
+            f1 = (
+                0 if precision * recall == 0 
+                else 2*precision*recall / (precision + recall)
+            )
+            if f1 > best_f1:
+                best_f1 = f1
+                best_pointer = pointer
+
+        elif metric == 'accuracy':
+            if num_correct > best_count:
+                best_count = num_correct
+                best_pointer = pointer
+
+        else:
+            raise ValueError(
+                'Unrecognized value for `metric`: %s. ' % metric
+                + "Expected 'f1' or 'accuracy'."
+            )
+
+    # Place the threshold below the last item shifted into the positive class
+    if best_pointer > -1 and best_pointer < len(sorted_scored_typed) - 1:
+        threshold = 0.5 * (
+            sorted_scored_typed[best_pointer][0] 
+            + sorted_scored_typed[best_pointer+1][0]
+        )
+    elif best_pointer == -1:
+        threshold = sorted_scored_typed[best_pointer][0] + 0.1
+    elif best_pointer == len(sorted_scored_typed) - 1:
+        threshold = sorted_scored_typed[best_pointer][0] - 0.1
+    else:
+        RuntimeError('Impossible state reached')
+
+    if metric == 'f1':
+        return best_f1, threshold
+
+    elif metric == 'accuracy':
+        return best_count / float(len(scored_typed)), threshold
 
 
 def diagnose_map_evaluators(
@@ -113,7 +337,7 @@ def diagnose_map_evaluators(
 	# scoring tokens, and write them to file
 	for cdef, map_evaluator in map_evaluators:
 		unrecognized_tokens = map_evaluator.diagnose_MAP(n)
-		out_file.write(json.dumps(cdef)+'\n')
+		out_file.write(str(cdef)+'\n')
 		out_file.write('\n'.join(unrecognized_tokens) + '\n\n')
 
 	return map_evaluators
@@ -122,9 +346,7 @@ def diagnose_map_evaluators(
 def get_map_evaluator(
 	kind='svm',
 	on_unk=False,
-	dictionary_dir=DICTIONARY_DIR,
-	min_frequency=5,
-	syntactic_similarity=True,
+	syntax_feature_types=['baseline', 'dependency', 'hand_picked'],
 	semantic_similarity=None,
 	syntactic_multiplier=1.0,
 	semantic_multiplier=1.0,
@@ -133,18 +355,17 @@ def get_map_evaluator(
 	classifier = c.make_classifier(
 		kind=kind,
 		on_unk=on_unk,
-		syntactic_similarity=syntactic_similarity,
+		syntax_feature_types=syntax_feature_types,
 		semantic_similarity=semantic_similarity,
 		syntactic_multiplier=syntactic_multiplier,
 		semantic_multiplier=semantic_multiplier,
 		k=k,
 	)
-	train_positives, train_negatives = get_train_sets()
-	test_positives, test_negatives = get_test_sets()
+	train_positives, train_negatives, train_neutrals = get_train_sets()
+	test_positives, test_negatives, test_neutrals = get_test_sets()
 	evaluator = RelationalNounMapEvaluator(
 		classifier, train_positives, train_negatives, test_positives,
-		test_negatives, dictionary_dir=dictionary_dir,
-		min_frequency=min_frequency
+		test_negatives
 	)
 
 	return evaluator
@@ -181,8 +402,6 @@ class RelationalNounMapEvaluator(object):
 		train_negatives,
 		test_positives,
 		test_negatives,
-		dictionary_dir=DICTIONARY_DIR, 
-		min_frequency=5
 	):
 
 		# Register parameters
@@ -191,12 +410,7 @@ class RelationalNounMapEvaluator(object):
 		self.testing_data = test_positives | test_negatives
 		self.test_positives = test_positives
 		self.test_negatives = test_negatives
-		self.dictionary = load_dictionary(dictionary_dir)
-		self.min_frequency = min_frequency
-
-		# Prune the dictionary to `min_frequency` if it isn't Falsey
-		if min_frequency:
-			self.dictionary.prune(min_frequency)
+		self.vocabulary = utils.read_wordnet_index()
 
 		# Make a MAP evaluator
 		descriminant_func = get_descriminant_func(
@@ -207,9 +421,6 @@ class RelationalNounMapEvaluator(object):
 		# This will hold the "relational-nounishness-scores" to rank the
 		# nouns that seem most relational
 		self.scores = None
-
-		# NOTE: this can be removed once we have a pre-lemmatized dictionary
-		self.lemmatizer = WordNetLemmatizer()
 
 
 	def diagnose_MAP(self, n):
@@ -245,18 +456,12 @@ class RelationalNounMapEvaluator(object):
 
 
 	def get_scores(self):
-		# Get the scores for each token in the dictionary
+		# Get the scores for each token in the vocabulary
 		# Skip any tokens that were in the training_data!
-		# NOTE: this can be removed once I make a lematized dictionary 
-		print 'lemmatizing...'
-		token_list = set([
-			self.lemmatizer.lemmatize(ensure_unicode(token).lower())
-			for token in self.dictionary.get_token_list()
-		])
 		print 'scoring...'
 		self.scores = [
 			(self.classifier.score(token), token)
-			for token in token_list
+			for token in self.vocabulary
 			if token not in self.training_data
 		]
 		print 'sorting...'
