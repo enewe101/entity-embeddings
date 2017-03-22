@@ -1,5 +1,6 @@
 linguini_markers
 SETTINGS.py
+resources
 *.swp
 *.pyc
 data
