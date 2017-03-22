@@ -611,6 +611,20 @@ class SvmNounClassifier(object):
         )
         classifier = svm.SVC(kernel=kernel, C=self.C)
         classifier.fit(X,Y)
+
+		# Next we'll find the best threshold.  First calculate scores for all
+		# the training data
+		pos_scores = self.score(self.positive_seeds)
+		neg_scores = self.score(self.negative_seeds)
+		scored_typed = (
+			[(s, 'pos') for s in pos_scores] 
+			+ [(s, 'neg') for s in neg_scores]
+		)
+
+		# Next, find the best threshold that optimizes f1 on training data.
+		metric, threshold = calculate_best_score(scored_typed, metric='f1')
+		self.threshold = threshold
+
         return classifier
 
 
@@ -629,6 +643,16 @@ class SvmNounClassifier(object):
                 raise
             else:
                 raise ValueError('Unrecognized word: %s' % offending_lemma)
+
+
+	def predict_adjusted_threshold(self, tokens):
+        # and need special handling of UNK tokens
+        ids, lemmas = self.convert_tokens(tokens)
+        return self.handle_unk(self.predict_adusted_threshold_id, ids, lemmas)
+
+
+	def predict_adjusted_threshold_id(self, token_ids):
+		return [s > self.threshold for s in self.score_id(ids)]
 
 
     def predict(self, tokens):

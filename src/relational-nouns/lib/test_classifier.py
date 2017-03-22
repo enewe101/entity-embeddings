@@ -217,98 +217,11 @@ def evaluate_classifier(
         (cls.score(lemma)[0], 'neg') for lemma in test_neg
     ]
 
-    best_f1, threshold = calculate_best_score(scored_typed, metric='f1')
+    best_f1, threshold = utils.calculate_best_score(scored_typed, metric='f1')
 
     return best_f1, threshold
 
 
-def calculate_best_score(scored_typed, metric='f1'):
-    """
-    The best threshold score, above which items should be labelled positive and
-    below which items should be labelled negative, is found by maximizing the
-    f1-score or accuracy that would result.  The value of the metric is then 
-    returned, along with the threshold score.
-
-    INPUTS
-        ``scored_typed`` should be a list of tuples of scored items, where the
-        first element of the tuple is the score, and the second element is the
-        true class of the item, which should be 'pos' or 'neg'
-
-        ``metric`` can be 'f1' or 'accuracy'.
-
-    OUTPUTS 
-        ``(best_metric, threshold)`` where best_metric is the best value for
-        the chosen metric, achieved when threshold is used to label items
-        according to their assigned scores.
-    """
-
-    # sort all the scores, keeping their clasification bound to the score
-    sorted_scored_typed = sorted(scored_typed, reverse=True)
-
-    # We begin with the threshold score set at the max score, which means
-    # putting all items into the 'neg' class.  The number of correct
-    # classifications according to that threshold is the number of items that
-    # are actually in the neg class
-    true_pos = 0
-    labelled_pos = 0
-    num_pos = sum([st[1]=='pos' for st in sorted_scored_typed])
-    num_correct = sum([st[1]=='neg' for st in sorted_scored_typed])
-
-    best_f1 = 0
-    best_count = num_correct
-    best_pointer = -1
-
-    # Move down through the scored items, shifting each one up to the 'pos'
-    # class, and note the effect on the number of correct classifications
-    # keep track of the point at which we get the largest correct count.
-    for pointer in range(len(sorted_scored_typed)):
-        labelled_pos += 1
-        if sorted_scored_typed[pointer][1] == 'pos':
-            num_correct += 1
-            true_pos += 1
-        elif sorted_scored_typed[pointer][1] == 'neg':
-            num_correct -= 1
-
-        if metric == 'f1':
-            precision = true_pos / float(labelled_pos)
-            recall = true_pos / float(num_pos)
-            f1 = (
-                0 if precision * recall == 0 
-                else 2*precision*recall / (precision + recall)
-            )
-            if f1 > best_f1:
-                best_f1 = f1
-                best_pointer = pointer
-
-        elif metric == 'accuracy':
-            if num_correct > best_count:
-                best_count = num_correct
-                best_pointer = pointer
-
-        else:
-            raise ValueError(
-                'Unrecognized value for `metric`: %s. ' % metric
-                + "Expected 'f1' or 'accuracy'."
-            )
-
-    # Place the threshold below the last item shifted into the positive class
-    if best_pointer > -1 and best_pointer < len(sorted_scored_typed) - 1:
-        threshold = 0.5 * (
-            sorted_scored_typed[best_pointer][0] 
-            + sorted_scored_typed[best_pointer+1][0]
-        )
-    elif best_pointer == -1:
-        threshold = sorted_scored_typed[best_pointer][0] + 0.1
-    elif best_pointer == len(sorted_scored_typed) - 1:
-        threshold = sorted_scored_typed[best_pointer][0] - 0.1
-    else:
-        RuntimeError('Impossible state reached')
-
-    if metric == 'f1':
-        return best_f1, threshold
-
-    elif metric == 'accuracy':
-        return best_count / float(len(scored_typed)), threshold
 
 
 def diagnose_map_evaluators(

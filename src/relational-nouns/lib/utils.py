@@ -7,6 +7,99 @@ from t4k import UNK, UnigramDictionary
 from SETTINGS import TRAIN_PATH, TEST_PATH, WORDNET_INDEX_PATH, SEED_PATH
 
 
+def calculate_best_score(scored_typed, metric='f1'):
+    """
+	This function helps to convert from a scoring function to a classification
+	function.  Given some function which provides scores to items that are
+	either "positive" or "negative", find the best threshold score that gives
+	the greatest performance, when used to label any items whose score is
+	higher as "positive" and lower as "negative"
+
+	"Best performance" can either mean highest f1-score or highest accuracy,
+	determined by passing either 'f1' or 'accuracy' as the argument for 
+	``metric``.
+
+    INPUTS
+        ``scored_typed`` should be a list of tuples of scored items, where the
+        first element of the tuple is the score, and the second element is the
+        true class of the item, which should be 'pos' or 'neg'
+
+        ``metric`` can be 'f1' or 'accuracy'.
+
+    OUTPUTS 
+        ``(best_metric, threshold)`` where best_metric is the best value for
+        the chosen metric, achieved when threshold is used to label items
+        according to their assigned scores.
+    """
+
+    # sort all the scores, keeping their clasification bound to the score
+    sorted_scored_typed = sorted(scored_typed, reverse=True)
+
+    # We begin with the threshold score set at the max score, which means
+    # putting all items into the 'neg' class.  The number of correct
+    # classifications according to that threshold is the number of items that
+    # are actually in the neg class
+    true_pos = 0
+    labelled_pos = 0
+    num_pos = sum([st[1]=='pos' for st in sorted_scored_typed])
+    num_correct = sum([st[1]=='neg' for st in sorted_scored_typed])
+
+    best_f1 = 0
+    best_count = num_correct
+    best_pointer = -1
+
+    # Move down through the scored items, shifting each one up to the 'pos'
+    # class, and note the effect on the number of correct classifications
+    # keep track of the point at which we get the largest correct count.
+    for pointer in range(len(sorted_scored_typed)):
+        labelled_pos += 1
+        if sorted_scored_typed[pointer][1] == 'pos':
+            num_correct += 1
+            true_pos += 1
+        elif sorted_scored_typed[pointer][1] == 'neg':
+            num_correct -= 1
+
+        if metric == 'f1':
+            precision = true_pos / float(labelled_pos)
+            recall = true_pos / float(num_pos)
+            f1 = (
+                0 if precision * recall == 0 
+                else 2*precision*recall / (precision + recall)
+            )
+            if f1 > best_f1:
+                best_f1 = f1
+                best_pointer = pointer
+
+        elif metric == 'accuracy':
+            if num_correct > best_count:
+                best_count = num_correct
+                best_pointer = pointer
+
+        else:
+            raise ValueError(
+                'Unrecognized value for `metric`: %s. ' % metric
+                + "Expected 'f1' or 'accuracy'."
+            )
+
+    # Place the threshold below the last item shifted into the positive class
+    if best_pointer > -1 and best_pointer < len(sorted_scored_typed) - 1:
+        threshold = 0.5 * (
+            sorted_scored_typed[best_pointer][0] 
+            + sorted_scored_typed[best_pointer+1][0]
+        )
+    elif best_pointer == -1:
+        threshold = sorted_scored_typed[best_pointer][0] + 0.1
+    elif best_pointer == len(sorted_scored_typed) - 1:
+        threshold = sorted_scored_typed[best_pointer][0] - 0.1
+    else:
+        RuntimeError('Impossible state reached')
+
+    if metric == 'f1':
+        return best_f1, threshold
+
+    elif metric == 'accuracy':
+        return best_count / float(len(scored_typed)), threshold
+
 def read_wordnet_index():
     return set(open(WORDNET_INDEX_PATH).read().split('\n'))
 
@@ -104,6 +197,12 @@ def get_seed_set(path):
             )
 
     return positives, negatives, neutrals
+
+
+def get_full_seed_set():
+	seed_path = os.path.join(DATA_DIR, 'relational_nouns', 'categorized.tsv')
+	pos, neg, neut = get_seed_set(seed_path)
+	return pos, neg, neut
 
 
 def get_train_test_split():
