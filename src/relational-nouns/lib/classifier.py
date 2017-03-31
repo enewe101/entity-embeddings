@@ -11,6 +11,7 @@ from t4k import UnigramDictionary, UNK, SILENT
 from collections import Counter, deque
 from SETTINGS import RELATIONAL_NOUN_FEATURES_DIR
 from kernels import bind_kernel, bind_dist
+import utils
 from utils import (
     read_seed_file, get_train_sets, filter_seeds, ensure_unicode,
     get_dictionary, get_features
@@ -21,7 +22,7 @@ import extract_features
 
 
 def make_classifier(
-    kind='svm',    # available: 'svm', 'knn', 'wordnet', 'basic_syntax'
+    kind='svm',    # available: 'osvm', 'svm', 'knn', 'wordnet', 'basic_syntax'
     on_unk=False,
     features=os.path.join(RELATIONAL_NOUN_FEATURES_DIR, 'test-coalesce'),
     positives=None,
@@ -35,9 +36,9 @@ def make_classifier(
     include_suffix = True,
 
     # How to weight the different types of features
-    syntactic_multiplier=0.33,
-    semantic_multiplier=0.33,
-    suffix_multiplier=0.33,
+    syntactic_multiplier=10.0,
+    semantic_multiplier=2.0,
+    suffix_multiplier=0.2,
 
     # KNN options
     k=3,
@@ -65,9 +66,31 @@ def make_classifier(
     # We can only use words that we actually have features for
     positives = filter_seeds(positives, features.dictionary)
     negatives = filter_seeds(negatives, features.dictionary)
+    neutrals = filter_seeds(neutrals, features.dictionary)
 
     # The proposed most-performant classifier
-    if kind == 'svm':
+    if kind == 'osvm':
+        return OrdinalSvmNounClassifier(
+            positive_seeds=positives,
+            neutral_seeds=neutrals,
+            negative_seeds=negatives,
+
+            # SVM options
+            features=features,
+            on_unk=False,
+
+            C=C,
+            syntax_feature_types=syntax_feature_types,
+            semantic_similarity=semantic_similarity,
+            include_suffix=include_suffix,
+
+            syntactic_multiplier=syntactic_multiplier,
+            semantic_multiplier=semantic_multiplier,
+            suffix_multiplier=suffix_multiplier
+        )
+
+    # The proposed most-performant classifier
+    elif kind == 'svm':
         return SvmNounClassifier(
             positive_seeds=positives,
             negative_seeds=negatives,
@@ -538,7 +561,100 @@ class WordnetClassifier(object):
         return self.predict(tokens)
 
             
+class OrdinalSvmNounClassifier(object):
 
+    def __init__(
+        self,
+
+        # Training data
+        positive_seeds,
+        neutral_seeds,
+        negative_seeds,
+
+        # Features to be used in the kernel
+        features=None,    # Must be provided if syntax_feature_types is not None
+
+        # SVM options
+        on_unk=False,
+
+        # Which features to include
+        C=1.0,
+        syntax_feature_types=['baseline', 'dependency', 'hand_picked'],
+        semantic_similarity='res',
+        include_suffix = True,
+
+        # How to weight the different types of features
+        syntactic_multiplier=0.33,
+        semantic_multiplier=0.33,
+        suffix_multiplier=0.33
+    ):
+
+        # We create two classifiers: one to distinguish positive from '
+        # (neutral + negative) and the other to distinguish (positive + neutral)
+        # from negative.
+
+        # Make classifier for distinguishing negative from (neutral + positive)
+        binary_negative = negative_seeds
+        binary_positive = neutral_seeds + positive_seeds
+        self.classifier_0 = SvmNounClassifier(
+            binary_positive,
+            binary_negative,
+            features, on_unk, C,
+            syntax_feature_types,
+            semantic_similarity,
+            include_suffix,
+            syntactic_multiplier,
+            semantic_multiplier,
+            suffix_multiplier,
+        )
+
+        # Make classifier for distinguishing (negative + neutral) from positive
+        binary_negative = negative_seeds + neutral_seeds
+        binary_positive = positive_seeds
+        self.classifier_1 = SvmNounClassifier(
+            binary_positive,
+            binary_negative,
+            features, on_unk, C,
+            syntax_feature_types,
+            semantic_similarity,
+            include_suffix,
+            syntactic_multiplier,
+            semantic_multiplier,
+            suffix_multiplier,
+        )
+
+
+    def score(self, tokens):
+
+        scores_0 = self.classifier_0.score(tokens)
+        scores_1 = self.classifier_1.score(tokens)
+
+        overall_scores = []
+        for s0, s1 in zip(scores_0, scores_1):
+            if s0 < 0:
+                print 'neg'
+                overall_scores.append(s0-1)
+
+            elif s1 > 0:
+                print 'pos'
+                overall_scores.append(s1+1)
+
+            elif s1 < 0 and s0 > 1:
+                print 'neut'
+                overall_scores.append((s0+s1)/(s0-s1))
+
+            else:
+                print 'ambig'
+                overall_scores.append((s0+s1)/(s0-s1))
+
+        return overall_scores
+
+
+    def predict(self, tokens):
+        scores = self.score(tokens)
+        return [-1 if s <= -1 else 0 if s < 1 else 1 for s in scores]
+
+        
 
 class SvmNounClassifier(object):
 
@@ -591,6 +707,7 @@ class SvmNounClassifier(object):
 
         # Make the underlying classifier
         self.classifier = self.make_svm_classifier()
+        self.adjust_threshold()
 
 
     def make_svm_classifier(self):
@@ -611,21 +728,25 @@ class SvmNounClassifier(object):
         )
         classifier = svm.SVC(kernel=kernel, C=self.C)
         classifier.fit(X,Y)
-
-		# Next we'll find the best threshold.  First calculate scores for all
-		# the training data
-		pos_scores = self.score(self.positive_seeds)
-		neg_scores = self.score(self.negative_seeds)
-		scored_typed = (
-			[(s, 'pos') for s in pos_scores] 
-			+ [(s, 'neg') for s in neg_scores]
-		)
-
-		# Next, find the best threshold that optimizes f1 on training data.
-		metric, threshold = calculate_best_score(scored_typed, metric='f1')
-		self.threshold = threshold
-
         return classifier
+
+
+    def adjust_threshold(self):
+
+        # We'll find the best threshold.  First calculate scores for all
+        # the training data.
+        pos_scores = self.score(self.positive_seeds)
+        neg_scores = self.score(self.negative_seeds)
+        scored_typed = (
+            [(s, 'pos') for s in pos_scores] 
+            + [(s, 'neg') for s in neg_scores]
+        )
+
+        # Next, find the best threshold that optimizes f1 on training data.
+        metric, threshold = utils.calculate_best_score(
+            scored_typed, metric='f1')
+        self.threshold = threshold
+
 
 
     def handle_unk(self, func, ids, lemmas):
@@ -645,14 +766,14 @@ class SvmNounClassifier(object):
                 raise ValueError('Unrecognized word: %s' % offending_lemma)
 
 
-	def predict_adjusted_threshold(self, tokens):
+    def predict_adjusted_threshold(self, tokens):
         # and need special handling of UNK tokens
         ids, lemmas = self.convert_tokens(tokens)
-        return self.handle_unk(self.predict_adusted_threshold_id, ids, lemmas)
+        return self.handle_unk(self.predict_adjusted_threshold_id, ids, lemmas)
 
 
-	def predict_adjusted_threshold_id(self, token_ids):
-		return [s > self.threshold for s in self.score_id(ids)]
+    def predict_adjusted_threshold_id(self, token_ids):
+        return [s > self.threshold for s in self.score_id(ids)]
 
 
     def predict(self, tokens):

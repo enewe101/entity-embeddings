@@ -4,7 +4,9 @@ import sys
 sys.path.append('..')
 import cjson
 from t4k import UNK, UnigramDictionary
-from SETTINGS import TRAIN_PATH, TEST_PATH, WORDNET_INDEX_PATH, SEED_PATH
+from SETTINGS import (
+    TRAIN_PATH, TEST_PATH, WORDNET_INDEX_PATH, SEED_PATH, DATA_DIR
+)
 
 
 def calculate_best_score(scored_typed, metric='f1'):
@@ -200,7 +202,7 @@ def get_seed_set(path):
 
 
 def get_full_seed_set():
-	seed_path = os.path.join(DATA_DIR, 'relational_nouns', 'categorized.tsv')
+	seed_path = os.path.join(DATA_DIR, 'relational-nouns', 'categorized.tsv')
 	pos, neg, neut = get_seed_set(seed_path)
 	return pos, neg, neut
 

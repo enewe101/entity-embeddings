@@ -1,70 +1,63 @@
 import sys
-sys.path.join('../lib')
+sys.path.append('../lib')
+import os
+import t4k
 from SETTINGS import DATA_DIR
-import classifier
+import generate_candidates
 import utils
+import random
 
-BEST_CLASSIFIER_THRESHOLD = -0.331195
-BEST_CLASSIFIER_CONFIG = {
-	'kind': 'svm',
-	'on_unk': False,
-	'C': 0.01,
-	'syntax_feature_types': ['baseline', 'dependency', 'hand_picked'],
-	'semantic_similarity': 'res',
-	'include_suffix' :  True,
-	'syntactic_multiplier': 10.0,
-	'semantic_multiplier': 2.0,
-	'suffix_multiplier': 0.2
-}
-BEST_WORDNET_ONLY_FEATURES_PATH = os.path.join(
-	DATA_DIR, 'relational-noun-features-wordnet-only', 'accumulated-pruned-5000'
-)
+CANDIDATES_DIR = os.path.join(DATA_DIR, 'relational-nouns', 'candidates')
+BEST_FEATURES_DIR = os.path.join(
+    DATA_DIR, 'relational-noun-features-wordnet-only', 
+    'accumulated-pruned-5000')
 
-CANDIDATES_DIR = os.path.join(DATA_DIR, 'relational_nouns', 'candidates')
+def do_generate_candidates1():
 
-def do_generate_candidates():
+    # Decide the output path and the number of positive candidates to find
+    t4k.ensure_exists(CANDIDATES_DIR)
+    out_path = os.path.join(CANDIDATES_DIR, 'candidates1.txt')
+    num_to_generate = 1000
 
-	# Where will we write the new candidates?
-	t4k.ensure_exists(CANDIDATES_DIR)
-	out_path = os.path.join(CANDIDATES_DIR, 'candidates1.txt')
+    # Read in the seed set, which is the basis for the model that selects new 
+    # candidates
+    pos, neg, neut = utils.get_full_seed_set()
 
-	# Read in the seed set, which we'll need for a couple things
-	pos, neg, neut = utils.get_full_seed_set()
+    # Don't keep any candidates that were already in the seed set
+    exclude = pos | neg | neut
 
-	# Make the best performing classifier.  This is what we'll use to score the
-	# "relationalness" of new words.
-	clf = classifier.make_classifier(
-		features=BEST_WORDNET_ONLY_FEATURES_PATH,
-		positives=pos,
-		negatives=neg,
-		**BEST_CLASSIFIER_CONFIG
-	)
-
-	print clf.threshold
+    generate_candidates.generate_candidates(
+        num_to_generate, out_path, pos, neg, exclude)
 
 
-	## Now generate the candidates
-	#for token in dictionary.get_token_list():
-	#	clf.score(token)
+def generate_uniform_random_candidates1():
 
-	#generate_candidates(1000, clf.score, pos|neg|neut, out_path)
+    # Open a path that we want to write to 
+    out_path = os.path.join(CANDIDATES_DIR, 'random_candidates1.txt')
+    out_f = open(out_path, 'w')
+
+    # Open the dictionary of words seen in the corpus
+    dictionary_path = os.path.join(BEST_FEATURES_DIR, 'dictionary')
+    dictionary = t4k.UnigramDictionary()
+    dictionary.load(dictionary_path)
+
+    # Don't keep any candidates that were already in the seed set
+    pos, neg, neut = utils.get_full_seed_set()
+    exclude = pos | neg | neut
+
+    # Uniformly randomly sample from it
+    samples = set()
+    num_to_sample = 500
+    while len(samples) < num_to_sample:
+        token = random.choice(dictionary.token_map.tokens)
+        if token != 'UNK' and token not in exclude and token not in samples:
+            samples.add(token)
+
+    out_f.write('\n'.join(samples))
 
 
-def generate_candidates(num_to_generate, sorted_dictionary, score_func, exclude):
-
-	work_queue = iterable_queue.IterableQueue()
-	results_queue = iterable_queue.IterableQueue()
-
-	# Add all of the words to the work producer
-	all_words = utils.read_wordnet_index()
-	for word in all_words:
-		work_producer.put(word)
-
-
-	work_producer = work_queue.get_producer()
-	for token in sorted_dictionary.get_token_list():
-		work_producer.put(candidates)
 
 
 if __name__ == '__main__':
-	do_generate_candidates()
+    # do_generate_candidates1()
+    generate_uniform_random_candidates1()
