@@ -10,39 +10,48 @@ import t4k
 CANDIDATES_DIR = os.path.join(DATA_DIR, 'relational-nouns', 'candidates')
 CROWDFLOWER_DIR = os.path.join(DATA_DIR, 'crowdflower')
 
-def make_crowdflower_csv():
+def make_crowdflower_csv(iteration=2):
 
     # Seed randomness for reproducibility
     random.seed(0)
 
     # Open a file at which to write the csv file
     t4k.ensure_exists(CROWDFLOWER_DIR)
-    csv_path = os.path.join(CROWDFLOWER_DIR, 'task1.csv')
+	task_fname = 'task%d.csv' % iteration
+    csv_path = os.path.join(CROWDFLOWER_DIR, task_fname)
     csv_f = open(csv_path, 'w')
     
     # First read the scored candidates
     pos_common_candidates = []
     neg_common_candidates = []
-    for line in open(os.path.join(CANDIDATES_DIR, 'candidates1.txt')):
+    neut_common_candidates = []
+	candidates_fname = 'candidates%d.txt' % iteration)
+    for line in open(os.path.join(CANDIDATES_DIR, candidates_fname)):
         token, class_ = line.split('\t')[:2]
         if class_ == '+':
             pos_common_candidates.append(token)
         elif class_ == '-':
             neg_common_candidates.append(token)
+		elif class_ == '0':
+			neut_common_candidates.append(token)
         else:
             raise ValueError('Unexpected classification character: %s' % class_)
 
     # We'll only keep the first 500 negatives.
-    neg_common_candidates = neg_common_candidates[:500]
+	num_neut = min(250, len(neut_common_candidates))
+    neg_common_candidates = neg_common_candidates[:500-num_neut]
+	neut_common_candidates = neut_common_candidates[:num_neut]
 
     # Next read the random candidates
+	random_candidates_fname = 'random_candidates%d.txt' % iteration
     random_candidates_path = os.path.join(
-        CANDIDATES_DIR, 'random_candidates1.txt')
+        CANDIDATES_DIR, random_candidates_fname)
     random_candidates = open(random_candidates_path).read().strip().split('\n')
 
     # Collect all the candidate words together and elminate dupes
     all_candidates = set(
-        pos_common_candidates + neg_common_candidates + random_candidates
+        pos_common_candidates + neg_common_candidates + neut_common_candidates
+		+ random_candidates
     )
 
     # Now keep track of why each word was included (i.e. was it a word labelled
@@ -50,6 +59,7 @@ def make_crowdflower_csv():
     # sampled?  Note that a word could be both randomly drawn and labelled.
     pos_common_candidates = set(pos_common_candidates)
     neg_common_candidates = set(neg_common_candidates)
+	neut_common_candidates = set(neut_common_candidates)
     random_candidates = set(random_candidates)
     sourced_candidates = []
     for candidate in all_candidates:
@@ -58,6 +68,8 @@ def make_crowdflower_csv():
             sources.append('pos')
         if candidate in neg_common_candidates:
             sources.append('neg')
+        if candidate in neut_common_candidates:
+            sources.append('neut')
         if candidate in random_candidates:
             sources.append('rand')
         sourced_candidates.append((candidate, ':'.join(sources)))
@@ -73,4 +85,5 @@ def make_crowdflower_csv():
 
 
 if __name__ == '__main__':
-    make_crowdflower_csv()
+    #make_crowdflower_csv(1)
+    make_crowdflower_csv(2)

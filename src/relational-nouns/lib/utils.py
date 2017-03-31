@@ -3,9 +3,10 @@ import os
 import sys
 sys.path.append('..')
 import cjson
-from t4k import UNK, UnigramDictionary
+import t4k
 from SETTINGS import (
-    TRAIN_PATH, TEST_PATH, WORDNET_INDEX_PATH, SEED_PATH, DATA_DIR
+	WORDNET_INDEX_PATH, DATA_DIR,
+    #TRAIN_PATH, TEST_PATH, SEED_PATH,
 )
 
 
@@ -201,6 +202,23 @@ def get_seed_set(path):
     return positives, negatives, neutrals
 
 
+def read_all_labels(path):
+	"""
+	Read all the label files within the directory given by ``path``.
+	"""
+	positives = set()
+	negatives = set()
+	neutrals = set()
+	for file_path in t4k.ls(path, dirs=False):
+		pos, neg, neut = get_seed_set(file_path)
+		positives.update(pos)
+		negatives.update(neg)
+		neutrals.update(neut)
+
+	return positives, negatives, neutrals
+
+
+
 def get_full_seed_set():
 	seed_path = os.path.join(DATA_DIR, 'relational-nouns', 'categorized.tsv')
 	pos, neg, neut = get_seed_set(seed_path)
@@ -228,27 +246,27 @@ def get_train_test_split():
 
 
 def get_dictionary(path):
-    dictionary = UnigramDictionary()
+    dictionary = t4k.UnigramDictionary()
     dictionary.load(path)
     return dictionary
 
 
-def get_train_sets():
-    '''
-    Get a set of positive (relational) words and a set of negative 
-    (non-relational) words, to be used as a training set
-    '''
-    positives, negatives, neutrals = get_seed_set(TRAIN_PATH)
-    return positives, negatives, neutrals
+#def get_train_sets():
+#    '''
+#    Get a set of positive (relational) words and a set of negative 
+#    (non-relational) words, to be used as a training set
+#    '''
+#    positives, negatives, neutrals = get_seed_set(TRAIN_PATH)
+#    return positives, negatives, neutrals
 
 
-def get_test_sets():
-    '''
-    Get a set of positive (relational) words and a set of negative 
-    (non-relational) words, to be used as a test set
-    '''
-    positives, negatives, neutrals = get_seed_set(TEST_PATH)
-    return positives, negatives, neutrals
+#def get_test_sets():
+#    '''
+#    Get a set of positive (relational) words and a set of negative 
+#    (non-relational) words, to be used as a test set
+#    '''
+#    positives, negatives, neutrals = get_seed_set(TEST_PATH)
+#    return positives, negatives, neutrals
 
 
 def load_feature_file(path):
