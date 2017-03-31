@@ -13,7 +13,7 @@ from SETTINGS import RELATIONAL_NOUN_FEATURES_DIR
 from kernels import bind_kernel, bind_dist
 import utils
 from utils import (
-    read_seed_file, get_train_sets, filter_seeds, ensure_unicode,
+    read_seed_file, filter_seeds, ensure_unicode,
     get_dictionary, get_features
 )
 from nltk.stem import WordNetLemmatizer
@@ -27,6 +27,7 @@ def make_classifier(
     features=os.path.join(RELATIONAL_NOUN_FEATURES_DIR, 'test-coalesce'),
     positives=None,
     negatives=None,
+    neutrals=None,
 
     # SVM options
     C=1.0,
@@ -52,9 +53,9 @@ def make_classifier(
 
     '''
 
-    # Load positive and negative training sets (unless supplied)
-    if positives is None or negatives is None:
-        positives, negatives, neutrals = get_train_sets()
+    ## Load positive and negative training sets (unless supplied)
+    #if positives is None or negatives is None:
+    #    positives, negatives, neutrals = get_train_sets()
 
     # Use the provided features or load from the provided path
     if isinstance(features, basestring):
@@ -70,6 +71,7 @@ def make_classifier(
 
     # The proposed most-performant classifier
     if kind == 'osvm':
+        print 'building an OrdinalSvmNounClassifier'
         return OrdinalSvmNounClassifier(
             positive_seeds=positives,
             neutral_seeds=neutrals,
@@ -91,6 +93,7 @@ def make_classifier(
 
     # The proposed most-performant classifier
     elif kind == 'svm':
+        print 'building an SvmNounClassifier'
         return SvmNounClassifier(
             positive_seeds=positives,
             negative_seeds=negatives,
@@ -112,6 +115,7 @@ def make_classifier(
 
     # A runner up, using KNN as the learner
     elif kind == 'knn':
+        print 'building a knn'
         return KnnNounClassifier(
             positives,
             negatives,
@@ -125,11 +129,13 @@ def make_classifier(
 
     # Simple rule: returns true if query is hyponym of known relational noun
     elif kind == 'wordnet':
+        print 'building a WordnetClassifier'
         return WordnetClassifier(positives, negatives)
 
 
     # Classifier using basic syntax cues
     elif kind == 'basic_syntax':
+        print 'building a BalancedLogisticClassifier'
         get_features_func = arm_get_basic_syntax_features(
             features['baseline'])
         return BalancedLogisticClassifier(
@@ -596,6 +602,7 @@ class OrdinalSvmNounClassifier(object):
         # Make classifier for distinguishing negative from (neutral + positive)
         binary_negative = negative_seeds
         binary_positive = neutral_seeds + positive_seeds
+        print 'training subclassifier 1 of 2'
         self.classifier_0 = SvmNounClassifier(
             binary_positive,
             binary_negative,
@@ -611,6 +618,7 @@ class OrdinalSvmNounClassifier(object):
         # Make classifier for distinguishing (negative + neutral) from positive
         binary_negative = negative_seeds + neutral_seeds
         binary_positive = positive_seeds
+        print 'training subclassifier 2 of 2'
         self.classifier_1 = SvmNounClassifier(
             binary_positive,
             binary_negative,
