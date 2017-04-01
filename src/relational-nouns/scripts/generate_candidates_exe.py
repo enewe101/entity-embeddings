@@ -46,7 +46,7 @@ def generate_uniform_random_candidates1():
 
 
 
-def do_generate_candidates_iteration(iteration=2):
+def do_generate_candidates_iteration(iteration=2, kernel=None, features=None):
 
     # Work out the file names
     candidates_fname = 'candidates%d.txt' % iteration
@@ -58,6 +58,7 @@ def do_generate_candidates_iteration(iteration=2):
     # Decide the output path and the number of positive candidates to find
     t4k.ensure_exists(CANDIDATES_DIR)
     out_path = os.path.join(CANDIDATES_DIR, candidates_fname)
+    random_out_path = os.path.join(CANDIDATES_DIR, random_candidates_fname)
     num_to_generate = 1000
 
     # Read in the seed set, which is the basis for the model that selects new 
@@ -70,7 +71,7 @@ def do_generate_candidates_iteration(iteration=2):
     add_pos, add_neg, add_neut = utils.read_all_labels(os.path.join(
         DATA_DIR, 'relational-nouns', previous_labels_dirname))
 
-    # Add in these data to the 
+    # Add in these nouns to the seeds
     pos.update(add_pos)
     neg.update(add_neg)
     neut.update(add_neut)
@@ -82,14 +83,14 @@ def do_generate_candidates_iteration(iteration=2):
         reader = csv.DictReader(open(task_path))
         exclude.update([row['token'] for row in reader])
 
-    # Generate the non-random candidates, enabling enrichment of positives
-    generate_candidates.generate_candidates_ordinal(
-        num_to_generate, out_path, pos, neg, neut, exclude)
+    ## Generate the non-random candidates, enabling enrichment of positives
+    #generate_candidates.generate_candidates_ordinal(
+    #    num_to_generate, out_path, pos, neg, neut, exclude, kernel, features)
 
     # Generate random candidates, enabling exploration and model testing.
     random_candidates_path = os.path.join(
         CANDIDATES_DIR, random_candidates_fname)
-    generate_random_candidates(500, out_path)
+    generate_candidates.generate_random_candidates(2000, random_out_path)
 
 
 if __name__ == '__main__':
