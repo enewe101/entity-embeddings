@@ -9,6 +9,7 @@ USUALLY_RELATIONAL = '+'
 OCCASIONALLY_RELATIONAL = '0'
 NEVER_RELATIONAL = '-'
 
+
 def interpret_annotations(crowdflower_results):
 	"""
 	Given a CrowdflowerResult object (obtained from passing a crowdflower 
@@ -64,7 +65,7 @@ def transcribe_labels(results_fname):
 
 def get_label(result):
 	"""
-	Get's the correct label based on the annotations of a single word.  If a
+	Gets the correct label based on the annotations of a single word.  If a
 	strict majority of annotations indicate that the word is either "usually
 	relational" or "almost never relational", then the corresponding label is
 	taken.  Otherwise, for ambiguous cases, "occasionally relational" is taken.
