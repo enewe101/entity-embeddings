@@ -10,8 +10,24 @@ def as_number_string(response):
 	return {
 		'usually relational': '2',
 		'occasionally relational': '1',
-		'almost never relational': '0'
+		'almost never relational': '0',
+		'+':'2',
+		'0':'1',
+		'-':'0'
 	}[response]
+
+
+def convert_interpeted_annotations(expert_annotations, participant_annotations):
+	all_words = set()
+	expert_converted = []
+	participant_converted = []
+	for word in expert_annotations:
+		expert_converted.append(as_number_string(expert_annotations[word]))
+		participant_converted.append(as_number_string(
+			participant_annotations[word]))
+
+	return [expert_converted, participant_converted]
+
 
 def convert_data(results):
 	"""

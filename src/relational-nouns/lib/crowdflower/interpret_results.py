@@ -9,8 +9,21 @@ USUALLY_RELATIONAL = '+'
 OCCASIONALLY_RELATIONAL = '0'
 NEVER_RELATIONAL = '-'
 
+PARTICIPANT_RESULTS_PATHS = [
+	os.path.join(DATA_DIR, 'crowdflower', 'results1.json'),
+	os.path.join(DATA_DIR, 'crowdflower', 'results2.json')
+]
+EXPERT_CROWDFLOWER_RESULTS_PATH = os.path.join(
+	DATA_DIR, 'crowdflower', 'results-expert.json')
+EXPERT_RESULTS_PATH = os.path.join(
+	DATA_DIR, 'crowdflower', 'results3-expert.csv')
+FEATURES_DIR = os.path.join(
+	DATA_DIR, 'relational-noun-features-wordnet-only', 'accumulated-pruned-5000'
+)
+DICTIONARY_DIR = os.path.join(FEATURES_DIR, 'dictionary')
 
-def interpret_annotations(crowdflower_results):
+
+def interpret_annotations(crowdflower_results, policy='majority'):
 	"""
 	Given a CrowdflowerResult object (obtained from passing a crowdflower 
 	json report into t4k.CrowdFlowerResult), interpret the label for given 
@@ -18,13 +31,98 @@ def interpret_annotations(crowdflower_results):
 	Never Relational".
 	"""
 
-	word_labels = defaultdict(dict)
+	word_labels = {}
+
+	for result in crowdflower_results:
+
+		# Work out the word, its sampling source(s), and its label
+		word = result['data']['token']
+		label = get_label(result)
+		word_labels[word] = label
+
+	return word_labels
+
+
+def get_finalized_data_rows(crowdflower_results, annotator):
+	"""
+	Given a CrowdflowerResult object (obtained from passing a crowdflower 
+	json report into t4k.CrowdFlowerResult), interpret the label for given 
+	words (either "Usually Relational", "Occasionally Relational", or "Almost
+	Never Relational".
+	"""
+
+	finalized_rows = {}
+
+	for result in crowdflower_results:
+
+		# Work out the word, its sampling source(s), and its label
+		word = result['data']['token']
+		sources = result['data']['source']
+		label = get_label(result)
+
+		finalized_rows[word] = (word, sources, annotator, label)
+
+	return finalized_rows
+
+
+def get_top_words():
+	"""
+	Get the k most common words in gigawords for which all words were annotated
+	and k is as big as it can be.
+	"""
+	all_annotated_words = get_all_annotated_words()
+	dictionary = t4k.UnigramDictionary()
+	dictionary.load(DICTIONARY_DIR)
+	top_words = []
+	for i, token in enumerate(dictionary.get_token_list()):
+		if token == 'UNK':
+			continue
+		if token in all_annotated_words:
+			top_words.append(token)
+		else:
+			break
+
+	return top_words
+
+
+
+
+
+def get_all_annotated_words():
+
+	# First open the participant results
+	results = t4k.CrowdflowerResults(PARTICIPANT_RESULTS_PATHS)
+	participant_words = set([row['data']['token'] for row in results])
+
+	# Next get the expert crowdflower results
+	results = t4k.CrowdflowerResults(EXPERT_CROWDFLOWER_RESULTS_PATH)
+	expert_crowdflower_words = set([row['data']['token'] for row in results])
+
+	# Finally get the expert results not annotated in crowdflower
+	expert_words = set([
+		line.split(',')[0] for line in open(EXPERT_RESULTS_PATH)])
+
+	return participant_words | expert_words | expert_crowdflower_words
+
+
+
+def interpret_annotations_by_source(crowdflower_results):
+	"""
+	Given a CrowdflowerResult object (obtained from passing a crowdflower 
+	json report into t4k.CrowdFlowerResult), interpret the label for given 
+	words (either "Usually Relational", "Occasionally Relational", or "Almost
+	Never Relational".
+	"""
+
+	word_labels = {}
 
 	for result in crowdflower_results:
 
 		# Work out the word, its sampling source(s), and its label
 		word = result['data']['token']
 		sources =  result['data']['source'].split(':')
+
+		# Check if the word is in the top X sources
 		label = get_label(result)
 
 		# Store accordingly
@@ -32,6 +130,7 @@ def interpret_annotations(crowdflower_results):
 			word_labels[source][word] = label
 
 	return word_labels
+
 
 
 def transcribe_labels(results_fname):
@@ -53,7 +152,7 @@ def transcribe_labels(results_fname):
 	# Read in the results, and interpret labels
 	crowdflower_results = t4k.CrowdflowerResults(
 		results_path, lambda x:x['data']['token'])
-	word_labels = interpret_annotations(crowdflower_results)
+	word_labels = interpret_annotations_by_source(crowdflower_results)
 
 	# Write labels to disk, with words coming from different sources put into
 	# different files.
@@ -74,10 +173,16 @@ def get_label(result):
 	# never relational" then take the correponding label, otherwise we
 	# default to "occasionally relational".
 	label = OCCASIONALLY_RELATIONAL
-	if len(result['mode']['response']) < 2:
-		if result['mode']['response'][0] == 'usually relational':
+
+	try:
+		mode = result['mode']['response']
+	except KeyError:
+		mode = result['mode']['is_relational']
+
+	if len(mode) < 2:
+		if mode[0] == 'usually relational':
 			label = USUALLY_RELATIONAL
-		elif result['mode']['response'][0] == 'almost never relational':
+		elif mode[0] == 'almost never relational':
 			label = NEVER_RELATIONAL
 
 	return label
