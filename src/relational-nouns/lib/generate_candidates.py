@@ -1,3 +1,4 @@
+import random
 import sys
 sys.path.append('../lib')
 import extract_features
@@ -33,7 +34,7 @@ def generate_candidates(num_to_generate, out_path, pos, neg, exclude):
     # Make the best performing classifier.  This is what we'll use to score the
     # "relationalness" of new words.
     clf = classifier.make_classifier(
-		kind='svm',
+        kind='svm',
         features=features,
         positives=pos,
         negatives=neg,
@@ -80,44 +81,48 @@ def generate_random_candidates(num_to_generate, out_path, exclude=set()):
 
 
 def generate_candidates_ordinal(
-	num_to_generate, out_path, pos, neg, neut, exclude
+    num_to_generate, out_path, pos, neg, neut, exclude, 
+    kernel=None, features=None
 ):
 
     # Open the file to which we will write candidates
     out_f = open(out_path, 'w')
 
     # Read in the extracted features, which we'll also need for a couple things
-    features = extract_features.FeatureAccumulator(
-        load=BEST_WORDNET_ONLY_FEATURES_PATH)
+    if features is None:
+        features = extract_features.FeatureAccumulator(
+            load=BEST_WORDNET_ONLY_FEATURES_PATH)
 
     # Make the best performing classifier.  This is what we'll use to score the
     # "relationalness" of new words.
     clf = classifier.make_classifier(
-		kind='osvm'
+        kind='osvm',
+        kernel=kernel,
         features=features,
         positives=pos,
         negatives=neg,
-		neutrals=neut,
+        neutrals=neut,
         **BEST_CLASSIFIER_CONFIG
     )
 
     # Now generate the candidates.  We only keep track of the number of 
     # positives generated, because there are always more negatives
     num_generated = 0
-    for token in features.dictionary.get_token_list():
-        if token in exclude:
-            print '\t\tx\t%s' % token
-            continue
-        score = clf.score(token)[0]
-		if score >= 1:
+    filtered_tokens = [
+        t for t in features.dictionary.get_token_list() if t not in exclude]
+
+    for token, score in clf.score_parallel(filtered_tokens):
+        if score >= 1:
             print '%s\t+' % token
             out_f.write('%s\t+\t%f\n' % (token, score))
             num_generated += 1
             if num_generated == num_to_generate:
                 break
-		elif score > -1:
+        elif score > -1:
             print '\t0\t%s' % token
             out_f.write('%s\t0\t%f\n' % (token, score))
-		else:
+        else:
             print '\t-\t%s' % token
             out_f.write('%s\t-\t%f\n' % (token, score))
+
+

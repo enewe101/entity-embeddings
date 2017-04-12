@@ -1,3 +1,5 @@
+import iterable_queue as iq
+import multiprocessing
 import os
 import random
 import t4k
@@ -13,20 +15,34 @@ from SETTINGS import RELATIONAL_NOUN_FEATURES_DIR
 from kernels import bind_kernel, bind_dist
 import utils
 from utils import (
-    read_seed_file, get_train_sets, filter_seeds, ensure_unicode,
+    read_seed_file, filter_seeds, ensure_unicode,
     get_dictionary, get_features
 )
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet as w
 import extract_features
 
+BEST_SETTINGS = {
+    'on_unk': False,
+    'C': 1.0,
+    'syntax_feature_types': ['baseline', 'dependency', 'hand_picked'],
+    'semantic_similarity': 'res',
+    'include_suffix' :  True,
+    'syntactic_multiplier': 10.0,
+    'semantic_multiplier': 2.0,
+    'suffix_multiplier': 0.2
+}
+
+
 
 def make_classifier(
     kind='svm',    # available: 'osvm', 'svm', 'knn', 'wordnet', 'basic_syntax'
     on_unk=False,
     features=os.path.join(RELATIONAL_NOUN_FEATURES_DIR, 'test-coalesce'),
+    kernel=None,
     positives=None,
     negatives=None,
+    neutrals=None,
 
     # SVM options
     C=1.0,
@@ -52,9 +68,9 @@ def make_classifier(
 
     '''
 
-    # Load positive and negative training sets (unless supplied)
-    if positives is None or negatives is None:
-        positives, negatives, neutrals = get_train_sets()
+    ## Load positive and negative training sets (unless supplied)
+    #if positives is None or negatives is None:
+    #    positives, negatives, neutrals = get_train_sets()
 
     # Use the provided features or load from the provided path
     if isinstance(features, basestring):
@@ -62,20 +78,21 @@ def make_classifier(
 
     if min_feature_frequency is not None:
         features.prune_features(min_feature_frequency)
-
-    # We can only use words that we actually have features for
+# We can only use words that we actually have features for
     positives = filter_seeds(positives, features.dictionary)
     negatives = filter_seeds(negatives, features.dictionary)
     neutrals = filter_seeds(neutrals, features.dictionary)
 
     # The proposed most-performant classifier
     if kind == 'osvm':
+        print 'building an OrdinalSvmNounClassifier'
         return OrdinalSvmNounClassifier(
             positive_seeds=positives,
             neutral_seeds=neutrals,
             negative_seeds=negatives,
 
             # SVM options
+            kernel=kernel,
             features=features,
             on_unk=False,
 
@@ -91,6 +108,7 @@ def make_classifier(
 
     # The proposed most-performant classifier
     elif kind == 'svm':
+        print 'building an SvmNounClassifier'
         return SvmNounClassifier(
             positive_seeds=positives,
             negative_seeds=negatives,
@@ -112,6 +130,7 @@ def make_classifier(
 
     # A runner up, using KNN as the learner
     elif kind == 'knn':
+        print 'building a knn'
         return KnnNounClassifier(
             positives,
             negatives,
@@ -125,11 +144,13 @@ def make_classifier(
 
     # Simple rule: returns true if query is hyponym of known relational noun
     elif kind == 'wordnet':
+        print 'building a WordnetClassifier'
         return WordnetClassifier(positives, negatives)
 
 
     # Classifier using basic syntax cues
     elif kind == 'basic_syntax':
+        print 'building a BalancedLogisticClassifier'
         get_features_func = arm_get_basic_syntax_features(
             features['baseline'])
         return BalancedLogisticClassifier(
@@ -572,6 +593,7 @@ class OrdinalSvmNounClassifier(object):
         negative_seeds,
 
         # Features to be used in the kernel
+        kernel=None,
         features=None,    # Must be provided if syntax_feature_types is not None
 
         # SVM options
@@ -593,12 +615,19 @@ class OrdinalSvmNounClassifier(object):
         # (neutral + negative) and the other to distinguish (positive + neutral)
         # from negative.
 
+        # Our classifiers will share a kernel function that caches values so 
+        # that they don't both need to calculate all kernel evaluations 
+        # multiple times and so that the kernel evaluations on the training set 
+        # can be multiprocessed
+
         # Make classifier for distinguishing negative from (neutral + positive)
         binary_negative = negative_seeds
         binary_positive = neutral_seeds + positive_seeds
+        print 'training subclassifier 1 of 2'
         self.classifier_0 = SvmNounClassifier(
             binary_positive,
             binary_negative,
+            kernel,
             features, on_unk, C,
             syntax_feature_types,
             semantic_similarity,
@@ -611,9 +640,11 @@ class OrdinalSvmNounClassifier(object):
         # Make classifier for distinguishing (negative + neutral) from positive
         binary_negative = negative_seeds + neutral_seeds
         binary_positive = positive_seeds
+        print 'training subclassifier 2 of 2'
         self.classifier_1 = SvmNounClassifier(
             binary_positive,
             binary_negative,
+            kernel,
             features, on_unk, C,
             syntax_feature_types,
             semantic_similarity,
@@ -623,6 +654,41 @@ class OrdinalSvmNounClassifier(object):
             suffix_multiplier,
         )
 
+    def score_parallel(self, tokens, num_processes=16):
+
+        # Make queues to parallelize work
+        work_queue = iq.IterableQueue()
+        result_queue = iq.IterableQueue()
+
+        # put work
+        work_producer = work_queue.get_producer()
+        for token in tokens:
+            work_producer.put(token)
+        work_producer.close()
+
+        # Start workers
+        for p in range(num_processes):
+            proc = multiprocessing.Process(
+                target=self.score_worker,
+                args=(work_queue.get_consumer(), result_queue.get_producer())
+            )
+            proc.start()
+
+        # Collect results.  Close queues.
+        result_consumer = result_queue.get_consumer()
+        result_queue.close()
+        work_queue.close()
+
+        for token, score in result_consumer:
+            yield token, score[0]
+
+
+    def score_worker(self, work_consumer, result_producer):
+        for token in work_consumer:
+            score = self.score(token)
+            result_producer.put((token, score))
+        result_producer.close()
+
 
     def score(self, tokens):
 
@@ -631,21 +697,21 @@ class OrdinalSvmNounClassifier(object):
 
         overall_scores = []
         for s0, s1 in zip(scores_0, scores_1):
-            if s0 < 0:
-                print 'neg'
+            if s0 < 0 and s1 < 0:
                 overall_scores.append(s0-1)
+                print 'neg'
 
-            elif s1 > 0:
-                print 'pos'
+            elif s0 > 0 and s1 > 0:
                 overall_scores.append(s1+1)
+                print 'pos'
 
             elif s1 < 0 and s0 > 1:
-                print 'neut'
                 overall_scores.append((s0+s1)/(s0-s1))
+                print 'neut'
 
             else:
+                overall_scores.append((s0+s1)/(s1-s0))
                 print 'ambig'
-                overall_scores.append((s0+s1)/(s0-s1))
 
         return overall_scores
 
@@ -666,6 +732,7 @@ class SvmNounClassifier(object):
         negative_seeds,
 
         # Features to be used in the kernel
+        kernel=None,
         features=None,    # Must be provided if syntax_feature_types is not None
 
         # SVM options
@@ -695,6 +762,7 @@ class SvmNounClassifier(object):
         self.negative_seeds = negative_seeds
 
         # Register SVM options
+        self.kernel = kernel
         self.features = features
         self.on_unk = on_unk
         self.C = C
@@ -715,18 +783,24 @@ class SvmNounClassifier(object):
         Make an SVM classifier
         '''
         X, Y = self.make_training_set()
-        kernel = bind_kernel(
-            self.features, 
+        if self.kernel is None:
+            
+            kernel_func = bind_kernel(
+                self.features, 
 
-            syntax_feature_types=self.syntax_feature_types,
-            semantic_similarity=self.semantic_similarity,
-            include_suffix=self.include_suffix,
+                syntax_feature_types=self.syntax_feature_types,
+                semantic_similarity=self.semantic_similarity,
+                include_suffix=self.include_suffix,
 
-            syntactic_multiplier=self.syntactic_multiplier,
-            semantic_multiplier=self.semantic_multiplier,
-            suffix_multiplier=self.suffix_multiplier
-        )
-        classifier = svm.SVC(kernel=kernel, C=self.C)
+                syntactic_multiplier=self.syntactic_multiplier,
+                semantic_multiplier=self.semantic_multiplier,
+                suffix_multiplier=self.suffix_multiplier
+            )
+
+        else:
+            kernel_func = self.kernel.eval
+
+        classifier = svm.SVC(kernel=kernel_func, C=self.C)
         classifier.fit(X,Y)
         return classifier
 
