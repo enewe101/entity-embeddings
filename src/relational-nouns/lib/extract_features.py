@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+from nltk.corpus import wordnet
+import numpy as np
 import utils
 import shutil
 import t4k
@@ -15,31 +17,36 @@ import sys
 from collections import defaultdict, Counter, deque
 from SETTINGS import (
     GIGAWORD_DIR, DATA_DIR, RELATIONAL_NOUN_FEATURES_DIR, WORDNET_INDEX_PATH,
-    ACCUMULATED_FEATURES_PATH, SUFFIX_PATH
+    ACCUMULATED_FEATURES_PATH, SUFFIX_PATH, GOOGLE_VECTORS_PATH
 )
 from nltk.corpus import wordnet
+from scipy.sparse import csr_matrix, coo_matrix
 
 
+LEN_GOOGLE_VECTORS = 300
 NUM_ARTICLE_LOADING_PROCESSES = 12
 GAZETTEER_DIR = os.path.join(DATA_DIR, 'gazetteers')
 GAZETTEER_FILES = [
     'country', 'city', 'us-state', 'continent', 'subcontinent'
 ]
     
+# Average dot product between two randomly chosen vectors.  Should be used
+# in the kernel when one or both of the token's vectors are missing
+AVERAGE_ABSOLUTE_DOT = 0.068708472297183756
 
 def coalesce_features(
-    out_dir_name, in_dir=RELATIONAL_NOUN_FEATURES_DIR, limit=None, 
-    min_token_occurrences=5, min_feature_occurrences=5
+    out_dir, 
+    min_token_occurrences=5,
+    min_feature_occurrences=5,
+    vocabulary=None,
+    feature_dirs=t4k.ls(
+        RELATIONAL_NOUN_FEATURES_DIR, 
+        absolute=True, match='/[0-9a-f]{3,3}$', files=False
+    )
 ):
 
-    # Get a list of all the feature_dirs
-    feature_dirs = t4k.ls(
-        in_dir, absolute=True, 
-        match='/[0-9a-f]{3,3}$', files=False
-    )[:limit]
-
     # Make the feature accumulator in which to aggregate results
-    feature_accumulator = make_feature_accumulator()
+    feature_accumulator = make_feature_accumulator(vocabulary)
 
     # Read in the features for each feature_dir and accumulate
     for feature_dir in feature_dirs:
@@ -57,7 +64,7 @@ def coalesce_features(
     feature_accumulator.prune_dictionary(min_token_occurrences)
     feature_accumulator.prune_features(min_token_occurrences)
 
-    coalesced_path = os.path.join(in_dir, out_dir_name)
+    coalesced_path = out_dir
     feature_accumulator.write(coalesced_path)
 
 
@@ -106,10 +113,11 @@ def make_feature_accumulator(vocabulary=None, load=None):
 
 
 def extract_all_features(
-    article_archive_dir, untar=True, limit=None, vocabulary=None
+    article_archive_dir, out_dir, untar=True, limit=None, vocabulary=None
 ):
 
     start = time.time()
+    t4k.ensure_exists(out_dir)
 
     # If ``untar`` is true, then untar the path first
     if untar:
@@ -155,7 +163,7 @@ def extract_all_features(
 
     # Write the features to disk
     dirname = os.path.basename(untarred_article_dir)
-    write_path = os.path.join(RELATIONAL_NOUN_FEATURES_DIR, dirname)
+    write_path = os.path.join(out_dir, dirname)
     feature_accumulator.write(write_path)
 
     # If we untarred the file, then delete the untarred copy
@@ -199,37 +207,211 @@ def extract_features_worker(
     features_producer.close()
 
 
-FEATURE_TYPES = ['baseline', 'dependency', 'hand_picked']
+# Wordnet parts of speech are encoded using the following characters.
+# (Apparently 'r' also occurs, but it wasn't observed in this dataset.)
+WORDNET_POS = 'asnv'
+COUNT_BASED_FEATURES = [
+    'baseline', 'dependency', 'hand_picked',
+    'lemma_unigram', 'lemma_bigram', 'pos_unigram', 'pos_bigram', 
+    'surface_unigram', 'surface_bigram'
+]
+ALL_FEATURES = COUNT_BASED_FEATURES + [
+    'derivational', 'google-vectors', 'suffix'
+]
+
 class FeatureAccumulator(object):
     """
     Extracts and accumulates features associated to nouns by reading
     CoreNLP-annotated articles.
     """
 
-    def __init__(self, vocabulary=None, load=None):
+    def __init__(
+        self,
+        vocabulary=None,
+        load=None, 
+        google_vectors_path=GOOGLE_VECTORS_PATH,
+        lexical_feature_window=5
+    ):
         """
         ``vocabulary`` is a set of words for which we will collect features.
         words not in ``vocabulary`` will be skipped.
         """
         self.vocabulary = vocabulary
-
+        self.google_vectors_path = google_vectors_path
         self._initialize_accumulators()
+        self.lexical_feature_window = lexical_feature_window
+
         if load is not None:
             self.merge_load(load)
+
 
     def get_id(self, token):
         return self.dictionary.get_id(token)
 
+
     def get_token(self, idx):
         return self.dictionary.get_token(idx)
 
-    def _initialize_accumulators(self):
-        # This operation makes normalized features stale
-        self._stale = True
 
+    def _initialize_accumulators(self):
+        # This operation makes features stale
+        self.fresh = set()
+        self.threshold_features = defaultdict(Counter)
         self.dictionary = UnigramDictionary()
-        for feature_type in FEATURE_TYPES:
+        for feature_type in COUNT_BASED_FEATURES:
             setattr(self, feature_type, defaultdict(Counter))
+
+
+    def accumulate_sorted_feature_values(self):
+        self.all_feature_values = defaultdict(lambda:defaultdict(list))
+        for feature_type in COUNT_BASED_FEATURES:
+            # We will first need to determine what the (100*p)th percentile is
+            # for each feature.  To do that, we need to gather up all the
+            # values for each feature, sort them, then select the middle value.
+            print (
+                'accumulating feature values for %s' 
+                % feature_type
+            )
+            feature_counts = getattr(self, feature_type)
+            for lemma in feature_counts:
+                for feature_name, val in feature_counts[lemma].iteritems():
+                    self.all_feature_values[feature_type][feature_name].append(
+                        val)
+
+        # Sort all of the feature values
+        for feature_type in COUNT_BASED_FEATURES:
+            print 'sorting feature values for %s' % feature_type
+            for feature_name in self.all_feature_values[feature_type]:
+                self.all_feature_values[feature_type][feature_name].sort()
+
+        self.fresh.add('sorted-features')
+
+
+    def read_google_vectors(self):
+        self.vectors = {}
+        for line in open(self.google_vectors_path):
+
+            # Skip blank lines
+            line = line.strip()
+            if line == '':
+                continue
+
+            token = line.split(' ', 1)[0]
+            if token not in self.dictionary:
+                continue
+            self.vectors[token] = [float(v) for v in line.split(' ')[1:]]
+
+        self.fresh.add('vectors')
+
+
+    def calculate_derivational_features(self):
+        """ 
+        Pre-computes features that indicate whether a given noun has a
+        derivationally related verb or adjective.  This is precomputed from
+        wordnet and stored on disk as a tsv which is faster to read in than
+        computing from wordnet as needed.  
+        """
+        print 'computing derivational features'
+        all_pos = set()
+
+        self.derivational_features = {}
+        for i, token in enumerate(self.dictionary.get_token_list()):
+            related_forms = t4k.flatten([
+                lemma.derivationally_related_forms() 
+                for lemma in wordnet.lemmas(token)
+            ])
+            poss = set([rf.synset().pos() for rf in related_forms])
+            self.derivational_features[token] = [
+                int(pos in poss) for pos in WORDNET_POS]
+
+        print 'done calculating derivational features'
+        self.fresh.add('derivational')
+
+
+    def calculate_threshold_features(self, p=0.5):
+        """
+        Calculate a thresholded version of the features.  The thresholded
+        feature is 1 if the value of the feature is greater than the 50th
+        percentile for that feature, otherwise it's zero.
+        """
+
+        print 'calculating thresholded features'
+
+        # If necessary accumulate all feature values, sorted.  This allows us
+        # to determine the (p*100)th percentile, to be used as the threshold
+        if 'sorted-features' in self.fresh:
+            self.accumulate_sorted_feature_values()
+
+        # calculate the thresholds for each feature based on this p-value
+        thresholds = defaultdict(dict)
+        for feature_type in COUNT_BASED_FEATURES:
+            print 'calculating thresholds for %s' % feature_type
+            this_feature_type_set = self.all_feature_values[feature_type]
+            for feature_name in this_feature_type_set:
+
+                # Get the threshold value for this particular feature
+                this_feature_set = this_feature_type_set[feature_name]
+                num_feats = len(this_feature_set)
+                threshold_idx = int(np.floor(num_feats * p))
+                threshold = this_feature_set[threshold_idx]
+                thresholds[feature_type][feature_name] = threshold
+
+        # Calculate thresholded features now.  These are binary features where
+        # the value is 1 if the feature is above the threshold, 0 otherwise.
+        threshold_features = defaultdict(lambda:defaultdict(dict))
+        self.threshold_features[p] = threshold_features
+        for feature_type in COUNT_BASED_FEATURES:
+            print 'calculating threshold features for %s' % feature_type
+            this_feature_type_counts = getattr(self, feature_type)
+            this_thresholded_type = threshold_features[feature_type]
+            for lemma in this_feature_type_counts:
+                feature_counts_for_lemma = this_feature_type_counts[lemma]
+                this_thresholded_lemma = this_thresholded_type[lemma]
+                for feature_name in feature_counts_for_lemma:
+                    val = feature_counts_for_lemma[feature_name]
+                    thresholded = val > thresholds[feature_type][feature_name]
+                    this_thresholded_lemma[feature_name] = thresholded
+
+        print 'done thresholding'
+
+
+    def calculate_log_features(self):
+        """
+        Calculate log-transformed version of normalized feature counts.
+        """
+
+        # First, we'll need up-to-date normalized features
+        if 'normalize' not in self.fresh:
+            self.normalize_features()
+
+        self.log_features = defaultdict(lambda:defaultdict(dict))
+        for feature_type in COUNT_BASED_FEATURES:
+            print 'calculating log features %s' % feature_type
+            normalized_type = getattr(self, '%s_normalized' % feature_type)
+            for lemma in normalized_type:
+                normalized_lemma = normalized_type[lemma]
+                self.log_features[feature_type][lemma] = {
+                    feat_name : np.log(normalized_lemma[feat_name])
+                    for feat_name in 
+                    getattr(self, '%s_normalized' % feature_type)[lemma]
+                }
+
+        print 'done calculating log features'
+        self.fresh.add('log')
+
+
+    def calculate_suffix_features(self):
+        """
+        Calculate suffix-based features.
+        """
+        print 'calculating suffix features'
+        # Determine the suffix for every lemma
+        self.suffix = {}
+        for lemma in self.dictionary.get_token_list():
+            self.suffix[lemma] = get_suffix(lemma)
+
+        print 'done calculating suffix features'
+        self.fresh.add('suffix')
 
 
     def normalize_features(self):
@@ -239,7 +421,7 @@ class FeatureAccumulator(object):
 
         Calculate suffix-based features.
         """
-        for feature_type in FEATURE_TYPES:
+        for feature_type in COUNT_BASED_FEATURES:
             print 'normalizing %s' % feature_type
 
             # Initialize an normalized version of this feature_type
@@ -253,18 +435,18 @@ class FeatureAccumulator(object):
             lemmas_to_remove = set()
             for lemma in feature_counts:
 
-                lemma_counts = float(self.dictionary.get_token_frequency(lemma))
+                lemma_counts = self.dictionary.get_token_frequency(lemma)
                 if lemma_counts == 0:
                     lemmas_to_remove.add(lemma)
                     continue
 
                 for feature in feature_counts[lemma]:
                     feature_norm[lemma][feature] = (
-                        feature_counts[lemma][feature] / lemma_counts)
+                        feature_counts[lemma][feature] / float(lemma_counts))
 
             # Remove any entries in the main feature counters for lemmas that
-            # were pruned from the dictionary previously (there must be a bug in 
-            # somewhere for these to be left behind...)
+            # were pruned from the dictionary previously (there must be a bug
+            # in somewhere for these to be left behind...)
             for lemma in lemmas_to_remove:
                 print 'DELETING', lemma
                 del feature_counts[lemma]
@@ -275,7 +457,7 @@ class FeatureAccumulator(object):
             self.suffix[lemma] = get_suffix(lemma)
 
         print 'done normalizing'
-        self._stale = False
+        self.fresh.add('normalize')
 
 
     def get_suffix_idx(self, lemma_idx):
@@ -284,20 +466,227 @@ class FeatureAccumulator(object):
 
 
     def get_suffix(self, lemma):
-        if self._stale:
-            self.normalize_features()
+        if 'suffix' not in self.fresh:
+            self.calculate_suffix_features()
+
+        # Ensure the lemma is unicode and lowercased
+        lemma = utils.normalize_token(lemma)
+
         return self.suffix[lemma]
 
+            
+    def as_sparse_matrix(
+        self,
+        include_features=ALL_FEATURES,
+        mode='raw' # 'log' | 'normalized' | threshold
+    ):
+        """
+        Reformats the storage of the features into a pandas data frame, so that
+        we can easily slice out sparse, vectorized versions of the feature
+        data.
+        """
 
-    def get_features(self, lemma, feature_types=FEATURE_TYPES):
+        # Get a mapping from feature (names) to column indices.
+        if 'feature-map' not in self.fresh:
+            self.get_feature_map()
+
+        # Get a feature map, which maps each feature (by name) to an integer
+        # correponding to it's (column) index in the sparse matrix
+        # representation of tokens' features.
+        coo_val, coo_i, coo_j = [], [], []
+        for i, lemma in enumerate(self.dictionary.get_token_list()):
+
+            if lemma == 'home':
+                print 'home', i
+
+            t4k.progress(i, len(self.dictionary))
+
+            # We'll begin by getting the count-based features.  Determine the
+            # subset of features that are count-based
+            include_count_based_features = (
+                set(include_features) & set(COUNT_BASED_FEATURES))
+
+            # Get the count-based features using the desired mode
+            if mode == 'normalized':
+                count_features = self.get_normalized_features(
+                    lemma, include_count_based_features)
+            elif mode == 'log':
+                count_features = self.get_log_features(
+                    lemma, include_count_based_features)
+            elif mode == 'threshold':
+                count_features = self.get_threshold_features(
+                    lemma, include_count_based_features)
+            elif mode == 'raw':
+                count_features = self.get_feature_counts(
+                    lemma, include_count_based_features)
+            else:
+                raise ValueError('Unexpected mode: "%s"' % mode)
+
+            # Add the count feature to the coo_matrix construction lists
+            coo_val.extend(count_features.values())
+            coo_i.extend([i]*len(count_features))
+            coo_j.extend([self.feature_map[feat] for feat in count_features])
+
+            # Next get google embedding features (if desired)
+            if 'google-vectors' in include_features:
+                vec = self.get_vector(lemma)
+                coo_val.extend(vec)
+                coo_i.extend([i]*LEN_GOOGLE_VECTORS)
+                coo_j.extend([
+                    self.feature_map['google-vectors-%d'%f] 
+                    for f in range(LEN_GOOGLE_VECTORS)
+                ]) 
+
+            # Next get derivational features (if desired)
+            if 'derivational' in include_features:
+                deriv_feats = self.get_derivational_features(lemma)
+                if lemma == 'home':
+                    print deriv_feats
+                    print [i]*len(WORDNET_POS)
+                    print [
+                        self.feature_map['derivational-%s'%d] 
+                        for d in WORDNET_POS
+                    ]
+                coo_val.extend(deriv_feats)
+                coo_i.extend([i]*len(WORDNET_POS))
+                coo_j.extend([
+                    self.feature_map['derivational-%s'%d] 
+                    for d in WORDNET_POS
+                ])
+
+            # Next get suffix features (if desired)
+            if 'suffix' in include_features:
+                suffix = self.get_suffix(lemma)
+                if suffix is not None:
+                    coo_val.append(1)
+                    coo_i.append(i)
+                    coo_j.append(self.feature_map['suffix-%s' % suffix])
+
+        #return {
+        #    self.feature_map.key(coo_j[i]):coo_val[i] 
+        #    for i in range(len(coo_val)) 
+        #    if isinstance(coo_val[i], basestring)
+        #}
+
+        # Build and return a sparse row-compressed matrix
+        return csr_matrix(coo_matrix((coo_val, (coo_i, coo_j))))
+
+
+
+    def get_feature_map(
+        self #, include_feature_types=ALL_FEATURES
+    ):
+        """
+        Given the subset of features that have been chosen, create a mapping
+        from each individual feature to a component in a sparse feature vector.
+        This let's us vectorize the features in a consistent way.
+        """
+        #include_feature_types = set(include_feature_types)
+
+        # First accumulate all of the keys for all features.  We will make a
+        # mapping from a specific feature (key) to incrementing integers
+        # representing that features's component in the feature vector.
+        #for token in self.hand_picked for feature in self.hand_picked[token]
+        self.feature_map = t4k.IncrementingMap()
+
+        # Add keys for the count-based features
+        for feature_type in COUNT_BASED_FEATURES:
+            #if feature_type in include_feature_types:
+            feature_names = set([
+                feature for lemma in getattr(self, feature_type)
+                for feature in getattr(self, feature_type)[lemma]
+            ])
+            self.feature_map.add_many(feature_names)
+
+        # Add keys for other features
+        #if 'derivational' in include_feature_types:
+        feature_names = ['derivational-%s'%pos for pos in WORDNET_POS]
+        self.feature_map.add_many(feature_names)
+
+        # Add keys for google_vector features
+        #if 'google_vectors' in include_feature_types:
+        feature_names = [
+            'google-vectors-%d'%i for i in range(LEN_GOOGLE_VECTORS)]
+        self.feature_map.add_many(feature_names)
+
+        # Add keys for suffix features
+        #if 'suffix' in include_feature_types:
+        feature_names = ['suffix-%s'%s for s in SUFFIXES]
+        self.feature_map.add_many(feature_names)
+
+        self.fresh.add('feature-map')
+
+
+
+    def get_vector(self, lemma):
+        """
+        Get the google-vector embedding associated to a given token
+        """
+        if 'vectors' not in self.fresh:
+            self.read_google_vectors()
+
+        # Ensure the lemma is unicode and lowercased
+        lemma = utils.normalize_token(lemma)
+
+        # If there is no entry for this lemma, then return the average vector
+        if lemma not in self.vectors:
+
+            # Check if we've already calculated the average vector
+            if 'avg-google-vec' not in self.fresh:
+                self.avg_google_vec = np.mean(self.vectors.values(), axis=0)
+                self.fresh.add('avg-google-vec')
+
+            # Return the average vector (because no vector was found for lemma)
+            return self.avg_google_vec
+
+        # Return this lemma's vector embedding
+        return self.vectors[lemma]
+
+
+    def get_feature_counts(
+        self, lemma, feature_types=COUNT_BASED_FEATURES
+    ):
         """
         Get the features associated to a given token.  Features of all types
-        requested are merged into one dictionary and returned.  Ensures that
-        the normalized features returned are in sync with latest updates by
-        calling ``normalize_features()`` in case recent changes have altered
-        feature counts.
+        requested are merged into one dictionary and returned.
         """
-        if self._stale:
+        # Ensure the lemma is unicode and lowercased
+        lemma = utils.normalize_token(lemma)
+
+        # Get all the feature types requested for this lemma
+        features =  t4k.merge_dicts(*[
+            getattr(self, feature_type)[lemma]
+            for feature_type in feature_types
+        ])
+
+        return features
+
+
+    def get_derivational_features(self, lemma):
+        """
+        Get the derivational features for the provided word.
+        """
+        if 'derivational' not in self.fresh:
+            self.calculate_derivational_features()
+
+        # Ensure the lemma is unicode and lowercased
+        lemma = utils.normalize_token(lemma)
+
+        # Return the derivational features for this lemma
+        return self.derivational_features[lemma]
+
+
+    def get_normalized_features(
+        self, lemma, feature_types=COUNT_BASED_FEATURES
+    ):
+        """
+        Get the normalized features associated to a given token.  Features of
+        all types requested are merged into one dictionary and returned.
+        Ensures that the normalized features returned are in sync with latest
+        updates by calling ``normalize_features()`` in case recent changes have
+        altered feature counts.
+        """
+        if 'normalize' not in self.fresh:
             self.normalize_features()
 
         # Ensure the lemma is unicode and lowercased
@@ -312,7 +701,68 @@ class FeatureAccumulator(object):
         return features
 
 
-    def get_features_idx(self, lemma_idx, feature_types=FEATURE_TYPES):
+    def get_log_features(self, lemma, feature_types=COUNT_BASED_FEATURES):
+        """
+        Get the features associated to a given token under log transformation.
+        Features of all types requested are merged into one dictionary and
+        returned.  Ensures that the log features returned are in sync
+        with latest updates by calling ``calculate_log_features()`` in case
+        recent changes have altered feature counts.
+        """
+        if 'log' not in self.fresh:
+            self.calculate_log_features()
+
+        # Ensure the lemma is unicode and lowercased
+        lemma = utils.normalize_token(lemma)
+
+        # Get all the feature types requested for this lemma
+        features =  t4k.merge_dicts(*[
+            self.log_features[feature_type][lemma]
+            for feature_type in feature_types
+        ])
+
+        return features
+
+
+    def get_threshold_features(
+        self, lemma, feature_types=COUNT_BASED_FEATURES, p=0.5
+    ):
+        """
+        Get the thresholded features associated to a given token.  Features of
+        all types requested are merged into one dictionary and returned.
+        Ensures that the thresholded features returned are in sync with latest
+        updates by calling ``calculate_log_features()`` in case recent changes
+        have altered feature counts.
+        """
+        if p not in self.threshold_features:
+            self.calculate_threshold_features(p)
+
+        # Ensure the lemma is unicode and lowercased
+        lemma = utils.normalize_token(lemma)
+
+        # Get all the feature types requested for this lemma
+        features =  t4k.merge_dicts(*[
+            self.threshold_features[p][feature_type][lemma]
+            for feature_type in feature_types
+        ])
+
+        return features
+
+
+    def get_log_features_idx(
+        self, lemma_idx, feature_types=COUNT_BASED_FEATURES
+    ):
+        """
+        Similar to ``get_log_features()``, but look up the features by a
+        token's integer id.  Useful when tokens need to be encoded as ints.
+        """
+        lemma = self.dictionary.get_token(lemma_idx)
+        return self.get_log_features(lemma, feature_types)
+
+
+    def get_features_idx(
+        self, lemma_idx, feature_types=COUNT_BASED_FEATURES
+    ):
         """
         Similar to ``get_features()``, but look up the features by a token's 
         integer id.  Useful when tokens need to be encoded as ints.
@@ -326,33 +776,45 @@ class FeatureAccumulator(object):
         Add counts from ``other`` to self.
         """
         # This operation makes normalized features stale
-        self._stale = True
+        self.fresh = set()
+        self.threshold_features = {}
 
         self.dictionary.add_dictionary(other.dictionary)
-        for key in other.dependency:
-            self.dependency[key] += other.dependency[key]
-        for key in other.baseline:
-            self.baseline[key] += other.baseline[key]
-        for key in other.hand_picked:
-            self.hand_picked[key] += other.hand_picked[key]
+        for feature_type in COUNT_BASED_FEATURES:
+            own_features = getattr(self, feature_type)
+            other_features = getattr(other, feature_type)
+            for key in other_features:
+                own_features[key] += other_features[key]
 
 
     def merge_load(self, path):
         print 'reading features from disc...'
         # This operation makes normalized features stale
-        self._stale = True
+        self.fresh = set()
+        self.threshold_features = {}
 
         # Read the dictionary from disc and merge it with the one in memory.
         add_dictionary = UnigramDictionary()
         add_dictionary.load(os.path.join(path, 'dictionary'))
+
+        # Filter out any tokens that are out-of-vocabulary (if vocab was given)
+        if self.vocabulary is not None:
+            for token in add_dictionary.get_token_list():
+                if token not in self.vocabulary and token != 'UNK':
+                    add_dictionary.remove(token)
+            add_dictionary.compact()
+
+        # Merge the loaded and filtered dictionary with the one in memory.
         self.dictionary.add_dictionary(add_dictionary)
 
         # Read each of the feature types from disc and merge with those in mem.
-        for feature_type in FEATURE_TYPES:
+        for feature_type in COUNT_BASED_FEATURES:
             feature_accumulator = getattr(self, feature_type)
             feature_path = os.path.join(path, feature_type + '.json')
             as_dict = json.loads(open(feature_path).read())
             for key in as_dict:
+                if self.vocabulary is not None and key not in self.vocabulary:
+                    continue
                 feature_accumulator[key].update(as_dict[key])
 
 
@@ -363,7 +825,8 @@ class FeatureAccumulator(object):
 
     def extract(self, article):
         # This operation makes normalized features stale
-        self._stale = True
+        self.fresh = set()
+        self.threshold_features = {}
 
         for sentence in article.sentences:
             for token in sentence['tokens']:
@@ -372,8 +835,9 @@ class FeatureAccumulator(object):
                 lemma = utils.normalize_token(token['lemma'])
 
                 # Skip words that aren't in the vocabulary.
-                if self.vocabulary is not None and lemma not in self.vocabulary:
-                    continue
+                if self.vocabulary is not None:
+                    if lemma not in self.vocabulary:
+                        continue
 
                 # Skip words that aren't a common noun.
                 pos = token['pos']
@@ -387,19 +851,22 @@ class FeatureAccumulator(object):
                 self.get_dep_tree_features(token)
                 self.get_baseline_features(token)
                 self.get_hand_picked_features(token)
+                self.get_lexical_features(token, sentence)
 
 
-    def prune_features(self, min_occurrences=5):
+    def prune_features(self, min_frequencey=5):
         """
-        Eliminates features that occur in fewer than 5 examples.
+        Eliminates features that occur in fewer than ``min_frequencey``
+        examples.
         """
         # This operation makes normalized features stale
-        self._stale = True
+        self.fresh = set()
+        self.threshold_features = {}
 
-        # First we need to count how many times each feature occurs accross all 
+        # First we need to count how many times each feature occurs accross all
         # tokens.  We'll do this separately for the different feature types.
         # And then, for each, we'll remove any features.
-        for feature_type in FEATURE_TYPES:
+        for feature_type in COUNT_BASED_FEATURES:
 
             # First count the occurrences of each feature for this feature type
             features = getattr(self, feature_type)
@@ -410,7 +877,7 @@ class FeatureAccumulator(object):
             # Make a set of all features that occured too few times
             features_to_eliminate = {
                 feature for feature in feature_occurrences 
-                if feature_occurrences[feature] < min_occurrences
+                if feature_occurrences[feature] < min_frequencey
             }
 
             # Now eliminate those features
@@ -420,29 +887,29 @@ class FeatureAccumulator(object):
                         del features[token][feature]
 
 
-    def prune_dictionary(self, min_occurrences=5):
+    def prune_dictionary(self, min_frequencey=5):
         """
         Eliminiates words in the vocabulary (and the associated features we 
         collected) that occur less than 5 times.
         """
         # This operation makes normalized features stale
-        self._stale = True
+        self.fresh = set()
+        self.threshold_features = {}
 
         # First, delegate to the underlying unigram dictionary, which will
         # prune itself and return the set of tokens that were removed (so we
         # can use it to prune the feature Counters).
-        eliminated_tokens = self.dictionary.prune(min_occurrences)
+        eliminated_tokens = self.dictionary.prune(min_frequencey)
 
         # Now go through each feature type and eliminate entries for the
         # removed words
-        for feature_type in FEATURE_TYPES:
+        for feature_type in COUNT_BASED_FEATURES:
             features = getattr(self, feature_type)
             for token in eliminated_tokens:
                 try:
                     del features[token]
                 except KeyError:
                     pass
-
 
 
     def write(self, path):
@@ -453,15 +920,76 @@ class FeatureAccumulator(object):
         self.dictionary.save(os.path.join(path, 'dictionary'))
 
         # Save each of the features
-        open(os.path.join(path, 'dependency.json'), 'w').write(json.dumps(
-            self.dependency))
-        open(os.path.join(path, 'baseline.json'), 'w').write(json.dumps(
-            self.baseline))
-        open(os.path.join(path, 'hand_picked.json'), 'w').write(json.dumps(
-            self.hand_picked))
+        for feature_type in COUNT_BASED_FEATURES:
+            features = getattr(self, feature_type)
+            open(os.path.join(path, feature_type + '.json'), 'w').write(
+                json.dumps(features))
 
 
-    # TODO: go to arbitrary depth recursivley
+
+    def get_lexical_features(self, token, sentence):
+        """
+        Get's lexical features such as the occurrence and position of 
+        neighboring tokens and bigrams, POSs, and lemmas.
+        """
+
+        # Establish a window around the token, but bounded by the sentence
+        window = self.lexical_feature_window
+        start = max(0, token['id'] - window)
+        end = min(len(sentence['tokens']), token['id'] + window + 1)
+
+        # Record the position-based lexical features
+        lemma = token['lemma']
+        for i in range(start, end):
+
+            # Skip the token itself.
+            if i == token['id']:
+                continue
+
+            # Get the relative position to the token
+            rel_pos = i - token['id']
+
+            # Get unigram features
+            neighbor_token = sentence['tokens'][i]
+            lemma_feature = '%s-(%d)' % (neighbor_token['lemma'], rel_pos)
+            self.lemma_unigram[lemma][lemma_feature] += 1
+            pos_feature = '%s-(%d)' % (neighbor_token['pos'], rel_pos)
+            self.pos_unigram[lemma][pos_feature] += 1
+            word_lowercase = neighbor_token['word'].lower()
+            surface_feature = '%s-(%d)' % (word_lowercase, rel_pos)
+            self.surface_unigram[lemma][surface_feature] += 1
+
+            # If we can create bigram features at this location, do so.
+            # This is possible either if we're looking at a token ahead of
+            # the focal token separated by at least one token, or if we're
+            # looking at a token after the focal token with at least one more
+            # token left before the end of the sentnece.
+            has_space_before = rel_pos < -1
+            has_space_after = rel_pos > 0 and i < len(sentence['tokens'])-1
+            if has_space_before or has_space_after:
+                next_neighbor_token = sentence['tokens'][i+1]
+
+                # Add lemma bigram features
+                lemma_feature = '%s-%s-(%d)' % (
+                    neighbor_token['lemma'], next_neighbor_token['lemma'],
+                    rel_pos
+                )
+                self.lemma_bigram[lemma][lemma_feature] += 1
+
+                # Add pos bigram features
+                pos_feature = '%s-%s-(%d)' % (
+                    neighbor_token['pos'], next_neighbor_token['pos'],
+                    rel_pos
+                )
+                self.pos_bigram[lemma][pos_feature] += 1
+
+                # Add surface bigram features
+                next_word_lowercase = next_neighbor_token['word'].lower()
+                surface_feature = '%s-%s-(%d)' % (
+                    word_lowercase, next_word_lowercase, rel_pos)
+                self.surface_bigram[lemma][surface_feature] += 1
+
+
     def get_dep_tree_features(self, token, depth=3):
         '''
         Extracts a set of features based on the dependency tree relations
@@ -660,7 +1188,8 @@ class FeatureAccumulator(object):
 
                 # See if there is a prepositional noun phrase of this type, and
                 # get it's head.  If not, continue to the next type
-                NP_head = get_first_matching_child(token, 'nmod:%s' % prep_type)
+                NP_head = get_first_matching_child(
+                    token, 'nmod:%s' % prep_type)
                 if NP_head is None:
                     continue
 
@@ -749,9 +1278,8 @@ def get_constituent_tokens(constituent, recursive=True):
             tokens.extend(get_constituent_tokens(child, recursive))
 
     return tokens
-    
+ 
 
-    
 def get_fnames(path):
     corenlp_path = os.path.join(path, 'CoreNLP')
     return t4k.ls(corenlp_path, absolute=True)

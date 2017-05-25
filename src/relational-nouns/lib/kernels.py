@@ -36,9 +36,9 @@ class PrecalculatedKernel(object):
         syntax_feature_types=['baseline', 'dependency', 'hand_picked'],
         semantic_similarity='res',
         include_suffix=True,
-        syntactic_multiplier=0.33,
-        semantic_multiplier=0.33,
-        suffix_multiplier=0.33,
+        syntactic_multiplier=10.0,
+        semantic_multiplier=2.0,
+        suffix_multiplier=0.2
     ):
         self.features = features
         self.syntax_feature_types = syntax_feature_types
@@ -78,6 +78,8 @@ class PrecalculatedKernel(object):
             self.information_content = wordnet_ic.ic(INFORMATION_CONTENT_FILE)
             
         self.cache = {}
+        self.verbose = False
+        self.eval_counter = 0
 
 
     def precompute(self, examples):
@@ -85,7 +87,9 @@ class PrecalculatedKernel(object):
         Precompute the kernel evaluation of all pairs in examples.
         """
         # Add all the example pairs to the work queue
-        for ex1, ex2 in itertools.combinations(examples, 2):
+        combinations = list(itertools.combinations_with_replacement(examples, 2))
+        for i, (ex1, ex2) in enumerate(combinations):
+            t4k.progress(i, len(combinations))
             dot = self.eval_pair(ex1, ex2)
 
 
@@ -98,13 +102,17 @@ class PrecalculatedKernel(object):
         result_queue = iq.IterableQueue()
 
         # Add all the example pairs to the work queue
+        print 'loading work onto queue'
         work_producer = work_queue.get_producer()
-        for ex1, ex2 in itertools.combinations(examples, 2):
+        combinations = list(itertools.combinations_with_replacement(examples,2))
+        for i, (ex1, ex2) in enumerate(combinations):
+            t4k.progress(i, len(combinations))
             work_producer.put((ex1, ex2))
         work_producer.close()
 
         # Start a bunch of workers
         for proc in range(num_processes):
+            print 'starting worker %d' % proc
             p = multiprocessing.Process(
                 target=self.precompute_worker,
                 args=(work_queue.get_consumer(), result_queue.get_producer())
@@ -113,12 +121,14 @@ class PrecalculatedKernel(object):
 
         # Get a result consumer, which is the last endpoint.  No more endpoints 
         # will be made from either queue, so close them
+        print 'starting to collect results'
         result_consumer = result_queue.get_consumer()
         result_queue.close()
         work_queue.close()
 
         # Get all the results and cache them
-        for ex1, ex2, dot in result_consumer:
+        for i, (ex1, ex2, dot) in enumerate(result_consumer):
+            t4k.progress(i, len(combinations))
             self.cache[frozenset((ex1, ex2))] = dot
 
 
@@ -141,11 +151,21 @@ class PrecalculatedKernel(object):
         len(A) by len(B) matrix.
         '''
 
+        # Keep track of calls to this
+        self.eval_counter += 1
+        #if self.eval_counter % 10000 == 0:
+        #    print self.eval_counter
+
         # Check the cache
         if frozenset((a,b)) in self.cache:
-            #t4k.out('+')
+            if self.verbose:
+                if self.eval_counter % 10000 == 0:
+                    t4k.out('+')
             return self.cache[frozenset((a,b))]
-        #t4k.out('.')
+
+        if self.verbose:
+            if self.eval_counter % 10000 == 0:
+                t4k.out('.')
 
         # Get a's dependency tree features
         if self.syntax_feature_types is not None:

@@ -5,22 +5,22 @@ sys.path.append('..')
 import cjson
 import t4k
 from SETTINGS import (
-	WORDNET_INDEX_PATH, DATA_DIR,
+	WORDNET_INDEX_PATH, DATA_DIR, SEED_PATH
     #TRAIN_PATH, TEST_PATH, SEED_PATH,
 )
 
 
 def calculate_best_score(scored_typed, metric='f1'):
     """
-	This function helps to convert from a scoring function to a classification
-	function.  Given some function which provides scores to items that are
-	either "positive" or "negative", find the best threshold score that gives
-	the greatest performance, when used to label any items whose score is
-	higher as "positive" and lower as "negative"
+        This function helps to convert from a scoring function to a
+        classification function.  Given some function which provides scores to
+        items that are either "positive" or "negative", find the best threshold
+        score that gives the greatest performance, when used to label any items
+        whose score is higher as "positive" and lower as "negative"
 
-	"Best performance" can either mean highest f1-score or highest accuracy,
-	determined by passing either 'f1' or 'accuracy' as the argument for 
-	``metric``.
+        "Best performance" can either mean highest f1-score or highest
+        accuracy, determined by passing either 'f1' or 'accuracy' as the
+        argument for ``metric``.
 
     INPUTS
         ``scored_typed`` should be a list of tuples of scored items, where the
@@ -220,7 +220,8 @@ def read_all_labels(path):
 
 
 def get_full_seed_set():
-	seed_path = os.path.join(DATA_DIR, 'relational-nouns', 'categorized.tsv')
+	seed_path = os.path.join(
+            DATA_DIR, 'relational-nouns', 'categorized.tsv')
 	pos, neg, neut = get_seed_set(seed_path)
 	return pos, neg, neut
 
@@ -249,24 +250,6 @@ def get_dictionary(path):
     dictionary = t4k.UnigramDictionary()
     dictionary.load(path)
     return dictionary
-
-
-#def get_train_sets():
-#    '''
-#    Get a set of positive (relational) words and a set of negative 
-#    (non-relational) words, to be used as a training set
-#    '''
-#    positives, negatives, neutrals = get_seed_set(TRAIN_PATH)
-#    return positives, negatives, neutrals
-
-
-#def get_test_sets():
-#    '''
-#    Get a set of positive (relational) words and a set of negative 
-#    (non-relational) words, to be used as a test set
-#    '''
-#    positives, negatives, neutrals = get_seed_set(TEST_PATH)
-#    return positives, negatives, neutrals
 
 
 def load_feature_file(path):

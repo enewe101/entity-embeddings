@@ -22,6 +22,7 @@ from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet as w
 import extract_features
 
+
 BEST_SETTINGS = {
     'on_unk': False,
     'C': 1.0,
@@ -32,7 +33,6 @@ BEST_SETTINGS = {
     'semantic_multiplier': 2.0,
     'suffix_multiplier': 0.2
 }
-
 
 
 def make_classifier(
@@ -68,17 +68,14 @@ def make_classifier(
 
     '''
 
-    ## Load positive and negative training sets (unless supplied)
-    #if positives is None or negatives is None:
-    #    positives, negatives, neutrals = get_train_sets()
-
     # Use the provided features or load from the provided path
     if isinstance(features, basestring):
         features = extract_features.make_feature_accumulator(load=features)
 
     if min_feature_frequency is not None:
         features.prune_features(min_feature_frequency)
-# We can only use words that we actually have features for
+
+    # We can only use words that we actually have features for
     positives = filter_seeds(positives, features.dictionary)
     negatives = filter_seeds(negatives, features.dictionary)
     neutrals = filter_seeds(neutrals, features.dictionary)
@@ -222,11 +219,11 @@ def arm_get_basic_syntax_features(features):
 
         count = features[lemma]['count']
         f1 = (
-            features[lemma]['nmod:of:NNX'] / float(count)
+            features[lemma]['nmod:of:NNX'] #/ float(count)
             if 'nmod:of:NNX' in features[lemma] else 0
         )
         f2 = (
-            features[lemma]['nmod:poss'] / float(count)
+            features[lemma]['nmod:poss'] #/ float(count)
             if 'nmod:poss' in features[lemma] else 0
         )
         return [f1, f2]
@@ -331,14 +328,20 @@ class BalancedLogisticClassifier(object):
     def predict(self, tokens):
         tokens = maybe_list_wrap(tokens)
         lemmas = lemmatize_many(tokens)
-        features = [self.get_features(lemma) for lemma in lemmas]
+        features = [
+            self.features.get_features(lemma, ['baseline']) 
+            for lemma in lemmas
+        ]
         return self.classifier.predict(features)
 
 
     def score(self, tokens):
         tokens = maybe_list_wrap(tokens)
         lemmas = lemmatize_many(tokens)
-        features = [self.get_features(l) for l in lemmas]
+        features = [
+            self.features.get_features(l, ['baseline'])
+            for l in lemmas
+        ]
         return self.classifier.predict_proba(features)[:,1]
 
 
@@ -354,13 +357,15 @@ class BalancedLogisticClassifier(object):
             negative_seeds = self.negative_seeds
 
         X = np.array(
-            [self.get_features(s) for s in positive_seeds]
-            + [self.get_features(s) for s in negative_seeds]
-        )
+            [
+                self.features.get_features(s, ['baseline']) 
+                for s in positive_seeds
+            ] + [
+                self.features.get_features(s, ['baseline']) 
+                for s in negative_seeds]
+            )
 
-        Y = np.array(
-            [1]*len(positive_seeds) + [0]*len(negative_seeds)
-        )
+        Y = np.array([1]*len(positive_seeds) + [0]*len(negative_seeds))
 
         return X, Y
 
@@ -606,9 +611,9 @@ class OrdinalSvmNounClassifier(object):
         include_suffix = True,
 
         # How to weight the different types of features
-        syntactic_multiplier=0.33,
-        semantic_multiplier=0.33,
-        suffix_multiplier=0.33
+        syntactic_multiplier=10.0,
+        semantic_multiplier=2.0,
+        suffix_multiplier=0.2
     ):
 
         # We create two classifiers: one to distinguish positive from '
@@ -721,6 +726,71 @@ class OrdinalSvmNounClassifier(object):
         return [-1 if s <= -1 else 0 if s < 1 else 1 for s in scores]
 
         
+
+class NounClassifier(object):
+    def __init__(self, X, Y, features, options):
+        self.features = features
+        self.dictionary = features.dictionary
+        self.train_classifier(X, Y, options)
+
+    def predict_token(self, token):
+        return self.classifier.predict(self.dictionary.get_id(token))
+
+    def predict(self, X):
+        return self.classifier.predict(X)
+
+
+DEFAULT_SVM_OPTIONS = {
+    'classifier': {
+        'C': 1.0,
+    },
+    'kernel': {
+        'syntax_feature_types': ['baseline', 'dependency', 'hand_picked'],
+        'semantic_similarity': 'res',
+        'include_suffix': True,
+        'syntactic_multiplier': 10.0,
+        'semantic_multiplier': 2.0,
+        'suffix_multiplier': 0.2
+    }
+}
+
+class SimplerSvmClassifier(NounClassifier):
+    """
+    Options
+    - C=1.0: Constant affecting the SVM fitting routine
+    - pre-bound-kernel: include a ready-bound kernel function to be used.
+    - kernel: Subdictionary of options for binding the kernel
+      -  syntax_feature_types=['baseline', 'dependency', 'hand_picked'],
+      -  semantic_similarity='res',
+      -  include_suffix = True,
+      -  syntactic_multiplier=0.33,
+      -  semantic_multiplier=0.33,
+      -  suffix_multiplier=0.33
+            
+    """
+
+    # Make the init function take a default for options
+    def __init__(self, X, Y, features, options=None):
+        if options is not None:
+            options = t4k.merge_dicts(options, DEFAULT_SVM_OPTIONS)
+        else:
+            options = DEFAULT_SVM_OPTIONS
+        super(SimplerSvmClassifier, self).__init__(X, Y, features, options)
+
+    def train_classifier(self, X, Y, options):
+
+        # Bind the kernel
+        if 'pre-bound-kernel' in options:
+            print 'using provided kernel'
+            kernel = options['pre-bound-kernel']
+        else:
+            kernel = bind_kernel(self.features, **options['kernel'])
+
+        self.classifier = svm.SVC(kernel=kernel, **options['classifier'])
+        self.classifier.fit(X,Y)
+
+
+
 
 class SvmNounClassifier(object):
 
