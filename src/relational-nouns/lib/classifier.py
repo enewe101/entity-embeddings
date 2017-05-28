@@ -36,10 +36,15 @@ BEST_SETTINGS = {
 
 
 def make_classifier(
-    kind='svm',    # available: 'osvm', 'svm', 'knn', 'wordnet', 'basic_syntax'
+
+    kind,                   # 'osvm','svm','knn','wordnet', 'basic_syntax'
+    X_train, y_train,
+    classifier_options={},
+
     on_unk=False,
     features=os.path.join(RELATIONAL_NOUN_FEATURES_DIR, 'test-coalesce'),
     kernel=None,
+
     positives=None,
     negatives=None,
     neutrals=None,
@@ -514,8 +519,6 @@ class BasicSyntaxNounClassifier(object):
         return X, Y
 
 
-
-
 class WordnetClassifier(object):
 
     def __init__(self, positive_seeds, negative_seeds):
@@ -599,7 +602,7 @@ class OrdinalSvmNounClassifier(object):
 
         # Features to be used in the kernel
         kernel=None,
-        features=None,    # Must be provided if syntax_feature_types is not None
+        features=None,
 
         # SVM options
         on_unk=False,
@@ -740,6 +743,7 @@ class NounClassifier(object):
         return self.classifier.predict(X)
 
 
+
 DEFAULT_SVM_OPTIONS = {
     'classifier': {
         'C': 1.0,
@@ -753,6 +757,7 @@ DEFAULT_SVM_OPTIONS = {
         'suffix_multiplier': 0.2
     }
 }
+
 
 class SimplerSvmClassifier(NounClassifier):
     """
@@ -803,7 +808,7 @@ class SvmNounClassifier(object):
 
         # Features to be used in the kernel
         kernel=None,
-        features=None,    # Must be provided if syntax_feature_types is not None
+        features=None,
 
         # SVM options
         on_unk=False,
@@ -1263,6 +1268,7 @@ def get_all_synsets(tokens):
 LEMMATIZER = WordNetLemmatizer()
 def lemmatize(token):
     return LEMMATIZER.lemmatize(ensure_unicode(token).lower())
+
 
 def lemmatize_many(tokens):
     return [lemmatize(token) for token in tokens ]

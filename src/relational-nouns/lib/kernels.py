@@ -8,12 +8,13 @@ sys.path.append('..')
 import t4k
 from nltk.corpus import wordnet, wordnet_ic
 import utils as u
+import extract_features
 
 INFORMATION_CONTENT_FILE = 'ic-treebank-resnik-add1.dat'
 LEGAL_SIMILARITIES = [
     'jcn', 'wup', 'res', 'path', 'lin', 'lch' 
 ]
-LEGAL_SYNTACTIC_SIMILARITIES = ['hand_picked', 'dependency', 'baseline']
+LEGAL_SYNTACTIC_SIMILARITIES = extract_features.COUNT_BASED_FEATURES
 
 
 def bind_dist(features, dictionary):
@@ -32,18 +33,39 @@ class PrecalculatedKernel(object):
 
     def __init__(
         self, 
-        features=None, # Must be provided if syntax_feature_types is True
-        syntax_feature_types=['baseline', 'dependency', 'hand_picked'],
+        features=None, # Must be provided if count_based_feature_types is True
+        count_based_feature_types=extract_features.COUNT_BASED_FEATURES,
+        non_count_feature_types=extract_features.NON_COUNT_FEATURES,
+        count_feature_mode='normalized',
+        use_derivational_features=True,
+        use_embedding_features=True,
+        use_suffix_features=True,
         semantic_similarity='res',
-        include_suffix=True,
-        syntactic_multiplier=10.0,
-        semantic_multiplier=2.0,
-        suffix_multiplier=0.2
+
+        syntactic_multiplier=1.0,
+        semantic_multiplier=1.0,
+        suffix_multiplier=1.0
+        #syntactic_multiplier=10.0,
+        #semantic_multiplier=2.0,
+        #suffix_multiplier=0.2
     ):
+
+        # Register the switches that control which features are included when
+        # calculating the kernel function
         self.features = features
-        self.syntax_feature_types = syntax_feature_types
+
+        self.count_based_feature_types = count_based_feature_types
+        self.non_count_feature_types = non_count_feature_types
+        self.count_feature_mode = count_feature_mode
+
+        self.use_derivational_features = use_derivational_features
+        self.use_embedding_features = use_embedding_features
+        self.use_suffix_features = use_suffix_features
+
         self.semantic_similarity = semantic_similarity
-        self.include_suffix = include_suffix
+
+        # Register the multiplicative weight applied to specific feature 
+        # subsets' contributions to the kernel function.
         self.syntactic_multiplier = syntactic_multiplier
         self.semantic_multiplier = semantic_multiplier
         self.suffix_multiplier = suffix_multiplier
@@ -61,22 +83,22 @@ class PrecalculatedKernel(object):
             )
 
         # Validate that a sensible value for syntactic similarity was provided
-        syntactic_similarity_is_valid = syntax_feature_types is None or all(
+        syntactic_similarity_is_valid = count_based_feature_types is None or all(
             feature_type in LEGAL_SYNTACTIC_SIMILARITIES 
-            for feature_type in syntax_feature_types
+            for feature_type in count_based_feature_types
         )
         if not syntactic_similarity_is_valid:
             raise ValueError(
-                'syntax_feature_types must be a list with any of the following: '
+                'count_based_feature_types must be a list with any of the following: '
                 + ', '.join(LEGAL_SYNTACTIC_SIMILARITIES) 
-                + '.  Got %s.' % repr(syntax_feature_types)
+                + '.  Got %s.' % repr(count_based_feature_types)
             )
 
         # Semantic similarity functions need an "information content" file 
         # to calculate similarity values.
         if semantic_similarity is not None:
             self.information_content = wordnet_ic.ic(INFORMATION_CONTENT_FILE)
-            
+
         self.cache = {}
         self.verbose = False
         self.eval_counter = 0
@@ -167,54 +189,74 @@ class PrecalculatedKernel(object):
             if self.eval_counter % 10000 == 0:
                 t4k.out('.')
 
-        # Get a's dependency tree features
-        if self.syntax_feature_types is not None:
-            syntax_features_a = self.features.get_features(
-                a, self.syntax_feature_types
-            )
+        kernel_score = 0
 
-        # Get the a's synset if semantic similarity is being used
+        # Compute the count-based contribution to the kernel
+        if self.count_based_feature_types is not None:
+            syntax_features_a = self.features.get_count_based_features(
+                a, self.count_based_feature_types,
+                self.count_feature_mode
+            )
+            syntax_features_b = self.features.get_count_based_features(
+                b, self.count_based_feature_types,
+                self.count_feature_mode
+            )
+            count_based_contribution = self.syntactic_multiplier * dict_dot(
+                syntax_features_a, syntax_features_b)            
+            print 'count-based contribution:', count_based_contribution
+            kernel_score += count_based_contribution
+
+        # Compute derivational feature contribution to kernel
+        if 'derivational' in self.non_count_feature_types:
+            derivational_contribution = np.dot(
+                self.features.get_derivational_features(a),
+                self.features.get_derivational_features(b)
+            )
+            print 'derivational contribution', derivational_contribution
+            kernel_score += derivational_contribution
+
+        # Compute embedding feature contribution to kernel
+        if 'google-vectors' in self.non_count_feature_types:
+            embedding_contribution = np.dot(
+                self.features.get_vector(a), self.features.get_vector(b))
+            print 'embedding contribution', embedding_contribution
+            kernel_score += embedding_contribution
+
+        # Compute suffix contribution to kernel
+        if 'suffix' in self.non_count_feature_types:
+            suffix_a = self.features.get_suffix(a)
+            suffix_b = self.features.get_suffix(b)
+            if suffix_a is not None and suffix_a == suffix_b:
+                suffix_contribution = self.suffix_multiplier
+            else:
+                suffix_contribution = 0
+            print 'suffix contribution', suffix_contribution
+            kernel_score += suffix_contribution
+
+        # Compute semantic similarity contribution to kernel
         if self.semantic_similarity is not None:
             try:
                 semantic_features_a = nouns_only(wordnet.synsets(a))
             except WordNetError:
-                print a
+                print 'WordNetError-a', a
                 return 0
 
-        if self.include_suffix:
-            suffix_a = self.features.get_suffix(a)
-
-        kernel_score = 0
-
-        # Calculate the dependency tree kernel
-        if self.syntax_feature_types is not None:
-            syntax_features_b = self.features.get_features(
-                b, self.syntax_feature_types
-            )
-            kernel_score += self.syntactic_multiplier * dict_dot(
-                syntax_features_a, syntax_features_b)
-
-        # Calculate semantic similarity is being used
-        if self.semantic_similarity is not None:
             try:
                 semantic_features_b = nouns_only(wordnet.synsets(b))
             except WordNetError:
-                print b
+                print 'WordNetError-b', a
                 return 0
 
             try:
-                kernel_score += self.semantic_multiplier * max_similarity(
-                    self.semantic_similarity, semantic_features_a, 
-                    semantic_features_b, self.information_content
-                )
+                semantic_contribution = (
+                    self.semantic_multiplier * max_similarity(
+                        self.semantic_similarity, semantic_features_a, 
+                        semantic_features_b, self.information_content
+                ))
+                print 'semantic contribution', semantic_contribution
+                kernel_score += semantic_contribution
             except WordNetError:
-                print a, b
-
-        # Determine if suffixes match
-        if self.include_suffix:
-            suffix_b = self.features.get_suffix(b)
-            if suffix_a is not None and suffix_a == suffix_b:
-                kernel_score += self.suffix_multiplier
+                print 'WordNetError-ab', a, b
 
         self.cache[frozenset((a,b))] = kernel_score
 

@@ -22,6 +22,12 @@ import kernels
 UNRECOGNIZED_TOKENS_PATH = os.path.join(DATA_DIR, 'unrecognized-tokens.txt')
 
 
+def test_svm_ternary_fract_nowhite():
+   feature_accumulator = extract_features.get_accumulated_features()
+   feature_accumulator.normalize_features()
+   kernel = 0
+
+
 all_sets = set(['rand', 'guess', 'top'])
 def evaluate_simple_classifier(
     annotations, features, kernel, test_sets, num_folds=3
@@ -70,7 +76,6 @@ def evaluate_simple_classifier(
         results.append(result)
 
     return results
-
 
 
 
@@ -134,14 +139,6 @@ def evaluate_ordinal_classifier_(
         results.append(result)
 
     return results
-
-
-
-
-
-
-
-
 
 
 
@@ -414,7 +411,7 @@ def optimize_classifier(
 
     # Open the file where we'll write the results
     out_f = open(out_path, 'w')
-    
+
     # Open queues to spread work and collect results
     work_queue = iq.IterableQueue()
     results_queue = iq.IterableQueue()

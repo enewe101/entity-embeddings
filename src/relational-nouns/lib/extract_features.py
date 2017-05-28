@@ -29,7 +29,7 @@ GAZETTEER_DIR = os.path.join(DATA_DIR, 'gazetteers')
 GAZETTEER_FILES = [
     'country', 'city', 'us-state', 'continent', 'subcontinent'
 ]
-    
+
 # Average dot product between two randomly chosen vectors.  Should be used
 # in the kernel when one or both of the token's vectors are missing
 AVERAGE_ABSOLUTE_DOT = 0.068708472297183756
@@ -56,7 +56,7 @@ def coalesce_features(
 
         # Tolerate errors reading or json parsing
         except (IOError, ValueError), e:
-            print 'problem with feature_dir %d: %s' % (feature_dir, str(e))
+            print 'problem with feature_dir %s: %s' % (feature_dir, str(e))
             pass
 
     # Prune the features
@@ -215,9 +215,9 @@ COUNT_BASED_FEATURES = [
     'lemma_unigram', 'lemma_bigram', 'pos_unigram', 'pos_bigram', 
     'surface_unigram', 'surface_bigram'
 ]
-ALL_FEATURES = COUNT_BASED_FEATURES + [
-    'derivational', 'google-vectors', 'suffix'
-]
+NON_COUNT_FEATURES = ['derivational', 'google-vectors', 'suffix']
+ALL_FEATURES = COUNT_BASED_FEATURES + NON_COUNT_FEATURES
+
 
 class FeatureAccumulator(object):
     """
@@ -339,7 +339,7 @@ class FeatureAccumulator(object):
 
         # If necessary accumulate all feature values, sorted.  This allows us
         # to determine the (p*100)th percentile, to be used as the threshold
-        if 'sorted-features' in self.fresh:
+        if 'sorted-features' not in self.fresh:
             self.accumulate_sorted_feature_values()
 
         # calculate the thresholds for each feature based on this p-value
@@ -643,6 +643,26 @@ class FeatureAccumulator(object):
         return self.vectors[lemma]
 
 
+    def get_count_based_features(
+        self, 
+        lemma,
+        feature_types=COUNT_BASED_FEATURES,
+        mode='normalized',
+        p=0.5
+    ):
+
+        if mode == 'raw':
+            return self.get_feature_counts(lemma, feature_types)
+        elif mode == 'normalized':
+            return self.get_normalized_features(lemma, feature_types)
+        elif mode == 'log':
+            return self.get_log_features(lemma, feature_types)
+        elif mode == 'threshold':
+            return self.get_threshold_features(lemma, feature_types, p)
+        else:
+            raise ValueError('Unexpected mode: %s' % mode)
+
+
     def get_feature_counts(
         self, lemma, feature_types=COUNT_BASED_FEATURES
     ):
@@ -924,7 +944,6 @@ class FeatureAccumulator(object):
             features = getattr(self, feature_type)
             open(os.path.join(path, feature_type + '.json'), 'w').write(
                 json.dumps(features))
-
 
 
     def get_lexical_features(self, token, sentence):

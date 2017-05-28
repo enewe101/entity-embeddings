@@ -45,8 +45,26 @@ def coalesce_batch(batch_num):
         feature_dirs=feature_dirs
     )
 
+def combine_batches():
+    in_dir = os.path.join(DATA_DIR, 'relational-noun-features-lexical-wordnet')
+    feature_dirs = t4k.ls(
+        in_dir, absolute=True, match='.*accumulated50-', files=False
+    )
+    out_dir = os.path.join(
+        in_dir, 'accumulated450-min_token_5-min_feat5000')
+
+    ef.coalesce_features(
+        out_dir=out_dir,
+        min_token_occurrences=5,
+        min_feature_occurrences=5000,
+        vocabulary=utils.read_wordnet_index(),
+        feature_dirs=feature_dirs
+    )
+
+
 if __name__ == '__main__':
     #coalesce_wordnet_only()
     #coalesce()
-    coalesce_batch(5)
+    #batch_num = int(sys.argv[1])
+    combine_batches()
 
