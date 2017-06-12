@@ -1,8 +1,12 @@
 import t4k
 import os
 import sys
-from SETTINGS import DATA_DIR
+from SETTINGS import DATA_DIR, SEED_PATH
+import numpy as np
+import random
+import utils
 
+ALL_SOURCES = {'rand', 'top', 'guess', 'seed'}
 ANNOTATIONS_PATH = os.path.join(
     DATA_DIR, 'relational-nouns', 'all-annotations.tsv')
 DICTIONARY_DIR = os.path.join(
@@ -10,21 +14,22 @@ DICTIONARY_DIR = os.path.join(
     'accumulated-pruned-5000', 'dictionary'
 )
 
+class UnknownLabelError(Exception):
+    pass
+
 class Annotations(object):
 
-    def __init__(self):
+    def __init__(self, vocabulary=utils.read_wordnet_index()):
 
-        # Read a dictionary which maps tokens to ids (so they can be used in 
-        # classifiers)
-        self.dictionary = t4k.UnigramDictionary()
-        self.dictionary.load(DICTIONARY_DIR)
+        self.vocabulary = vocabulary
 
         # All tokens and their classification are stored here, according to 
         # their source
         self.examples_by_source = {
             'rand':set(),
             'top':set(),
-            'guess':set()
+            'guess':set(),
+            'seed':set()
         }
         self.guessed_examples_by_source = {
             'pos': set(),
@@ -44,6 +49,8 @@ class Annotations(object):
 
             # Parse and store this example
             token, sources, annotator, label = line.split('\t')
+            if token not in vocabulary:
+                continue
             self.examples[token] = get_label(label)
             self.example_source_lookup[token] = (
                 get_sources(sources) + list(get_guessed_sources(sources)))
@@ -51,6 +58,34 @@ class Annotations(object):
                 self.examples_by_source[source].add(token)
             for source in get_guessed_sources(sources):
                 self.guessed_examples_by_source[source].add(token)
+
+        for line in open(SEED_PATH):
+
+            # Clean trailing whitespace and skip blank lines
+            line = line.strip()
+            if line == '':
+                continue
+
+            # Parse the line
+            fields = line.split('\t')
+            token, label = fields[0], fields[1]
+
+            # Don't add seeds that are duplicates
+            if token in self.examples:
+                continue
+
+            # Don't add seeds that are outside the vocabulary
+            if token not in self.vocabulary:
+                continue
+
+            # Store this token, it's label, and its source ('seed').
+            try:
+                self.examples[token] = get_label(label)
+            except UnknownLabelError:
+                continue
+            self.example_source_lookup[token] = ['seed']
+            self.examples_by_source['seed'].add(token)
+
 
 
     def get_source_tokens(self, sources, exclude_sources=[]):
@@ -83,6 +118,91 @@ class Annotations(object):
 
         return tokens
 
+    def get_train_test(self, source, num_test=500):
+        """
+        Get items split into testing and training sets, drawing `num_test` 
+        testing items from ``source``, while putting the remainder into the
+        training set along with all elements from sources other than `source`.
+        """
+
+        random.seed(0)
+
+        # The test set will consist of 500 examples from top and 500 examples
+        # from rand.
+        focal_pos, focal_neut, focal_neg = self.get_as_tokens(source)
+        total = float(len(focal_pos) + len(focal_neut) + len(focal_neg))
+
+        # Take proportionately from each
+        num_test_pos = int(np.round(num_test*len(focal_pos)/total))
+        test_pos = set(random.sample(focal_pos, num_test_pos))
+        num_test_neut = int(np.round(num_test*len(focal_neut)/total))
+        test_neut = set(random.sample(focal_neut, num_test_neut))
+        num_test_neg =  int(np.round(num_test*len(focal_neg)/total))
+        test_neg = set(random.sample(focal_neg, num_test_neg))
+
+        # Everything else will be part of the training set.
+        add_train_pos = focal_pos - test_pos
+        add_train_neut = focal_neut - test_neut
+        add_train_neg = focal_neg - test_neg
+
+        # Get the training set from the other parts of the dataset
+        non_focal_sources = set(ALL_SOURCES) - set([source])
+        train_pos, train_neut, train_neg = self.get_as_tokens(
+            non_focal_sources, source)
+
+        # take items from focal sets not used for testing and add to training
+        train_pos |= focal_pos - test_pos
+        train_neut |= focal_neut - test_neut
+        train_neg |= focal_neg - test_neg
+
+        train = {'pos': train_pos, 'neut': train_neut, 'neg': train_neg}
+        test = {'pos': test_pos, 'neut': test_neut, 'neg': test_neg}
+
+        return train, test
+
+
+    def get_train_dev(self, num_dev=500, num_test=500):
+        """
+        Get the training set split into a training and dev set (excludes items
+        that would be served in the test set for get_train_test('top') and
+        get_train_test('rand').
+        """
+
+        # begin by getting both relevant test sets: one based on items in 'top'
+        # and one based on items from 'rand'.  Then, eliminate these items
+        # before making the dev and train sets.  Split what remains into dev
+        # and train.
+
+        # First, get both relevant test sets
+        train_top, test_top = self.get_train_test('top', num_test)
+        train_rand, test_rand = self.get_train_test('rand', num_test)
+
+        # Now get the items remaining once the test items have been removed.
+        # train_rand already doesn't have rand items, so only need to remove top
+        dev_train = {}
+        dev_train['pos'] = train_rand['pos'] - test_top['pos']
+        dev_train['neut'] = train_rand['neut'] - test_top['neut']
+        dev_train['neg'] = train_rand['neg'] - test_top['neg']
+
+        # Now split what remains into a training and dev set
+        dev = {}
+        train = {}
+        total = float(
+            len(dev_train['pos'] | dev_train['neut'] | dev_train['neg']))
+        num_dev_pos = int(np.round(num_dev * len(dev_train['pos']) / total))
+        dev['pos'] = set(random.sample(dev_train['pos'], num_dev_pos))
+        train['pos'] = dev_train['pos'] - dev['pos']
+
+        num_dev_neut = int(np.round(num_dev * len(dev_train['neut']) / total))
+        dev['neut'] = set(random.sample(dev_train['neut'], num_dev_neut))
+        train['neut'] = dev_train['neut'] - dev['neut']
+
+        num_dev_neg = int(np.round(num_dev * len(dev_train['neg']) / total))
+        dev['neg'] = set(random.sample(dev_train['neg'], num_dev_neg))
+        train['neg'] = dev_train['neg'] - dev['neg']
+
+        return train, dev
+
 
     def get_as_tokens(self, sources, exclude_sources=[]):
         """
@@ -106,21 +226,21 @@ class Annotations(object):
         return positive, neutral, negative
 
 
-    def get(self, sources, exclude_sources=[]):
-        """
-        Get the feature and label arrays, in a format suitable for scikit 
-        classifiers.
-        """
+    #def get(self, sources, exclude_sources=[]):
+    #    """
+    #    Get the feature and label arrays, in a format suitable for scikit 
+    #    classifiers.
+    #    """
 
-        tokens = self.get_source_tokens(sources, exclude_sources)
+    #    tokens = self.get_source_tokens(sources, exclude_sources)
 
-        # convert tokens to an array of token-ids and provide labels as 
-        # separate array
-        X, Y = [], []
-        X = [[self.dictionary.get_id(token)] for token in tokens]
-        Y = [self.examples[token] for token in tokens]
+    #    # convert tokens to an array of token-ids and provide labels as 
+    #    # separate array
+    #    X, Y = [], []
+    #    X = [[self.dictionary.get_id(token)] for token in tokens]
+    #    Y = [self.examples[token] for token in tokens]
 
-        return X, Y
+    #    return X, Y
 
                 
 
@@ -150,6 +270,7 @@ GUESSED_SOURCE_MAP = {
     'neut2': 'neut'
 }
 
+
 def get_guessed_sources(sources):
     for source in sources.split(':'):
         if source in GUESSED_SOURCE_MAP:
@@ -163,4 +284,7 @@ LABEL_MAP = {
     '+': 2  # usually relational
 }
 def get_label(label):
-    return LABEL_MAP[label]
+    try:
+        return LABEL_MAP[label]
+    except KeyError:
+        raise UnknownLabelError(KeyError.message)

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import sklearn
 from nltk.corpus import wordnet
 import numpy as np
 import utils
@@ -288,6 +289,7 @@ class FeatureAccumulator(object):
 
 
     def read_google_vectors(self):
+        print 'reading google vectors'
         self.vectors = {}
         for line in open(self.google_vectors_path):
 
@@ -301,6 +303,7 @@ class FeatureAccumulator(object):
                 continue
             self.vectors[token] = [float(v) for v in line.split(' ')[1:]]
 
+        print 'done reading google vectors'
         self.fresh.add('vectors')
 
 
@@ -472,13 +475,20 @@ class FeatureAccumulator(object):
         # Ensure the lemma is unicode and lowercased
         lemma = utils.normalize_token(lemma)
 
-        return self.suffix[lemma]
+        try:
+            return self.suffix[lemma]
+        except KeyError:
+            return None
 
             
     def as_sparse_matrix(
         self,
-        include_features=ALL_FEATURES,
-        mode='raw' # 'log' | 'normalized' | threshold
+        tokens=None,
+        count_based_features=COUNT_BASED_FEATURES,
+        non_count_features=NON_COUNT_FEATURES,
+        mode='raw', # 'log' | 'normalized' | threshold,
+        whiten=False,
+        threshold=0.5
     ):
         """
         Reformats the storage of the features into a pandas data frame, so that
@@ -490,87 +500,86 @@ class FeatureAccumulator(object):
         if 'feature-map' not in self.fresh:
             self.get_feature_map()
 
+        # For which tokens are we building the feature vectors?  If nothing
+        # was provided, make it for all tokens in the dictionary.
+        if tokens is None:
+            tokens = self.dictionary.get_token_list()
+
+
         # Get a feature map, which maps each feature (by name) to an integer
         # correponding to it's (column) index in the sparse matrix
         # representation of tokens' features.
         coo_val, coo_i, coo_j = [], [], []
-        for i, lemma in enumerate(self.dictionary.get_token_list()):
+        for token_num, lemma in enumerate(tokens):
 
-            if lemma == 'home':
-                print 'home', i
-
-            t4k.progress(i, len(self.dictionary))
-
-            # We'll begin by getting the count-based features.  Determine the
-            # subset of features that are count-based
-            include_count_based_features = (
-                set(include_features) & set(COUNT_BASED_FEATURES))
+            t4k.progress(token_num, len(self.dictionary))
 
             # Get the count-based features using the desired mode
             if mode == 'normalized':
                 count_features = self.get_normalized_features(
-                    lemma, include_count_based_features)
+                    lemma, count_based_features)
             elif mode == 'log':
                 count_features = self.get_log_features(
-                    lemma, include_count_based_features)
+                    lemma, count_based_features)
             elif mode == 'threshold':
                 count_features = self.get_threshold_features(
-                    lemma, include_count_based_features)
+                    lemma, count_based_features, threshold)
             elif mode == 'raw':
                 count_features = self.get_feature_counts(
-                    lemma, include_count_based_features)
+                    lemma, count_based_features)
             else:
                 raise ValueError('Unexpected mode: "%s"' % mode)
 
             # Add the count feature to the coo_matrix construction lists
             coo_val.extend(count_features.values())
-            coo_i.extend([i]*len(count_features))
+            coo_i.extend([token_num]*len(count_features))
             coo_j.extend([self.feature_map[feat] for feat in count_features])
 
             # Next get google embedding features (if desired)
-            if 'google-vectors' in include_features:
+            if 'google-vectors' in non_count_features:
                 vec = self.get_vector(lemma)
                 coo_val.extend(vec)
-                coo_i.extend([i]*LEN_GOOGLE_VECTORS)
+                coo_i.extend([token_num]*LEN_GOOGLE_VECTORS)
                 coo_j.extend([
                     self.feature_map['google-vectors-%d'%f] 
                     for f in range(LEN_GOOGLE_VECTORS)
                 ]) 
 
             # Next get derivational features (if desired)
-            if 'derivational' in include_features:
+            if 'derivational' in non_count_features:
                 deriv_feats = self.get_derivational_features(lemma)
-                if lemma == 'home':
-                    print deriv_feats
-                    print [i]*len(WORDNET_POS)
-                    print [
-                        self.feature_map['derivational-%s'%d] 
-                        for d in WORDNET_POS
-                    ]
                 coo_val.extend(deriv_feats)
-                coo_i.extend([i]*len(WORDNET_POS))
+                coo_i.extend([token_num]*len(WORDNET_POS))
                 coo_j.extend([
                     self.feature_map['derivational-%s'%d] 
                     for d in WORDNET_POS
                 ])
 
             # Next get suffix features (if desired)
-            if 'suffix' in include_features:
+            if 'suffix' in non_count_features:
                 suffix = self.get_suffix(lemma)
                 if suffix is not None:
                     coo_val.append(1)
-                    coo_i.append(i)
+                    coo_i.append(token_num)
                     coo_j.append(self.feature_map['suffix-%s' % suffix])
 
-        #return {
-        #    self.feature_map.key(coo_j[i]):coo_val[i] 
-        #    for i in range(len(coo_val)) 
-        #    if isinstance(coo_val[i], basestring)
-        #}
+        num_tokens = token_num + 1
 
-        # Build and return a sparse row-compressed matrix
-        return csr_matrix(coo_matrix((coo_val, (coo_i, coo_j))))
+        # Build a sparse row-compressed matrix
+        sparse_matrix = csr_matrix(
+            coo_matrix(
+                (coo_val, (coo_i, coo_j)),
+                shape=(num_tokens, len(self.feature_map))
+            )
+        )
 
+        # Center and scale the data
+        if whiten:
+            print 'whitening...'
+            scaler = sklearn.preprocessing.StandardScaler(with_mean=False)
+            sparse_matrix = scaler.fit_transform(sparse_matrix)
+
+        return sparse_matrix
 
 
     def get_feature_map(
@@ -648,7 +657,7 @@ class FeatureAccumulator(object):
         lemma,
         feature_types=COUNT_BASED_FEATURES,
         mode='normalized',
-        p=0.5
+        threshold=0.5
     ):
 
         if mode == 'raw':
@@ -658,7 +667,7 @@ class FeatureAccumulator(object):
         elif mode == 'log':
             return self.get_log_features(lemma, feature_types)
         elif mode == 'threshold':
-            return self.get_threshold_features(lemma, feature_types, p)
+            return self.get_threshold_features(lemma, feature_types, threshold)
         else:
             raise ValueError('Unexpected mode: %s' % mode)
 
@@ -745,7 +754,7 @@ class FeatureAccumulator(object):
 
 
     def get_threshold_features(
-        self, lemma, feature_types=COUNT_BASED_FEATURES, p=0.5
+        self, lemma, feature_types=COUNT_BASED_FEATURES, threshold=0.5
     ):
         """
         Get the thresholded features associated to a given token.  Features of
@@ -754,15 +763,15 @@ class FeatureAccumulator(object):
         updates by calling ``calculate_log_features()`` in case recent changes
         have altered feature counts.
         """
-        if p not in self.threshold_features:
-            self.calculate_threshold_features(p)
+        if threshold not in self.threshold_features:
+            self.calculate_threshold_features(threshold)
 
         # Ensure the lemma is unicode and lowercased
         lemma = utils.normalize_token(lemma)
 
         # Get all the feature types requested for this lemma
         features =  t4k.merge_dicts(*[
-            self.threshold_features[p][feature_type][lemma]
+            self.threshold_features[threshold][feature_type][lemma]
             for feature_type in feature_types
         ])
 

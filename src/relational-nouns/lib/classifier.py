@@ -6,21 +6,25 @@ import t4k
 import numpy as np
 from sklearn import svm
 from sklearn.linear_model import LogisticRegression
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.ensemble import RandomForestClassifier
 import json
 import sys
 sys.path.append('..')
 from t4k import UnigramDictionary, UNK, SILENT
-from collections import Counter, deque
+from collections import Counter, deque, defaultdict
 from SETTINGS import RELATIONAL_NOUN_FEATURES_DIR
 from kernels import bind_kernel, bind_dist
 import utils
 from utils import (
-    read_seed_file, filter_seeds, ensure_unicode,
-    get_dictionary, get_features
+    ensure_unicode, get_dictionary, 
+    #filter_seeds, 
+    #get_features
 )
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet as w
 import extract_features
+import itertools as it
 
 
 BEST_SETTINGS = {
@@ -38,11 +42,11 @@ BEST_SETTINGS = {
 def make_classifier(
 
     kind,                   # 'osvm','svm','knn','wordnet', 'basic_syntax'
-    X_train, y_train,
-    classifier_options={},
+    X_train, Y_train,
+    features,
+    classifier_definition,
 
     on_unk=False,
-    features=os.path.join(RELATIONAL_NOUN_FEATURES_DIR, 'test-coalesce'),
     kernel=None,
 
     positives=None,
@@ -64,14 +68,12 @@ def make_classifier(
     # KNN options
     k=3,
 ):
-
-    '''
+    """
     Convenience method to create a RelationalNounClassifier using
     default seed data and feature data
 
     # FeatureAccumulator or path load features from
-
-    '''
+    """
 
     # Use the provided features or load from the provided path
     if isinstance(features, basestring):
@@ -81,9 +83,9 @@ def make_classifier(
         features.prune_features(min_feature_frequency)
 
     # We can only use words that we actually have features for
-    positives = filter_seeds(positives, features.dictionary)
-    negatives = filter_seeds(negatives, features.dictionary)
-    neutrals = filter_seeds(neutrals, features.dictionary)
+    #positives = filter_seeds(positives, features.dictionary)
+    #negatives = filter_seeds(negatives, features.dictionary)
+    #neutrals = filter_seeds(neutrals, features.dictionary)
 
     # The proposed most-performant classifier
     if kind == 'osvm':
@@ -110,45 +112,57 @@ def make_classifier(
 
     # The proposed most-performant classifier
     elif kind == 'svm':
-        print 'building an SvmNounClassifier'
-        return SvmNounClassifier(
-            positive_seeds=positives,
-            negative_seeds=negatives,
+        print 'building SimplerSvmClassifier'
+        # Pull out the expected options (tolerate unexpected options)
+        options = t4k.select(
+            classifier_definition, 
+            ['kernel', 'C', 'gamma', 'class_weight', 'threshold', 
+                'cache_size'], 
+            require=False
+        )
+        return SimplerSvmClassifier(X_train, Y_train, options)
 
-            # SVM options
-            features=features,
-            on_unk=False,
-
-            C=C,
-            syntax_feature_types=syntax_feature_types,
-            semantic_similarity=semantic_similarity,
-            include_suffix=include_suffix,
-
-            syntactic_multiplier=syntactic_multiplier,
-            semantic_multiplier=semantic_multiplier,
-            suffix_multiplier=suffix_multiplier
+    # A using logistic regression as the learner
+    elif kind == 'logistic':
+        print 'building LogisticNounClassifier'
+        options = t4k.select(
+            classifier_definition,
+            ['C', 'solver', 'threshold', 'penalty', 'class_weight', 
+                'multi_class', 'n_jobs',],
+            require=False
+        )
+        return LogisticNounClassifier(
+            X_train,
+            Y_train,
+            options
         )
 
-
-    # A runner up, using KNN as the learner
-    elif kind == 'knn':
-        print 'building a knn'
-        return KnnNounClassifier(
-            positives,
-            negatives,
-            # KNN options
-            features['dep_tree'],
-            features['dictionary'],
-            on_unk=False,
-            k=3
+    # Using naive bayes as the learner
+    elif kind == 'NB':
+        print 'building NaiveBayesNounClassifier'
+        options = t4k.select(
+            classifier_definition, ['alpha', 'threshold'], require=False
         )
+        return NaiveBayesNounClassifier(X_train, Y_train, options)
 
+    # Using RandomForest as the learner
+    elif kind == 'RF':
+        print 'building RandomForestNounClassifier'
+        options = t4k.select(
+            classifier_definition,
+            ['n_estimators', 'criterion', 'max_features', 'max_depth', 
+                'min_samples_split', 'min_samples_leaf', 
+                'min_weight_fraction_leaf', 'max_leaf_nodes', 
+                'min_impurity_split', 'n_jobs', 'oob_score', 'bootstrap', 
+                'class_weight'],
+            require=False
+        )
+        return RandomForestNounClassifier(X_train, Y_train, options)
 
     # Simple rule: returns true if query is hyponym of known relational noun
     elif kind == 'wordnet':
         print 'building a WordnetClassifier'
         return WordnetClassifier(positives, negatives)
-
 
     # Classifier using basic syntax cues
     elif kind == 'basic_syntax':
@@ -160,6 +174,47 @@ def make_classifier(
             negatives,
             get_features=get_features_func
         )
+
+    else:
+        raise ValueError('Unrecognized kind: %s' % kind)
+
+    #elif kind == 'svm':
+    #    print 'building an SvmNounClassifier'
+    #    return SvmNounClassifier(
+    #        positive_seeds=positives,
+    #        negative_seeds=negatives,
+
+    #        # SVM options
+    #        features=features,
+    #        on_unk=False,
+
+    #        C=C,
+    #        syntax_feature_types=syntax_feature_types,
+    #        semantic_similarity=semantic_similarity,
+    #        include_suffix=include_suffix,
+
+    #        syntactic_multiplier=syntactic_multiplier,
+    #        semantic_multiplier=semantic_multiplier,
+    #        suffix_multiplier=suffix_multiplier
+    #    )
+
+
+#    # A runner up, using KNN as the learner
+#    elif kind == 'knn':
+#        print 'building a knn'
+#        return OldKnnNounClassifier(
+#            positives,
+#            negatives,
+#            # KNN options
+#            features['dep_tree'],
+#            features['dictionary'],
+#            on_unk=False,
+#            k=3
+#        )
+
+
+
+
 
 
 def balance_samples(populations, target='largest'):
@@ -237,7 +292,65 @@ def arm_get_basic_syntax_features(features):
 
 
 
-class BalancedLogisticClassifier(object):
+class RandomForestNounClassifier(object):
+
+    def __init__(self, X, Y, options={}):
+        self.threshold = options.pop('threshold', None)
+        self.classifier = RandomForestClassifier(**options)
+        self.classifier.fit(X,Y)
+
+    def set_threshold(self, threshold):
+        self.threshold = threshold
+
+    def predict(self, X):
+        if self.threshold is None:
+            return self.classifier.predict(X)
+        else:
+            return np.array([
+                1 if x > self.threshold else -1 for x in self.score(X)
+            ])
+
+    def score(self, X):
+        classes = self.classifier.classes_
+        if len(classes) == 2:
+            return self.classifier.predict_proba(X)[:,1]
+        else:
+            return [
+                (classes[np.argmax(x)], max(x))
+                for x in self.classifier.predict_proba(X)
+            ]
+
+
+class NaiveBayesNounClassifier(object):
+
+    def __init__(self, X, Y, options={}):
+        self.threshold = options.pop('threshold', None)
+        self.classifier = MultinomialNB(**options)
+        self.classifier.fit(X,Y)
+
+    def set_threshold(self, threshold):
+        self.threshold = threshold
+
+    def predict(self, X):
+        if self.threshold is None:
+            return self.classifier.predict(X)
+        else:
+            return np.array([
+                1 if x > self.threshold else -1 for x in self.score(X)
+            ])
+
+    def score(self, X):
+        classes = self.classifier.classes_
+        if len(classes) == 2:
+            return self.classifier.predict_proba(X)[:,1]
+        else:
+            return [
+                (classes[np.argmax(x)], max(x))
+                for x in self.classifier.predict_proba(X)
+            ]
+
+
+class LogisticNounClassifier(object):
     '''
     Wraps a logistic regression classifier, making it able to operate
     on an artificially balanced dataset, but is adjusts the decision
@@ -247,132 +360,89 @@ class BalancedLogisticClassifier(object):
     classified using the get_features function.
     '''
 
-    def __init__(
-        self, 
-        positive_seeds,
-        negative_seeds,
-        get_features,
-        prior=None,
-        balance=True,
-        do_adjust=True
-    ):
-        '''
-        Note that if the prevalence of positives and negatives in the 
-        dataset is not representative of their prior probabilities, you
-        need to explicitly specifiy the prior probability of positive
-        examples.
+    def __init__(self, X, Y, options={}):
+        self.threshold = options.pop('threshold', None)
+        self.classifier = LogisticRegression(**options)
+        self.classifier.fit(X, Y)
 
-        If no prior is given, it will be assumed that the prior is
+#        adjustment = -np.log(
+#            (1-self.prior)/self.prior
+#            * training_prior/(1 - training_prior)
+#        )
+#        # Make the adjustment
+#        self.classifier.intercept_ += adjustment
 
-            len(positive_seens) / float(
-                len(positive_seeds) + len(negative_seeds))
-
-        Logistic regression is sensitive to data imbalances.  A better
-        model can be achieved by training on a balanced dataset, and then
-        adjusting the model intercept based on the true class prevalences.
-        if `balance` is True, this is done automatically.
-        '''
-        self.positive_seeds = positive_seeds
-        self.negative_seeds = list(negative_seeds)
-        self.get_features = get_features
-
-        self.prior = prior
-        self.balance = balance
-        self.do_adjust = do_adjust
-
-        # Calculate the prior as it exists in the data.  The meaning and
-        # usefulness of this value will depend on the settings of `balance`
-        # and `prior`
-        total = float(len(positive_seeds) + len(negative_seeds))
-        self.data_prior = len(positive_seeds) / total
-
-        # If prior is not given, we assume that it is given by the data
-        # prior
-        if self.prior is None:
-            self.prior = self.data_prior
-
-        self.classifier = LogisticRegression(
-            solver='newton-cg',
-        )
-        self.fit()
+    def set_threshold(self, threshold):
+        self.threshold = threshold
 
 
-    def fit(self):
-        X,Y = self.make_training_set()
-        print 'balance:', sum(Y) / float(len(Y))
-        self.classifier.fit(X,Y)
+    def find_threshold(self, X, Y):
+        """
+        Adjusts the position(s) of the decision surfaces to optimize f1.
+        """
+        classes = self.classifier.classes_
+        if len(classes) == 2:
+            best_f1, threshold = utils.calculate_best_score(
+                zip(self.classifier.decision_function(X), Y))
+            self.threshold = np.array([threshold])
+            return self.threshold
 
-        # We'll need to adjust the model's intercept if it was not trained
-        # on data distributed according to it's natural prior.  This
-        # can happen if an explicit value for the prior was given or if
-        # we have artificially balanced the dataset during training
-        intercept_needs_adjustment = self.prior is not None or self.balance
-        if intercept_needs_adjustment and self.do_adjust:
-            self.adjust_intercept()
-
-
-    def adjust_intercept(self):
-        print 'adjusting...'
-
-        # Determine what the apparent prior (in the training data) was
-        if self.balance:
-            training_prior = 0.5
         else:
-            training_prior = self.data_prior
+            scores = self.classifier.decision_function(X)
+            label_scores = defaultdict(list)
+            for correct_label, row_scores in zip(Y, scores):
+                for label, score in zip(classes, row_scores):
+                    if label == correct_label:
+                        label_scores[label].append((score, 1))
+                    else:
+                        label_scores[label].append((score, -1))
 
-        # Determine the adjustment needed based on what the real prior is
-        adjustment = -np.log(
-            (1-self.prior)/self.prior
-            * training_prior/(1 - training_prior)
-        )
+            thresholds = []
+            for label in classes:
+                best_f1, threshold = utils.calculate_best_score(
+                    label_scores[label])
+                thresholds.append(threshold)
 
-        # Make the adjustment
-        self.classifier.intercept_ += adjustment
-
-
-    def predict(self, tokens):
-        tokens = maybe_list_wrap(tokens)
-        lemmas = lemmatize_many(tokens)
-        features = [
-            self.features.get_features(lemma, ['baseline']) 
-            for lemma in lemmas
-        ]
-        return self.classifier.predict(features)
+            self.threshold = np.array([thresholds])
+            return self.threshold
 
 
-    def score(self, tokens):
-        tokens = maybe_list_wrap(tokens)
-        lemmas = lemmatize_many(tokens)
-        features = [
-            self.features.get_features(l, ['baseline'])
-            for l in lemmas
-        ]
-        return self.classifier.predict_proba(features)[:,1]
+    def adjusted_score(self, X):
+        scores = self.classifier.decision_function(X)
+        if self.threshold is None:
+            return scores
 
-
-    def make_training_set(self):
-
-        if self.balance:
-            print 'balancing...'
-            positive_seeds, negative_seeds = balance_samples(
-                [self.positive_seeds, self.negative_seeds]
-            )
         else:
-            positive_seeds = self.positive_seeds
-            negative_seeds = self.negative_seeds
+            return scores - self.threshold
 
-        X = np.array(
-            [
-                self.features.get_features(s, ['baseline']) 
-                for s in positive_seeds
-            ] + [
-                self.features.get_features(s, ['baseline']) 
-                for s in negative_seeds]
-            )
 
-        Y = np.array([1]*len(positive_seeds) + [0]*len(negative_seeds))
+    def predict(self, X):
+        if self.threshold is None:
+            return self.classifier.predict(X)
 
-        return X, Y
+        elif len(self.classifier.classes_) == 2:
+            return np.array([
+                1 if x > 0 else -1 for x in self.adjusted_score(X)
+            ])
+
+        else:
+            return np.array([
+                self.classifier.classes_[np.argmax(row_scores)] 
+                for row_scores in self.adjusted_score(X)
+            ])
+
+
+    def score(self, X):
+        classes = self.classifier.classes_
+        if len(classes) == 2:
+            return self.classifier.decision_function(X)
+
+        else:
+            return [
+                (classes[np.argmax(x)], max(x))
+                for x in self.classifier.decision_function(X)
+            ]
+
 
 
 
@@ -775,26 +845,238 @@ class SimplerSvmClassifier(NounClassifier):
     """
 
     # Make the init function take a default for options
-    def __init__(self, X, Y, features, options=None):
-        if options is not None:
-            options = t4k.merge_dicts(options, DEFAULT_SVM_OPTIONS)
-        else:
-            options = DEFAULT_SVM_OPTIONS
-        super(SimplerSvmClassifier, self).__init__(X, Y, features, options)
+    def __init__(self, X, Y, options={}):
 
-    def train_classifier(self, X, Y, options):
+        # If a threshold has been given, then we test that against scores to
+        # determine picredtions
+        self.threshold = options.pop('threshold', None)
 
-        # Bind the kernel
+        # If we have a "pre-bound-kernel", then pop it out of the options, 
+        # and bind it's kernel function to the 'kernel' option, where the
+        # SVC constructor expects it
         if 'pre-bound-kernel' in options:
-            print 'using provided kernel'
-            kernel = options['pre-bound-kernel']
-        else:
-            kernel = bind_kernel(self.features, **options['kernel'])
+            options['kernel'] = options.pop('pre-bound-kernel').eval_pair
 
-        self.classifier = svm.SVC(kernel=kernel, **options['classifier'])
+        if 'class_weight' in options:
+            print options['class_weight']
+
+        self.classifier = svm.SVC(**options)
         self.classifier.fit(X,Y)
 
+    def set_threshold(self, threshold):
+        self.threshold = threshold
 
+
+    def find_threshold(self, X, Y):
+        """
+        Adjusts the position(s) of the decision surfaces to optimize f1.
+        """
+
+        # The approach to finding the threshold is a bit different depending
+        # on whether we're doing a binary or ternary classification.
+        # Binary is the simpler case, there's just one decision surface.
+        if len(self.classifier.classes_) == 2:
+
+            # Make a pairing of scores given by the classifier and correct 
+            # labels
+            scored_typed = zip(self.classifier.decision_function(X), Y)
+
+            # Use a utility function that finds the cutoff score which, if
+            # used as the classification criterion, yields the best f1
+            best_f1, threshold= utils.calculate_best_score(
+                scored_typed, positive=set([self.classifier.classes_[1]]),
+                negative=set([self.classifier.classes_[0]])
+            )
+
+            # Set that best cutoff as the threshold used in classification
+            self.threshold = np.array([threshold])
+            return self.threshold
+
+        elif len(self.classifier.classes_) > 2:
+
+            # The first step is to collect the individual scores given for 
+            # the classifications made between each label pair.  So, whenever
+            # an example arises in the test set that matches one of the labels
+            # in a pair, we record the score given from the decision surface
+            # between those to labels, and what the correct result is.  
+            # This means we accumulate a bunch of binary classification 
+            # scores, along with correct answers, on a per-pair basis.  We 
+            # can then use this to adjust the decision surface for each label
+            # pair to optimize f1 for classifications between those labels.
+            scores = self.classifier.decision_function(X)
+            scores_per_label_pair = defaultdict(list)
+            classes = self.classifier.classes_
+            class_pairs = list(it.combinations(classes, 2))
+            for label, row_scores in zip(Y, scores):
+
+                for p,(i,j) in enumerate(class_pairs):
+
+                    # If label i wins, then in the context of the
+                    # sub-classification between i and j, the correct result is
+                    # positive (1)
+                    if i == label:
+                        scores_per_label_pair[p].append((row_scores[p], 1))
+
+                    # If label j wins, then the correct result is negative (-1)
+                    elif j == label:
+                        scores_per_label_pair[p].append((row_scores[p], -1))
+
+            # Now that we have accumulated scores on a per-label-pair basis,
+            # we consider each label pair in turn, and find the best cutoff
+            # value for the decision surface between them.
+            thresholds = []
+            for p, score_labels in scores_per_label_pair.iteritems():
+                best_f1, threshold = utils.calculate_best_score(score_labels)
+                thresholds.append(threshold)
+
+            # Save the threshold, and return it too.
+            self.threshold = np.array([thresholds])
+            return self.threshold
+
+
+    def predict(self, X):
+
+        if self.threshold is None:
+            return self.classifier.predict(X)
+
+        else:
+
+            if len(self.classifier.classes_) == 2:
+                # If this is a binary classification, then we only have one
+                # threshold to test, and the result is either positive or
+                # negative.
+                return np.array([
+                    self.classifier.classes_[1] if x > 0
+                    else self.classifier.classes_[0] 
+                    for x in self.adjusted_score(X)
+                ])
+
+            elif len(self.classifier.classes_) == 3:
+
+                return ternary_predict(
+                    self.classifier.classes_, self.adjusted_score(X)) 
+
+            else:
+                NotImplementedError(
+                    'Applying thresholds for more than 3 classes is '
+                    'not supported.'
+                )
+
+
+    def adjusted_score(self, X):
+        scores = self.classifier.decision_function(X)
+        if self.threshold is None:
+            return scores
+
+        else:
+            return scores - self.threshold
+
+
+    def score(self, X):
+
+        # We need to handle this in a special way if there are more than
+        # two classes
+        classes = self.classifier.classes_
+        scores = self.classifier.decision_function(X)
+        if len(classes) == 2:
+
+            # When classification is binary, there is only one score to
+            # consider.  And, because internally the classes are stored in
+            # lexicographic order a positive score always corresponds to class
+            # 1 beating class -1.  So we can return the scores unmodified
+            return scores
+
+        else:
+
+            # The scores we will return are 2-tuples instead of floats.  The 
+            # first position gives the label having the greatest score (whic
+            # for our purposes is 1, 0, or -1, and the second label gives what
+            # that score actually was.  That way, when scores are sorted,
+            # they will primarily be sorted based on which label had the 
+            # greatest score, and then secondarily, within each label, they 
+            # will be sorted by which score was the greatest.  Now, since
+            # we sort from the perspective that label -1 is a "negative" label
+            # the higher it's score, the lower should be its sort order.
+            # so, for examples where the -1 label is largest, we take the 
+            # negative of the -1 label's score as the second position in the 
+            # tuple
+            real_scores = []
+            predictions = self.classifier.predict(X)
+            classes = self.classifier.classes_
+            class_pairs = list(it.combinations(classes, 2))
+            for prediction, row_scores in zip(predictions, scores):
+                this_score = 0
+                for p,(i,j) in enumerate(class_pairs):
+                    if i == prediction:
+                        prediction, 
+                        this_score += row_scores[p]
+                    elif j == prediction:
+                        this_score -= row_scores[p]
+                if prediction > -1:
+                    real_scores.append((prediction, this_score))
+                elif prediction == -1:
+                    real_scores.append((prediction, -this_score))
+                else:
+                    raise ValueError(
+                        'Unexpected predicted label: %s' % prediction)
+
+            return real_scores
+
+
+def ternary_predict(classes, scores):
+
+    # If this is a ternary classification, we need to get the 
+    # adjusted scores and then judge each item on its own.
+    predictions = []
+    class_pairs = list(it.combinations(classes, 2))
+    for row_scores in scores:
+
+        # For each row of scores, keep track of how many times each
+        # label wins within face-offs that it is involved in.
+        # Also, keep track of the sum of each label's scores which
+        # is used to break ties.
+        votes = Counter()
+        scores = Counter()
+
+        # Look at the result for each label pair face-off
+        for p, (i,j) in enumerate(class_pairs):
+
+            # If the result is greater than zero, it means the
+            # first label won, else the second won.
+            if row_scores[p] > 0:
+                votes[i] += 1
+            else:
+                votes[j] += 1
+
+            # Accumulate the scores.  The second label gets a
+            # negated score because negative numbers mean a
+            # preference for second label.
+            scores[i] += row_scores[p]
+            scores[j] -= row_scores[p]
+
+        # Now find the label that won the most times.  At the same
+        # time, find the label with the highest total score.
+        max_votes = t4k.Max()
+        max_scores = t4k.Max()
+        for label in classes:
+            max_votes.add(votes[label], label)
+            max_scores.add(scores[label], label)
+
+        # As long as there's no draw, the label that won the most
+        # times wins overall.
+        if not max_votes.is_draw():
+            votes, prediction = max_votes.get()
+
+        # If there's a draw, then take the label with the highest
+        # total score.
+        else:
+            score, prediction = max_scores.get()
+
+        # Store the winner for this example
+        predictions.append(prediction)
+
+    # Return all the "winners"
+    return np.array(predictions)
 
 
 class SvmNounClassifier(object):
@@ -1023,7 +1305,9 @@ class SvmNounClassifier(object):
         return X, Y
 
 
-class KnnNounClassifier(object):
+
+
+class OldKnnNounClassifier(object):
     '''
     Class that wraps underlying classifiers and handles training, testing,
     and prediction logic that is specific to making a relational noun 

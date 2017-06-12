@@ -3,105 +3,125 @@ import os
 import sys
 sys.path.append('..')
 import cjson
+import numpy as np
 import t4k
+from collections import defaultdict
 from SETTINGS import (
 	WORDNET_INDEX_PATH, DATA_DIR, SEED_PATH
     #TRAIN_PATH, TEST_PATH, SEED_PATH,
 )
 
 
-def calculate_best_score(scored_typed, metric='f1'):
-    """
-        This function helps to convert from a scoring function to a
-        classification function.  Given some function which provides scores to
-        items that are either "positive" or "negative", find the best threshold
-        score that gives the greatest performance, when used to label any items
-        whose score is higher as "positive" and lower as "negative"
+def find_threshold(classifier, X, Y, positive=set([1]), negative=set([-1])):
+    scored = zip(classifier.score(X), Y)
+    return calculate_best_score(scored, positive, negative)
 
-        "Best performance" can either mean highest f1-score or highest
-        accuracy, determined by passing either 'f1' or 'accuracy' as the
-        argument for ``metric``.
+
+def calculate_best_score(scored_typed, positive=set([1]), negative=set([-1])):
+    """
+    This function helps to convert from a scoring function to a classification
+    function.  Given some function which provides scores to items that are
+    either "positive" or "negative", find the best threshold score that gives
+    the highest f1 score, when used to label any items whose score is higher as
+    "positive" and lower as "negative"
 
     INPUTS
         ``scored_typed`` should be a list of tuples of scored items, where the
         first element of the tuple is the score, and the second element is the
         true class of the item, which should be 'pos' or 'neg'
 
-        ``metric`` can be 'f1' or 'accuracy'.
-
     OUTPUTS 
-        ``(best_metric, threshold)`` where best_metric is the best value for
+        ``(best_f1, threshold)`` where best_metric is the best value for
         the chosen metric, achieved when threshold is used to label items
         according to their assigned scores.
     """
 
-    # sort all the scores, keeping their clasification bound to the score
-    sorted_scored_typed = sorted(scored_typed, reverse=True)
+    # Tally up the number of positive and negative examples having given scores
+    # This simplifies finding the best threshold if there are repeated scores.
+    labels_by_score = defaultdict(lambda: {1:0, -1:0})
+    for score, label in scored_typed:
+        binary_label = binarize(label, positive, negative)
+        labels_by_score[score][binary_label] += 1
 
-    # We begin with the threshold score set at the max score, which means
-    # putting all items into the 'neg' class.  The number of correct
-    # classifications according to that threshold is the number of items that
-    # are actually in the neg class
-    true_pos = 0
-    labelled_pos = 0
-    num_pos = sum([st[1]=='pos' for st in sorted_scored_typed])
-    num_correct = sum([st[1]=='neg' for st in sorted_scored_typed])
+    # Get a sorted list of the *unique* scores
+    sorted_scores = sorted(labels_by_score.keys())
 
-    best_f1 = 0
-    best_count = num_correct
-    best_pointer = -1
+    # Start with the threshold lower than the minimum score, then gradually 
+    # raise it, keeping track of the performance metric
+    num_pos = sum([v[1] for v in labels_by_score.values()])
+    num_neg = sum([v[-1] for v in labels_by_score.values()])
 
-    # Move down through the scored items, shifting each one up to the 'pos'
-    # class, and note the effect on the number of correct classifications
-    # keep track of the point at which we get the largest correct count.
-    for pointer in range(len(sorted_scored_typed)):
-        labelled_pos += 1
-        if sorted_scored_typed[pointer][1] == 'pos':
-            num_correct += 1
-            true_pos += 1
-        elif sorted_scored_typed[pointer][1] == 'neg':
-            num_correct -= 1
+    # We start with the threshold below the minimum score, so that all items
+    # are considered '1's. The initial number correct then is just the number
+    # of positives in total
+    true_pos = num_pos
+    false_pos = num_neg
+    initial_f1 = f1(true_pos, false_pos, num_pos)
+    initial_pointer = -1
 
-        if metric == 'f1':
-            precision = true_pos / float(labelled_pos)
-            recall = true_pos / float(num_pos)
-            f1 = (
-                0 if precision * recall == 0 
-                else 2*precision*recall / (precision + recall)
-            )
-            if f1 > best_f1:
-                best_f1 = f1
-                best_pointer = pointer
+    maximum = t4k.Max()
+    maximum.add(initial_f1, initial_pointer)
+    for pointer, score in enumerate(sorted_scores):
 
-        elif metric == 'accuracy':
-            if num_correct > best_count:
-                best_count = num_correct
-                best_pointer = pointer
+        # Determine the effect of moving the threshold just *above* this score
+        # Any positives at this score are now mis-labelled as negatives
+        true_pos -= labels_by_score[score][1]
 
-        else:
-            raise ValueError(
-                'Unrecognized value for `metric`: %s. ' % metric
-                + "Expected 'f1' or 'accuracy'."
-            )
+        # Any negatives at this score are now correctly labelled as negatives
+        false_pos -= labels_by_score[score][-1]
 
-    # Place the threshold below the last item shifted into the positive class
-    if best_pointer > -1 and best_pointer < len(sorted_scored_typed) - 1:
-        threshold = 0.5 * (
-            sorted_scored_typed[best_pointer][0] 
-            + sorted_scored_typed[best_pointer+1][0]
-        )
-    elif best_pointer == -1:
-        threshold = sorted_scored_typed[best_pointer][0] + 0.1
-    elif best_pointer == len(sorted_scored_typed) - 1:
-        threshold = sorted_scored_typed[best_pointer][0] - 0.1
+        # Recalculate the F1 score now.
+        this_f1 = f1(true_pos, false_pos, num_pos)
+
+        # If this is an improvement over the previous best value, keep it
+        maximum.add(this_f1, pointer)
+
+    best_f1, best_pointer = maximum.get()
+    if best_pointer == -1:
+        threshold = min(sorted_scores) - 1
+    elif best_pointer == len(sorted_scores)-1:
+        threshold = max(sorted_scores) + 1
     else:
-        RuntimeError('Impossible state reached')
+        threshold = (
+            sorted_scores[best_pointer] + sorted_scores[best_pointer+1]) / 2.0
 
-    if metric == 'f1':
-        return best_f1, threshold
+    return best_f1, threshold
 
-    elif metric == 'accuracy':
-        return best_count / float(len(scored_typed)), threshold
+
+def binarize(label, positive=set([1]), negative=set([-1])):
+    """
+    Interprets ``label`` as either positive or negative, based on which set
+    it is found in.  If the label is positive, return 1, if the label is
+    negative, return -1.  If the label is not found in either set, it's a
+    ValueError.
+    """
+    if label in positive:
+        return 1
+    if label in negative:
+        return -1
+    raise ValueError('Unexpected label: %s' % label)
+
+
+def f1(true_pos, false_pos, num_pos):
+
+    # Calculate recall (handle case where denominator is zero)
+    if num_pos == 0:
+        recall = 1.0
+    else:
+        recall = true_pos / float(num_pos)
+
+    # Calculate precision (handle case where denominator is zero)
+    if true_pos + false_pos == 0:
+        precision = 1.0
+    else:
+        precision = true_pos / float(true_pos + false_pos)
+
+    # Calculate F1 (handle the case where denominator is zero)
+    if precision + recall == 0:
+        return 0.0
+    else:
+        return 2 * precision * recall / (precision + recall)
+
 
 def read_wordnet_index():
     return set(open(WORDNET_INDEX_PATH).read().split('\n'))
@@ -162,22 +182,7 @@ def read_word(line):
     }
 
 
-def read_typed_seed_file(path):
-    return [
-        read_word(line) for line in open(path) 
-        if not line.strip().startswith('#')
-        and len(line.strip()) > 0
-    ]
-
-
-def read_seed_file(path):
-    return set([
-        s.strip() for s in open(path) 
-        if not s.strip().startswith('#') and len(s.strip())
-    ])
-
-
-def get_seed_set(path):
+def get_seed_set(path, dictionary=None):
     '''
     Get a set of positive (relational) words and a set of negative 
     (non-relational) words, to be used as a training set
@@ -185,6 +190,8 @@ def get_seed_set(path):
     positives, negatives, neutrals = set(), set(), set()
     for line in open(path):
         token, classification = line.strip().split('\t')[:2]
+        if dictionary is not None and token not in dictionary:
+            continue
         if classification == '+':
             positives.add(token)
         elif classification == '0':
@@ -218,32 +225,73 @@ def read_all_labels(path):
 	return positives, negatives, neutrals
 
 
+def get_full_seed_set(dictionary=None):
+    """
+    Reads in the small initial set of expert-labelled examples that were used
+    to design the task and help select new words for inclusion in the task.
 
-def get_full_seed_set():
-	seed_path = os.path.join(
-            DATA_DIR, 'relational-nouns', 'categorized.tsv')
-	pos, neg, neut = get_seed_set(seed_path)
-	return pos, neg, neut
+    If a dictionary is provided, then only words in the dictionary will be
+    included.
+    """
+    pos, neg, neut = get_seed_set(SEED_PATH, dictionary)
+    return pos, neg, neut
 
 
-def get_train_test_split():
+def get_train_test_seed_split(dictionary=None):
     random.seed(0)
     split_ratio = 0.33
-    pos, neg, neut = get_seed_set(SEED_PATH)
+    pos, neg, neut = get_seed_set(SEED_PATH, dictionary)
 
     train = {}
     test = {}
 
-    train['pos'] = set(random.sample(pos, int(len(pos)*split_ratio)))
-    test['pos'] = pos - train['pos']
+    test['pos'] = set(random.sample(pos, int(len(pos)*split_ratio)))
+    train['pos'] = pos - test['pos']
 
-    train['neg'] = set(random.sample(neg, int(len(neg)*split_ratio)))
-    test['neg'] = neg - train['neg']
+    test['neg'] = set(random.sample(neg, int(len(neg)*split_ratio)))
+    train['neg'] = neg - test['neg']
 
-    train['neut'] = set(random.sample(neut, int(len(neut)*split_ratio)))
-    test['neut'] = neut - train['neut']
+    test['neut'] = set(random.sample(neut, int(len(neut)*split_ratio)))
+    train['neut'] = neut - test['neut']
 
     return train, test
+
+
+def make_vectors(
+    dataset, features, count_based_features, non_count_features,
+    count_feature_mode, whiten=False, threshold=0.5
+):
+
+    X = features.as_sparse_matrix(
+        list(dataset['pos']) + list(dataset['neut']) + list(dataset['neg']),
+        count_based_features, non_count_features, count_feature_mode, whiten,
+        threshold
+    )
+
+    Y = np.array(
+        [1] * len(dataset['pos']) 
+        + [0] * len(dataset['neut'])
+        + [-1] * len(dataset['neg'])
+    )
+    return X, Y
+
+
+def make_kernel_vector(dataset, features):
+    # Make the training set.  Each "row" in the training set has a 
+    # single "feature" -- it's the id which identifies the token.  
+    # This will let us lookup the non-numeric features in kernel 
+    # functions
+    X = (
+        [[features.get_id(s)] for s in dataset['pos']]
+        + [[features.get_id(s)] for s in dataset['neut']]
+        + [[features.get_id(s)] for s in dataset['neg']]
+    )
+    Y = (
+        [1] * len(dataset['pos']) 
+        + [0] * len(dataset['neut'])
+        + [-1] * len(dataset['neg'])
+    )
+    return X, Y
 
 
 def get_dictionary(path):
@@ -252,21 +300,21 @@ def get_dictionary(path):
     return dictionary
 
 
-def load_feature_file(path):
-    return cjson.decode(open(path).read())
+#def load_feature_file(path):
+#    return cjson.decode(open(path).read())
 
 
-def get_features(path):
-    return {
-        'dep_tree': load_feature_file(os.path.join(
-            path, 'dependency.json')),
-        'baseline': load_feature_file(os.path.join(
-            path, 'baseline.json')),
-        'hand_picked': load_feature_file(os.path.join(
-            path, 'hand_picked.json')),
-        'dictionary': get_dictionary(os.path.join(
-            path, 'lemmatized-noun-dictionary'))
-    }
+#def get_features(path):
+#    return {
+#        'dep_tree': load_feature_file(os.path.join(
+#            path, 'dependency.json')),
+#        'baseline': load_feature_file(os.path.join(
+#            path, 'baseline.json')),
+#        'hand_picked': load_feature_file(os.path.join(
+#            path, 'hand_picked.json')),
+#        'dictionary': get_dictionary(os.path.join(
+#            path, 'lemmatized-noun-dictionary'))
+#    }
 
 
 def filter_seeds(words, dictionary):

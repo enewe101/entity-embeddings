@@ -29,87 +29,70 @@ def bind_dist(features, dictionary):
     return dist
 
 
-class PrecalculatedKernel(object):
+class PrecomputedKernel(object):
 
-    def __init__(
-        self, 
-        features=None, # Must be provided if count_based_feature_types is True
-        count_based_feature_types=extract_features.COUNT_BASED_FEATURES,
-        non_count_feature_types=extract_features.NON_COUNT_FEATURES,
-        count_feature_mode='normalized',
-        use_derivational_features=True,
-        use_embedding_features=True,
-        use_suffix_features=True,
-        semantic_similarity='res',
+    def __init__(self, features, options):
 
-        syntactic_multiplier=1.0,
-        semantic_multiplier=1.0,
-        suffix_multiplier=1.0
-        #syntactic_multiplier=10.0,
-        #semantic_multiplier=2.0,
-        #suffix_multiplier=0.2
-    ):
-
-        # Register the switches that control which features are included when
-        # calculating the kernel function
         self.features = features
 
-        self.count_based_feature_types = count_based_feature_types
-        self.non_count_feature_types = non_count_feature_types
-        self.count_feature_mode = count_feature_mode
+        # Pull out and register the relevant options.  This doubles as
+        # validation that all the expected options were provided.
+        self.count_based_features = options['count_based_features']
+        self.non_count_features = options['non_count_features']
+        self.count_feature_mode = options['count_feature_mode']
+        self.semantic_similarity = options['semantic_similarity']
+        self.syntactic_multiplier = options['syntactic_multiplier']
+        self.semantic_multiplier = options['semantic_multiplier']
+        self.suffix_multiplier = options['suffix_multiplier']
 
-        self.use_derivational_features = use_derivational_features
-        self.use_embedding_features = use_embedding_features
-        self.use_suffix_features = use_suffix_features
+        # Validate values for semantic and syntactic similarity.
+        self.validate_semantic_similarity()
+        self.validate_syntactic_similarity()
 
-        self.semantic_similarity = semantic_similarity
+        # Semantic similarity functions need an "information content" file 
+        # to calculate similarity values.
+        if self.semantic_similarity is not None:
+            self.information_content = wordnet_ic.ic(INFORMATION_CONTENT_FILE)
 
-        # Register the multiplicative weight applied to specific feature 
-        # subsets' contributions to the kernel function.
-        self.syntactic_multiplier = syntactic_multiplier
-        self.semantic_multiplier = semantic_multiplier
-        self.suffix_multiplier = suffix_multiplier
+        self.cache = {}
+        self.verbose = options.get('verbose', 1)
+        self.eval_counter = 0
 
-        # Validate that a sensible value for semantic similarity was provided
+
+    def validate_syntactic_similarity(self):
+        syntactic_similarity_is_valid = (
+            self.count_based_features is None or all(
+                feature_type in LEGAL_SYNTACTIC_SIMILARITIES 
+                for feature_type in self.count_based_features
+        ))
+        if not syntactic_similarity_is_valid:
+            raise ValueError(
+                'count_based_features must be a list with any of the '
+                'following: '
+                + ', '.join(LEGAL_SYNTACTIC_SIMILARITIES) 
+                + '.  Got %s.' % repr(self.count_based_features)
+            )
+
+
+    def validate_semantic_similarity(self):
         semantic_similarity_is_valid = (
-            semantic_similarity in LEGAL_SIMILARITIES 
-            or semantic_similarity is None
+            self.semantic_similarity in LEGAL_SIMILARITIES 
+            or self.semantic_similarity is None
         )
         if not semantic_similarity_is_valid:
             raise ValueError(
                 'semantic_similarity must be one of the following: '
                 + ', '.join(LEGAL_SIMILARITIES) 
-                + '.  Got %s.' % repr(semantic_similarity)
+                + '.  Got %s.' % repr(self.semantic_similarity)
             )
-
-        # Validate that a sensible value for syntactic similarity was provided
-        syntactic_similarity_is_valid = count_based_feature_types is None or all(
-            feature_type in LEGAL_SYNTACTIC_SIMILARITIES 
-            for feature_type in count_based_feature_types
-        )
-        if not syntactic_similarity_is_valid:
-            raise ValueError(
-                'count_based_feature_types must be a list with any of the following: '
-                + ', '.join(LEGAL_SYNTACTIC_SIMILARITIES) 
-                + '.  Got %s.' % repr(count_based_feature_types)
-            )
-
-        # Semantic similarity functions need an "information content" file 
-        # to calculate similarity values.
-        if semantic_similarity is not None:
-            self.information_content = wordnet_ic.ic(INFORMATION_CONTENT_FILE)
-
-        self.cache = {}
-        self.verbose = False
-        self.eval_counter = 0
-
 
     def precompute(self, examples):
         """
         Precompute the kernel evaluation of all pairs in examples.
         """
         # Add all the example pairs to the work queue
-        combinations = list(itertools.combinations_with_replacement(examples, 2))
+        combinations = list(
+            itertools.combinations_with_replacement(examples, 2))
         for i, (ex1, ex2) in enumerate(combinations):
             t4k.progress(i, len(combinations))
             dot = self.eval_pair(ex1, ex2)
@@ -126,9 +109,10 @@ class PrecalculatedKernel(object):
         # Add all the example pairs to the work queue
         print 'loading work onto queue'
         work_producer = work_queue.get_producer()
-        combinations = list(itertools.combinations_with_replacement(examples,2))
+        num_combinations = len(examples) * (len(examples)-1) / 2
+        combinations = itertools.combinations_with_replacement(examples,2)
         for i, (ex1, ex2) in enumerate(combinations):
-            t4k.progress(i, len(combinations))
+            t4k.progress(i, num_combinations)
             work_producer.put((ex1, ex2))
         work_producer.close()
 
@@ -150,8 +134,11 @@ class PrecalculatedKernel(object):
 
         # Get all the results and cache them
         for i, (ex1, ex2, dot) in enumerate(result_consumer):
-            t4k.progress(i, len(combinations))
-            self.cache[frozenset((ex1, ex2))] = dot
+            ex1_token = u.ensure_unicode(self.features.get_token(int(ex1[0])))
+            ex2_token = u.ensure_unicode(self.features.get_token(int(ex2[0])))
+
+            t4k.progress(i, num_combinations)
+            self.cache[frozenset((ex1_token, ex2_token))] = dot
 
 
     def precompute_worker(self, work_consumer, result_producer):
@@ -163,14 +150,19 @@ class PrecalculatedKernel(object):
 
     def eval_pair(self, a, b):
         '''
-        Custom kernel function.  This counts how often the links incident on
-        two different words within their respective dependency trees are the 
-        same, up to the dependency relation and the POS of the neighbour.
+        Custom kernel function that expects token ids.
+        '''
 
-        Note that A references a set of words' dependency trees, and B
-        references another set.  So that this function end up making
-        len(A) * len(B) of such comparisons, and return the result as a 
-        len(A) by len(B) matrix.
+        # Convert ids to tokens
+        a = u.ensure_unicode(self.features.get_token(int(a[0])))
+        b = u.ensure_unicode(self.features.get_token(int(b[0])))
+
+        return self.eval_pair_token(a,b)
+
+
+    def eval_pair_token(self, a, b):
+        '''
+        Custom kernel function that expects tokens.
         '''
 
         # Keep track of calls to this
@@ -192,71 +184,76 @@ class PrecalculatedKernel(object):
         kernel_score = 0
 
         # Compute the count-based contribution to the kernel
-        if self.count_based_feature_types is not None:
+        if self.count_based_features is not None:
             syntax_features_a = self.features.get_count_based_features(
-                a, self.count_based_feature_types,
+                a, self.count_based_features,
                 self.count_feature_mode
             )
             syntax_features_b = self.features.get_count_based_features(
-                b, self.count_based_feature_types,
+                b, self.count_based_features,
                 self.count_feature_mode
             )
             count_based_contribution = self.syntactic_multiplier * dict_dot(
                 syntax_features_a, syntax_features_b)            
-            print 'count-based contribution:', count_based_contribution
+            if self.verbose > 1:
+                print 'count-based contribution:', count_based_contribution
             kernel_score += count_based_contribution
 
         # Compute derivational feature contribution to kernel
-        if 'derivational' in self.non_count_feature_types:
+        if 'derivational' in self.non_count_features:
             derivational_contribution = np.dot(
                 self.features.get_derivational_features(a),
                 self.features.get_derivational_features(b)
             )
-            print 'derivational contribution', derivational_contribution
+            if self.verbose > 1:
+                print 'derivational contribution', derivational_contribution
             kernel_score += derivational_contribution
 
         # Compute embedding feature contribution to kernel
-        if 'google-vectors' in self.non_count_feature_types:
+        if 'google-vectors' in self.non_count_features:
             embedding_contribution = np.dot(
                 self.features.get_vector(a), self.features.get_vector(b))
-            print 'embedding contribution', embedding_contribution
+            if self.verbose > 1: 
+                print 'embedding contribution', embedding_contribution
             kernel_score += embedding_contribution
 
         # Compute suffix contribution to kernel
-        if 'suffix' in self.non_count_feature_types:
+        if 'suffix' in self.non_count_features:
             suffix_a = self.features.get_suffix(a)
             suffix_b = self.features.get_suffix(b)
             if suffix_a is not None and suffix_a == suffix_b:
                 suffix_contribution = self.suffix_multiplier
             else:
                 suffix_contribution = 0
-            print 'suffix contribution', suffix_contribution
+            if self.verbose > 1:
+                print 'suffix contribution', suffix_contribution
             kernel_score += suffix_contribution
 
         # Compute semantic similarity contribution to kernel
         if self.semantic_similarity is not None:
+            semantic_features_a, semantic_features_b = None, None
             try:
                 semantic_features_a = nouns_only(wordnet.synsets(a))
             except WordNetError:
                 print 'WordNetError-a', a
-                return 0
 
             try:
                 semantic_features_b = nouns_only(wordnet.synsets(b))
             except WordNetError:
                 print 'WordNetError-b', a
-                return 0
 
-            try:
-                semantic_contribution = (
-                    self.semantic_multiplier * max_similarity(
-                        self.semantic_similarity, semantic_features_a, 
-                        semantic_features_b, self.information_content
-                ))
-                print 'semantic contribution', semantic_contribution
-                kernel_score += semantic_contribution
-            except WordNetError:
-                print 'WordNetError-ab', a, b
+            if semantic_features_a and semantic_features_b:
+                try:
+                    semantic_contribution = (
+                        self.semantic_multiplier * max_similarity(
+                            self.semantic_similarity, semantic_features_a, 
+                            semantic_features_b, self.information_content
+                    ))
+                    if self.verbose > 1:
+                        print 'semantic contribution', semantic_contribution
+                    kernel_score += semantic_contribution
+                except WordNetError:
+                    print 'WordNetError-ab', a, b
 
         self.cache[frozenset((a,b))] = kernel_score
 
@@ -281,8 +278,6 @@ class PrecalculatedKernel(object):
             result_row = []
             result.append(result_row)
             for b in B:
-                token_a = u.ensure_unicode(self.features.get_token(int(a[0])))
-                token_b = u.ensure_unicode(self.features.get_token(int(b[0])))
                 result_row.append(self.eval_pair(token_a,token_b))
 
         return result

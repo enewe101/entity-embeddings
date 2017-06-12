@@ -13,11 +13,12 @@ from t4k import UnigramDictionary, SILENT
 import classifier as c
 DICTIONARY_DIR = os.path.join(DATA_DIR, 'dictionary')
 import utils
-from utils import read_seed_file, filter_seeds, ensure_unicode
+from utils import filter_seeds, ensure_unicode
 from nltk.stem import WordNetLemmatizer
 import annotations
 import extract_features
 import kernels
+from collections import defaultdict, Counter
 
 UNRECOGNIZED_TOKENS_PATH = os.path.join(DATA_DIR, 'unrecognized-tokens.txt')
 
@@ -56,7 +57,7 @@ def evaluate_simple_classifier(
 
         # Train the classifier
         options = {'pre-bound-kernel': kernel.eval}
-        clf = c.SimplerSvmClassifier(X_train, Y_train, features, options)
+        clf = c.SimplerSvmClassifier(X_train, Y_train, options)
 
         # Run classifier on test set
         prediction = clf.predict(X_test)
@@ -222,7 +223,7 @@ def evaluate_ordinal_classifier(annots=None, features=None, kernel=None):
     if features is None:
         features = extract_features.get_accumulated_features()
     if kernel is None:
-        kernel = kernels.PrecalculatedKernel(features)
+        kernel = kernels.PrecomputedKernel(features)
         # Precalculate the kernel for all the data in parallel
         kernel.precompute_parallel(annots.examples.keys())
 
@@ -400,6 +401,54 @@ def generate_classifier_definitions(
     return definitions
 
 
+class SearchValues(list):
+    """
+    This is just a special kind of list, which, because it has a different
+    Name, can be told appart from normal lists using `isinstance`.  No new
+    functionality!
+    """
+    pass
+
+
+def expand_run_specification(spec):
+    search_keys = [k for k in spec if isinstance(spec[k], SearchValues)]
+    specs = recurse_expand_specifications(spec, search_keys)
+    return specs
+
+
+def recurse_expand_specifications(spec, search_keys):
+
+    # If there are no search keys, just return the spec unchanged.
+    # This is how recursion bottoms out.  Wrap the spec in a list for
+    # consistency with non-leaf calls.
+    if len(search_keys) == 0:
+        return [spec]
+
+    # Pop one of the search keys, and make copies of the spec with each 
+    # value of the search key.  Recurse with each copy so that other search
+    # keys get expanded combinatorially.
+    specs = []
+    search_key = search_keys.pop()
+    for val in spec[search_key]:
+
+        # Copy the spec, setting the value for one of the search keys
+        new_spec = t4k.merge_dicts({search_key:val}, spec)
+
+        # Copy search_keys to prevent side effect in recursive call.
+        new_search_keys = list(search_keys) 
+
+        # Recurse, and accumulate the expanded specs
+        specs.extend(
+            # Here is the recursive call, which expands the keys other 
+            # than `search_key`.
+            recurse_expand_specifications(new_spec, new_search_keys)
+        )
+
+    # Return the expansions to the previous level
+    return specs
+
+   
+
 def optimize_classifier(
     classifier_definitions,
     features,
@@ -469,54 +518,361 @@ def optimize_classifier(
 def evaluate_classifiers(
     classifier_definitions, results_queue, 
     features, 
-    train_pos, train_neg,
-    test_pos, test_neg
+    #train_pos, train_neg,
+    #test_pos, test_neg
 ):
 
     # Evaluate performance of classifier for each classifier definition, and
     # put the results onto the result queue.
     for clf_def in classifier_definitions:
-        best_f1, threshold = evaluate_classifier(
-            clf_def, features, 
-            train_pos, train_neg,
-            test_pos, test_neg,
-        )
-        results_queue.put((best_f1, threshold, clf_def))
+        f1, evaluation_details = evaluate_classifier(clf_def, features)
+        results_queue.put((f1, evaluation_details, clf_def))
 
     # Close the results queue when no more work will be added
     results_queue.close()
     
 
-def evaluate_classifier(
-    classifier_definition,
-    features,
-    train_pos, train_neg,
-    test_pos, test_neg
-):
+def evaluate_classifier(name, classifier_definition, features, out_path=None):
     """
     Assesses the performance of the classifier defined by the dictionary
     ``classifier_definitions``.  That dictionary should provide the arguments
     needed to construct the classifier when provided to the function
     classifier.make_classifier.
     """
-    print 'evaluating:', str(classifier_definition)
-    cls = c.make_classifier(
+
+    print 'evaluating:', json.dumps(classifier_definition, indent=2)
+    print 'writing result to:%s' % out_path
+
+    if out_path is not None:
+        out_file = open(out_path, 'a')
+
+    # Some of the "classifier definition" settings control the train / test
+    # data and features supplied to the classifier, rather than the classifiers
+    # config.  Handle those settings now.
+
+    # Get the desired datset
+    data_source = classifier_definition.get('data_source', None)
+    if data_source == 'seed':
+        train, test = utils.get_train_test_seed_split(features.dictionary)
+    elif data_source == 'crowdflower-annotated-top':
+        train, test = annotations.Annotations(
+            features.dictionary).get_train_test('top')
+    elif data_source == 'crowdflower-annotated-rand':
+        train, test = annotations.Annotations(
+            features.dictionary).get_train_test('rand')
+    elif data_source == 'crowdflower-dev':
+        train, test = annotations.Annotations(
+            features.dictionary).get_train_dev()
+    else:
+        raise ValueError('Unexpected data_source: %s' % data_source)
+
+    # Binarize the dataset if desired by converting items labelled `neutral`
+    # into either positive or negative.
+    binarize_mode = classifier_definition.get('binarize_mode', None)
+    if binarize_mode is not None:
+        if binarize_mode == '+/0-':
+            train['neg'] = train['neut'] | train['neg']
+            test['neg'] = test['neut'] | test['neg']
+        elif binarize_mode == '+0/-':
+            train['pos'] = train['pos'] | train['neut']
+            test['pos'] = test['pos'] | test['neut']
+        else:
+            raise ValueError('Unexpected binarize_mode: %s' % binarize_mode)
+        train['neut'] = set()
+        test['neut'] = set()
+
+    # Convert the training and test sets into a vectorized format In the
+    # "kernel" format, the feature vectors are just token ids (the kernel
+    # function is "smart" and knows how to compute the kernels given ids).
+    data_format = classifier_definition.get('data_format')
+    if data_format == 'kernel':
+        X_train, Y_train = utils.make_kernel_vector(train, features)
+        X_test, Y_test = utils.make_kernel_vector(test, features)
+        classifier_definition['verbose'] = 1
+        precomputed_kernel = kernels.PrecomputedKernel(
+            features, classifier_definition)
+
+        # Trigger the necessary various lazy calculates on the features class 
+        # by doing one kernel calculation
+        precomputed_kernel.eval_pair_token('car', 'tree')
+        # Now precompute values of the kernel for all example pairs
+        num_processes = classifier_definition.get('kernel_processes', 4)
+        precomputed_kernel.precompute_parallel(
+            examples=X_train + X_test, num_processes=num_processes
+        )
+        classifier_definition['pre-bound-kernel'] = precomputed_kernel
+
+    # Or convert the training and test sets into a numpy sparse matrix format
+    elif data_format == 'vector':
+        count_based_features = classifier_definition.get(
+            'count_based_features')
+        non_count_features = classifier_definition.get('non_count_features')
+        count_feature_mode = classifier_definition.get('count_feature_mode')
+        whiten = classifier_definition.get('whiten', False)
+        feature_threshold = classifier_definition.get('feature_threshold', 0.5)
+
+        X_train, Y_train = utils.make_vectors(
+            train, features, count_based_features, non_count_features, 
+            count_feature_mode, whiten=whiten, threshold=feature_threshold
+        )
+        X_test, Y_test = utils.make_vectors(
+            test, features, count_based_features, non_count_features, 
+            count_feature_mode, whiten=whiten, threshold=feature_threshold
+        )
+
+    else:
+        raise ValueError('Unexpected data_format: %s' % data_format)
+
+    # Allow automatically re-weighting the class to help with unbalanced
+    # classifications.
+    if 'class_weight' in classifier_definition:
+        if classifier_definition['class_weight'] == 'auto':
+            classifier_definition['class_weight'] = get_class_weights(Y_train)
+
+    # Make the classifier
+    kind = classifier_definition.get('kind')
+    clf = c.make_classifier(
+        kind=kind,
+        X_train=X_train, 
+        Y_train=Y_train,
         features=features,
-        positives=train_pos,
-        negatives=train_neg,
-        **classifier_definition
+        classifier_definition=classifier_definition
     )
 
-    scored_typed = [
-        (cls.score(lemma)[0], 'pos') for lemma in test_pos
-    ] + [
-        (cls.score(lemma)[0], 'neg') for lemma in test_neg
-    ]
+    # We can either tune the decision threshold
+    if classifier_definition.get('find_threshold', False):
+        decision_threshold = clf.find_threshold(X_test, Y_test).tolist()
 
-    best_f1, threshold = utils.calculate_best_score(scored_typed, metric='f1')
+    # Or set it based on a prior fitted value
+    elif classifier_definition.get('use_threshold', None) is not None:
+        decision_threshold = classifier_definition['use_threshold']
+        clf.set_threshold(decision_threshold)
 
-    return best_f1, threshold
+    # Or stick with the default decision threshold built into the classifier
+    else:
+        decision_threshold = None
 
+        ## If binarize mode has been set, then the classifier is already 
+        ## configured to find treat the problem as a binary classification,
+        ## so finding the classification threshold is straightforward.
+        #if binarize_mode is '+0/-'
+        #    best_loose_f1, loose_threshold = utils.find_threshold(
+        #        clf, X_test, Y_test)
+        #    best_strict_f1, strict_threshold = None, None
+        #    clf.set_threshold(threshold)
+
+        #elif binarize_mode is '+/0-'
+        #    best_strict_f1, strict_threshold = utils.find_threshold(
+        #        clf, X_test, Y_test)
+        #    best_loose_f1, loose_threshold = None, None
+        #    clf.set_threshold(threshold)
+
+        #else:
+        #    best_strict_f1, strict_threshold = utils.find_threshold(
+        #        clf, X_test, Y_test_strict, positive=set([1,0]), 
+        #        negative=set([-1])
+        #    )
+        #    best_loose_f1, loose_threshold = utils.find_threshold(
+        #        clf, X_test, Y_test_strict, positive=set([1]), 
+        #        negative=set([0,-1])
+        #    )
+
+    # Test it on the test set, generating a confusion matrix
+    confusion_matrix = generate_confusion_matrix(clf, X_test, Y_test)
+
+    # Calculate the F1 relative to each class, and the macro-average
+    if binarize_mode is None:
+        f1s, macro_f1 = calculate_f1(confusion_matrix)
+        tight_f1 = f1s[1]
+        loose_f1 = calculate_f1_loose(confusion_matrix)
+
+    elif binarize_mode == '+0/-':
+        loose_f1 = calculate_simple_f1(confusion_matrix)
+        tight_f1 = None
+        macro_f1 = None
+
+    elif binarize_mode == '+/0-':
+        tight_f1 = calculate_simple_f1(confusion_matrix)
+        loose_f1 = None
+        macro_f1 = None
+
+    # Calculate the MAP
+    AP = calculate_classifier_MAP(clf, X_test, Y_test, [1,0])
+
+    results = {
+        'confusion_matrix':confusion_matrix,
+        'tight_f1':tight_f1,
+        'loose_f1':loose_f1,
+        'macro_f1':macro_f1,
+        'AP':AP,
+        'threshold':decision_threshold
+    }
+
+    if out_path is not None:
+        out_file.write(
+            '{"name":"%s",\n\n' % name
+            + '"run-specification":' 
+            + json.dumps(classifier_definition, indent=2) + ','
+            + '\n\n'
+            + '"results":'
+            + json.dumps(results) + '}\n\n\n'
+        )
+
+    return clf, results
+
+
+def get_class_weights(Y):
+    classes = set(Y)
+    class_amounts = {c:sum([y==c for y in Y]) for c in classes}
+    max_class_amount = max(class_amounts.values())
+    return {c:max_class_amount/float(class_amounts[c]) for c in classes}
+
+
+def calculate_classifier_MAP(classifier, X, Y, relevant_labels):
+    """
+    Given a ``classifier``, a set of examples `X` with known labels ``Y``,
+    and the set of labels that should be considered relevant 
+    (``relevant_labels``), determine the average precision for predictions on 
+    the set X.
+
+    The classifier must implement a method called ``score``, which returns
+    higher values for the relevant labels and lower values for the non-relevant
+    labels.  X should  be a numpy 2-D array of features (each row is a feature
+    vector for a single example), and Y should be a 1-D array of labels in
+    corresponding order to X.
+    """
+    relevant_labels = set(relevant_labels)
+    relevancies = [y in relevant_labels for y in Y]
+    scores = classifier.score(X)
+    return calculate_MAP(scores, relevancies)
+
+
+def calculate_MAP(scores, relevancies):
+
+    # Sort the items based on scores, keeping the relevencies along for the
+    # ride.  Settle ties randomly.
+    scores = sorted(
+        zip(scores, relevancies), 
+        key=lambda x: (x[0], np.random.random()),
+        reverse=True
+    )
+
+    # Sum the precisions at each true positive 
+    precision_sums = 0.0
+    num_relevant = 0.0
+    num_checked = 0.0
+    precisions = []
+    for score, is_relevant in scores:
+        num_checked += 1
+        if is_relevant:
+            num_relevant += 1
+            precision_sums += num_relevant / num_checked
+            precisions.append(num_relevant / num_checked)
+
+        #print '\n\n' + '-'*24 + '\n\n'
+        #print 'is relevant:', is_relevant
+        #if len(precisions) > 0:
+        #    print 'this precision:', precisions[-1]
+        #    print 'average precision:', np.mean(precisions)
+
+    return precision_sums / num_relevant
+
+
+def calculate_f1(confusion_matrix):
+    """
+    Returns F1 relative to each class, as well as the macro-average of the 
+    F1 scores.
+    """
+
+    # First calculate the individual and macro f1
+    f1s = {}
+    labels = confusion_matrix.keys()
+    for y in labels:
+
+        positives_predicted = float(
+            sum([confusion_matrix[y_][y] for y_ in labels]))
+        if positives_predicted == 0:
+            precision = 1
+        else:
+            precision = confusion_matrix[y][y] / positives_predicted
+
+        actual_positives = float(
+            sum([confusion_matrix[y][y_] for y_ in labels]))
+        if actual_positives == 0:
+            recall = 1
+        else:
+            recall = confusion_matrix[y][y] / actual_positives
+
+        if precision + recall == 0:
+            f1s[y] = 0
+        else:
+            f1s[y] = 2 * precision * recall / (precision + recall)
+
+    macro_f1 = sum(f1s.values()) / float(len(f1s))
+
+    return f1s, macro_f1
+
+
+def calculate_simple_f1(confusion):
+    positives_predicted = sum([confusion[y][1] for y in confusion])
+    if positives_predicted == 0:
+        precision = 1
+    else:
+        precision = confusion[1][1] / float(positives_predicted)
+
+    actual_positives = sum([confusion[1][y] for y in confusion])
+    if actual_positives == 0:
+        recall = 1
+    else:
+        recall = confusion[1][1] / float(actual_positives)
+
+    if precision + recall == 0:
+        f1 = 0
+    else:
+        f1 = 2 * precision * recall / (precision + recall)
+
+    return precision, recall, f1
+
+
+def calculate_f1_loose(confusion):
+
+    positives_predicted = float(
+        sum([confusion[y][1] for y in confusion])
+        + sum([confusion[y][0] for y in confusion])
+    )
+    print positives_predicted
+
+    true_positives = (
+        confusion[0][0] + confusion[0][1] + confusion[1][0] + confusion[1][1])
+    if positives_predicted == 0:
+        precision = 1
+    else:
+        precision = true_positives / positives_predicted
+
+    actual_positives = (
+        sum([confusion[1][y] for y in confusion])
+        + sum([confusion[0][y] for y in confusion])
+    )
+    if actual_positives == 0:
+        recall = 1
+    else:
+        recall = true_positives / float(actual_positives)
+
+    if precision + recall == 0:
+        f1 = 0
+    else:
+        f1 = 2 * precision * recall / (precision + recall)
+
+    return precision, recall, f1
+
+
+def generate_confusion_matrix(classifier, X_test, Y_test):
+    confusion_matrix = defaultdict(Counter)
+    Y_predicted = classifier.predict(X_test)
+    for y, y_pred in zip(Y_test, Y_predicted):
+        confusion_matrix[y][y_pred] += 1
+
+    return confusion_matrix
 
 
 def diagnose_map_evaluators(
