@@ -560,6 +560,12 @@ def evaluate_classifier(name, classifier_definition, features, out_path=None):
     elif data_source == 'crowdflower-annotated-rand':
         train, test = annotations.Annotations(
             features.dictionary).get_train_test('rand')
+    elif data_source == 'crowdflower-dev-top':
+        train, test = annotations.Annotations(
+            features.dictionary).get_train_dev('top')
+    elif data_source == 'crowdflower-dev-rand':
+        train, test = annotations.Annotations(
+            features.dictionary).get_train_dev('rand')
     elif data_source == 'crowdflower-dev':
         train, test = annotations.Annotations(
             features.dictionary).get_train_dev()

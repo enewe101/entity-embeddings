@@ -22,6 +22,7 @@ from SETTINGS import (
 )
 from nltk.corpus import wordnet
 from scipy.sparse import csr_matrix, coo_matrix
+import itertools
 
 
 LEN_GOOGLE_VECTORS = 300
@@ -34,6 +35,11 @@ GAZETTEER_FILES = [
 # Average dot product between two randomly chosen vectors.  Should be used
 # in the kernel when one or both of the token's vectors are missing
 AVERAGE_ABSOLUTE_DOT = 0.068708472297183756
+
+@np.vectorize
+def safe_log2(x):
+    return 0.0 if x==0 or np.isnan(x) else np.log2(x)
+
 
 def coalesce_features(
     out_dir, 
@@ -63,7 +69,7 @@ def coalesce_features(
     # Prune the features
     print 'prunning...'
     feature_accumulator.prune_dictionary(min_token_occurrences)
-    feature_accumulator.prune_features(min_token_occurrences)
+    feature_accumulator.prune_features(min_feature_occurrences)
 
     coalesced_path = out_dir
     feature_accumulator.write(coalesced_path)
@@ -216,7 +222,7 @@ COUNT_BASED_FEATURES = [
     'lemma_unigram', 'lemma_bigram', 'pos_unigram', 'pos_bigram', 
     'surface_unigram', 'surface_bigram'
 ]
-NON_COUNT_FEATURES = ['derivational', 'google-vectors', 'suffix']
+NON_COUNT_FEATURES = ['derivational', 'google_vectors', 'suffix']
 ALL_FEATURES = COUNT_BASED_FEATURES + NON_COUNT_FEATURES
 
 
@@ -241,6 +247,7 @@ class FeatureAccumulator(object):
         self.google_vectors_path = google_vectors_path
         self._initialize_accumulators()
         self.lexical_feature_window = lexical_feature_window
+        self.feature_map_contents = None
 
         if load is not None:
             self.merge_load(load)
@@ -497,14 +504,12 @@ class FeatureAccumulator(object):
         """
 
         # Get a mapping from feature (names) to column indices.
-        if 'feature-map' not in self.fresh:
-            self.get_feature_map()
+        self.get_feature_map(count_based_features, non_count_features)
 
         # For which tokens are we building the feature vectors?  If nothing
         # was provided, make it for all tokens in the dictionary.
         if tokens is None:
             tokens = self.dictionary.get_token_list()
-
 
         # Get a feature map, which maps each feature (by name) to an integer
         # correponding to it's (column) index in the sparse matrix
@@ -512,36 +517,28 @@ class FeatureAccumulator(object):
         coo_val, coo_i, coo_j = [], [], []
         for token_num, lemma in enumerate(tokens):
 
-            t4k.progress(token_num, len(self.dictionary))
+            t4k.progress(token_num, len(tokens))
 
-            # Get the count-based features using the desired mode
-            if mode == 'normalized':
-                count_features = self.get_normalized_features(
-                    lemma, count_based_features)
-            elif mode == 'log':
-                count_features = self.get_log_features(
-                    lemma, count_based_features)
-            elif mode == 'threshold':
-                count_features = self.get_threshold_features(
-                    lemma, count_based_features, threshold)
-            elif mode == 'raw':
-                count_features = self.get_feature_counts(
-                    lemma, count_based_features)
-            else:
-                raise ValueError('Unexpected mode: "%s"' % mode)
+            for feature_type in count_based_features:
+                count_features = self.get_count_based_features(
+                    lemma, [feature_type], mode, threshold
+                )
 
-            # Add the count feature to the coo_matrix construction lists
-            coo_val.extend(count_features.values())
-            coo_i.extend([token_num]*len(count_features))
-            coo_j.extend([self.feature_map[feat] for feat in count_features])
+                # Add the count feature to the coo_matrix construction lists
+                coo_val.extend(count_features.values())
+                coo_i.extend([token_num]*len(count_features))
+                coo_j.extend([
+                    self.feature_map['%s:%s' % (feature_type, feature_name)] 
+                    for feature_name in count_features
+                ])
 
             # Next get google embedding features (if desired)
-            if 'google-vectors' in non_count_features:
+            if 'google_vectors' in non_count_features:
                 vec = self.get_vector(lemma)
                 coo_val.extend(vec)
                 coo_i.extend([token_num]*LEN_GOOGLE_VECTORS)
                 coo_j.extend([
-                    self.feature_map['google-vectors-%d'%f] 
+                    self.feature_map['google_vectors:%d'%f] 
                     for f in range(LEN_GOOGLE_VECTORS)
                 ]) 
 
@@ -551,7 +548,7 @@ class FeatureAccumulator(object):
                 coo_val.extend(deriv_feats)
                 coo_i.extend([token_num]*len(WORDNET_POS))
                 coo_j.extend([
-                    self.feature_map['derivational-%s'%d] 
+                    self.feature_map['derivational:%s'%d] 
                     for d in WORDNET_POS
                 ])
 
@@ -561,7 +558,7 @@ class FeatureAccumulator(object):
                 if suffix is not None:
                     coo_val.append(1)
                     coo_i.append(token_num)
-                    coo_j.append(self.feature_map['suffix-%s' % suffix])
+                    coo_j.append(self.feature_map['suffix:%s' % suffix])
 
         num_tokens = token_num + 1
 
@@ -583,14 +580,20 @@ class FeatureAccumulator(object):
 
 
     def get_feature_map(
-        self #, include_feature_types=ALL_FEATURES
+        self, 
+        count_based_features=COUNT_BASED_FEATURES, 
+        non_count_features=NON_COUNT_FEATURES
     ):
         """
         Given the subset of features that have been chosen, create a mapping
         from each individual feature to a component in a sparse feature vector.
         This let's us vectorize the features in a consistent way.
         """
-        #include_feature_types = set(include_feature_types)
+
+        # Check to see if we have already assembled this feature map
+        desired_map_contents = set(count_based_features + non_count_features)
+        if self.feature_map_contents == desired_map_contents:
+            return
 
         # First accumulate all of the keys for all features.  We will make a
         # mapping from a specific feature (key) to incrementing integers
@@ -599,37 +602,38 @@ class FeatureAccumulator(object):
         self.feature_map = t4k.IncrementingMap()
 
         # Add keys for the count-based features
-        for feature_type in COUNT_BASED_FEATURES:
+        for feature_type in count_based_features:
             #if feature_type in include_feature_types:
             feature_names = set([
-                feature for lemma in getattr(self, feature_type)
+                '%s:%s' % (feature_type, feature)
+                for lemma in getattr(self, feature_type)
                 for feature in getattr(self, feature_type)[lemma]
             ])
             self.feature_map.add_many(feature_names)
 
         # Add keys for other features
-        #if 'derivational' in include_feature_types:
-        feature_names = ['derivational-%s'%pos for pos in WORDNET_POS]
-        self.feature_map.add_many(feature_names)
+        if 'derivational' in non_count_features:
+            feature_names = ['derivational:%s' % pos for pos in WORDNET_POS]
+            self.feature_map.add_many(feature_names)
 
         # Add keys for google_vector features
-        #if 'google_vectors' in include_feature_types:
-        feature_names = [
-            'google-vectors-%d'%i for i in range(LEN_GOOGLE_VECTORS)]
-        self.feature_map.add_many(feature_names)
+        if 'google_vectors' in non_count_features:
+            feature_names = [
+                'google_vectors:%d' % i for i in range(LEN_GOOGLE_VECTORS)]
+            self.feature_map.add_many(feature_names)
 
         # Add keys for suffix features
-        #if 'suffix' in include_feature_types:
-        feature_names = ['suffix-%s'%s for s in SUFFIXES]
-        self.feature_map.add_many(feature_names)
+        if 'suffix' in non_count_features:
+            feature_names = ['suffix:%s' % s for s in SUFFIXES]
+            self.feature_map.add_many(feature_names)
 
-        self.fresh.add('feature-map')
+        self.feature_map_contents = desired_map_contents
 
 
 
     def get_vector(self, lemma):
         """
-        Get the google-vector embedding associated to a given token
+        Get the google_vector embedding associated to a given token
         """
         if 'vectors' not in self.fresh:
             self.read_google_vectors()
@@ -881,6 +885,121 @@ class FeatureAccumulator(object):
                 self.get_baseline_features(token)
                 self.get_hand_picked_features(token)
                 self.get_lexical_features(token, sentence)
+
+
+    def calculate_mutual_information(self,
+        annotations,
+        out_path, 
+        count_based_features=COUNT_BASED_FEATURES,
+        non_count_features=['derivational', 'suffix'] # exclude goog-vec
+    ):
+        """
+        Calculate the mutual information for all features, sort features in
+        descending order of mutual information, write the results to disc,
+        and return the results.
+        """
+
+        # Open a file for writing
+        if out_path is not None:
+            out_file = open(out_path, 'w')
+
+        # We will compute the mutual information based on the features 
+        # thresholded at their fiftieth percentile.
+        tokens = list(annotations.examples.keys())
+        dense_features = self.as_sparse_matrix(
+            tokens=tokens,
+            count_based_features=count_based_features,
+            non_count_features=non_count_features, 
+            mode='threshold',
+            threshold=0.5
+        ).toarray()
+
+        relational_nouns = np.array([
+            int(annotations.examples[t]>0)  for t in tokens
+        ])
+
+        print 'calculating mutual information...'
+        # Calculate the mutual information for all features
+        mutual_inf = self.mutual_inf(dense_features, relational_nouns)
+
+        print 'sorting featrues by mutual information...'
+        # Get the indices that sorts features in descending order of mutual
+        # information.  The slice indexing provides descending order.
+        sort_indices = mutual_inf.argsort()[::-1]
+        mutual_inf = mutual_inf[sort_indices]
+        feature_names = np.array(
+            [t4k.ensure_unicode(s) for s in self.feature_map._keys]
+        )[sort_indices]
+
+        # Write the mutual informations to disc
+        if out_path is not None:
+            print 'writing feature mutual information to disk..'
+            for feature, m_inf in itertools.izip(feature_names, mutual_inf):
+                out_file.write('%s\t%f\n' % (feature, m_inf))
+
+        print 'returning...'
+        return feature_names, mutual_inf
+
+
+    def mutual_inf(self, features, classes):
+
+        N = float(len(features))
+
+        # Determine the frequency that given features "fire".
+        print 'summing feature occurrences...'
+        f_sum = features.sum(axis=0)/N
+
+        # Determine the frequency of relational nouns
+        print 'summing class occurrences...'
+        c_sum = classes.sum(axis=0)/N
+
+        # Calculate the concordance of presence/absence of features with nouns
+        # being relational/non-relational.  There are four cases.  When we 
+        # consider the absence of features, we take 1-features, and similarly
+        # when considering non-relational nouns, we take 1-classes.
+        mutual_information = np.zeros(features.shape[1])
+        for f_inv, c_inv in itertools.product([True, False], repeat=2):
+
+            # Possibly invert the features / classes
+            print 'inverting occurrences...'
+            f_sum_ = 1-f_sum if f_inv else f_sum
+            c_sum_ = 1-c_sum if c_inv else c_sum
+            f = 1-features if f_inv else features
+            c = 1-classes if c_inv else classes
+
+            # Calculate joint feature and class frequency
+            print 'calculating concordance...'
+            fc = c.dot(f)/N
+
+            # Add the contribution for this concordance to the mutual inf.
+            print 'accumulating mutual information...'
+            mutual_information += self.mutual_inf_term(fc,f_sum_,c_sum_)
+
+        return mutual_information
+            
+
+    def mutual_inf_term(self, joint_ab, marginal_a, marginal_b):
+        """
+        Calculate one term in the mutual information sum.
+        """
+        return joint_ab * safe_log2(joint_ab/(marginal_a*marginal_b))
+
+
+    def prune_features_keep_only(self, keep_features):
+        """
+        Eliminates any features not listed in ``keep_features``.
+        """
+
+        # Look at each count feature type, and prune any features that aren't
+        # in ``keep_features``
+        for feature_type in COUNT_BASED_FEATURES:
+            feature_set = getattr(self, feature_type)
+
+            # Do pruning on features stored for each lemma in the feature set
+            for lemma in feature_set:
+                for feature in feature_set[lemma].keys():
+                    if feature not in keep_features:
+                        del feature_set[lemma][feature]
 
 
     def prune_features(self, min_frequencey=5):
