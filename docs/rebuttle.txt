@@ -1,0 +1,49 @@
+We thank the reviewers for their insightful comments.
+
+R1/R3: Sec.5 seems isolated.
+We will better integrate the content of Sec. 5 into the paper.
+
+R1: Criterion-1 seems tautological.
+As in the text, compare "brother", and "car":
+    (1) He's a brother.
+    (2) That's a car.
+In (1) the word "brother" indicates a sibling relation to someone (likely the speaker), but no corresponding relation obtains in (2).  See 199-228.
+
+R1: Excluding body parts.
+Body part nouns seem to fall short of criterion-1.  Consider:
+    (3) That's a hand.
+We think this is more like (2) above than (1). The exceptions are usages of body parts as *Relative Parts*, as in "foot of the bed"; see Table 1.  We can clarify this in the text.
+
+R1: Nouns presented alone or in context? 
+We considered presenting words-in-context for each sense, but this greatly increases cost.
+
+R1: Sec.3.1.1 is confusing.
+Agreed, "participants" (=non-experts) is confusing. 
+Krippendorff's alpha for experts and non-experts: 0.43.
+Composition of 250 nouns:
+   usually-relational:       60
+   partly-relational:        28
+   almost-never-relational: 162
+
+R1: Elaborate on bootstrapping.
+Seed set: 460 expert-annotated nouns.  
+The classifier was an SVM using features from Sec.4.2 (except Sequence Features, which were considered after annotation).  
+Words were sampled from un-annotated nouns:
+   - 800 "most relational" nouns per the classifier
+   - 200 "least relational" nouns per the classifier
+   - 800 most frequent, per Gigaword
+   - 800 uniformly at random from Gigaword.
+Note: These sets overlap.  We can elaborate this.
+
+R1: Sec.4.1 Baseline vs performant model.
+Sec.4.1 describes the baseline, while Sec.4.2 describes features included to improve on the baseline.  We agree this can be clarified.
+
+R1: Error analysis.
+While potentially enlightening, this would require additional annotation (categorizing nouns into their subclasses).  We considered this but it increases the difficulty of the already-difficult task.  We can however break down performance (error) according to relational and non-relational.
+
+R2: Annotation/classification performance.
+We acknowledge R2's reservations, but point out that we are the first to report metrics for this annotation/classification task.
+
+R3: Evaluation not recall-centric.
+The overall bootstrapping and annotation effort should be recall-oriented, but that does not mean the classifier should be assessed based on recall alone.  The point of the classifier is to better allocate limited annotation effort wisely.  A classifier solely optimized for recall will not help: consider the trivial high-recall classifier that accepts all nouns.  We must instead balance classifier's precision to increases recall of the overall process.
+
