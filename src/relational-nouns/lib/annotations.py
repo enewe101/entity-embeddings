@@ -161,7 +161,7 @@ class Annotations(object):
         return train, test
 
 
-    def get_train_dev(self, num_dev=500, num_test=500):
+    def get_train_dev(self, mode=None, num_dev=500, num_test=500):
         """
         Get the training set split into a training and dev set (excludes items
         that would be served in the test set for get_train_test('top') and
@@ -200,6 +200,19 @@ class Annotations(object):
         num_dev_neg = int(np.round(num_dev * len(dev_train['neg']) / total))
         dev['neg'] = set(random.sample(dev_train['neg'], num_dev_neg))
         train['neg'] = dev_train['neg'] - dev['neg']
+
+        # If we want to test only on top items in the dev set, then 
+        # we need to intersect dev with top.
+        if mode == 'top':
+            top_pos, top_neut, top_neg = self.get_as_tokens('top')
+            dev['pos'] = dev['pos'] & top_pos
+            dev['neut'] = dev['neut'] & top_neut
+            dev['neg'] = dev['neg'] & top_neg
+        elif mode == 'rand':
+            rand_pos, rand_neut, rand_neg  = self.get_as_tokens('rand')
+            dev['pos'] = dev['pos'] & rand_pos
+            dev['neut'] = dev['neut'] & rand_neut
+            dev['neg'] = dev['neg'] & rand_neg
 
         return train, dev
 

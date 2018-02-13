@@ -8,7 +8,7 @@ import test_classifier as tc
 import utils
 import time
 
-def run_classifier(names_of_runs, out_fname=None, features=None):
+def run_classifier(names_of_runs, out_fname=None):
 
     # Accept being given a single run name -- in which case, wrap it in a list.
     if isinstance(names_of_runs, basestring):
@@ -23,16 +23,8 @@ def run_classifier(names_of_runs, out_fname=None, features=None):
     # Regrieve the definitions for the desired runs
     these_runs = t4k.select(runs, names_of_runs)
 
-    # Load the features if not provided
-    if features is None:
-        wni = utils.read_wordnet_index()
-        features_path = os.path.join(
-            RELATIONAL_NOUN_FEATURES_DIR,
-            'accumulated450-min_token_5-min_feat5000')
-
-        start = time.time()
-        features = ef.FeatureAccumulator(wni, load=features_path)
-        print 'time to read features elapsed: %s' % (time.time() - start)
+    features_dirname = 'accumulated450-min_token_5-min_feat5000'
+    features = None
 
     # Do the runs
     for name, run_specification in these_runs.iteritems():
@@ -44,9 +36,35 @@ def run_classifier(names_of_runs, out_fname=None, features=None):
         # Run the expanded specification (searches all values of `SearchValues`
         # fields).
         for i, spec in enumerate(expanded_specs):
+
+            # If different features path is given, load features from there.
+            if 'features_dirname' in spec:
+                new_fpath = spec['features_dirname']
+                if new_fpath != features_dirname:
+                    features_dirname = new_fpath
+                    features = load_features(new_fpath)
+
+            # And in any case, load the features if we haven't yet.
+            if features is None:
+                features = load_features(features_dirname)
+
             start = time.time()
             tc.evaluate_classifier('%s__%d'%(name,i), spec, features, out_path)
             print 'time to run model: %s' % (time.time() - start)
+
+
+def load_features(features_dirname):
+
+    print 'loading features from %s...' % features_dirname
+    start = time.time()
+
+    features_path = os.path.join(
+        RELATIONAL_NOUN_FEATURES_DIR, features_dirname)
+    features = ef.FeatureAccumulator(
+        utils.read_wordnet_index(), load=features_path)
+
+    print 'time to read features elapsed: %s' % (time.time() - start)
+    return features
 
 
 runs = {
@@ -282,6 +300,7 @@ runs = {
         'cache_size':8000
     },  # cross-validate C, gamma
 
+
     'svm-(+1|-)-norm-nowhite-optC-gamma1':{
         'binarize_mode':'+0/-',
         'count_feature_mode':'normalized',
@@ -356,6 +375,751 @@ runs = {
         'find_threshold':True,
         'cache_size':8000
     },
+
+    'svm-(+|0-)-[14a]-normalized-nowhite-C10-gamma0.01':{
+        'features_dirname': '14a',
+        'binarize_mode':'+/0-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': 10.,
+        'gamma': 0.01,
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':ef.COUNT_BASED_FEATURES,
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-normalized-nowhite-optC-optGamma0.001-0.00001':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([0.001, 0.0001]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':ef.COUNT_BASED_FEATURES,
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-normalized-nowhite-optC1000-100000-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([1000,10000,100000]),
+        'gamma': tc.SearchValues([0.001, 0.0001]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':ef.COUNT_BASED_FEATURES,
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<dep>-nowhite-optC1000-100000-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([1000,10000,100000]),
+        'gamma': tc.SearchValues([0.001, 0.0001]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if f!='dependency'],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<dep>-nowhite-optC-optGamma0.001-0.00001':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([0.001, 0.0001]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if f!='dependency'],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<baseline>-nowhite-optC1000-100000-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([1000,10000,100000]),
+        'gamma': tc.SearchValues([0.001, 0.0001]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if f!='baseline'],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<baseline>-nowhite-optC-optGamma0.001-0.00001':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([0.001, 0.0001]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if f!='baseline'],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<hand_picked>-nowhite-optC1000-100000-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([1000,10000,100000]),
+        'gamma': tc.SearchValues([0.001, 0.0001]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if f!='hand_picked'],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<hand_picked>-nowhite-optC-optGamma0.001-0.00001':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([0.001, 0.0001]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if f!='hand_picked'],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<lemma>-nowhite-optC1000-100000-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([1000,10000,100000]),
+        'gamma': tc.SearchValues([0.001, 0.0001]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if not f.startswith('lemma')],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<lemma>-nowhite-optC-optGamma0.001-0.00001':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([0.001, 0.0001]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if not f.startswith('lemma')],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<surface>-nowhite-optC1000-100000-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([1000,10000,100000]),
+        'gamma': tc.SearchValues([0.001, 0.0001]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if not f.startswith('surface')],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<surface>-nowhite-optC-optGamma0.001-0.00001':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([0.001, 0.0001]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if not f.startswith('surface')],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<pos>-nowhite-optC1000-100000-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([1000,10000,100000]),
+        'gamma': tc.SearchValues([0.001, 0.0001]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if not f.startswith('pos')],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<pos>-nowhite-optC-optGamma0.001-0.00001':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([0.001, 0.0001]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if not f.startswith('pos')],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<derivational>-nowhite-optC1000-100000-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([1000,10000,100000]),
+        'gamma': tc.SearchValues([0.001, 0.0001]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features': ef.COUNT_BASED_FEATURES,
+        'non_count_features':[
+            f for f in ef.NON_COUNT_FEATURES if f!='derivational'],
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<derivational>-nowhite-optC-optGamma0.001-0.00001':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([0.001, 0.0001]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features': ef.COUNT_BASED_FEATURES,
+        'non_count_features':[
+            f for f in ef.NON_COUNT_FEATURES if f!='derivational'],
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<google>-nowhite-optC1000-100000-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([1000,10000,100000]),
+        'gamma': tc.SearchValues([0.001, 0.0001]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features': ef.COUNT_BASED_FEATURES,
+        'non_count_features':[
+            f for f in ef.NON_COUNT_FEATURES if f!='google'],
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<google>-nowhite-optC-optGamma0.001-0.00001':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([0.001, 0.0001]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features': ef.COUNT_BASED_FEATURES,
+        'non_count_features':[
+            f for f in ef.NON_COUNT_FEATURES if f!='google'],
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<suffix>-nowhite-optC1000-100000-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([1000,10000,100000]),
+        'gamma': tc.SearchValues([0.001, 0.0001]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features': ef.COUNT_BASED_FEATURES,
+        'non_count_features':[
+            f for f in ef.NON_COUNT_FEATURES if f!='suffix'],
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<suffix>-nowhite-optC-optGamma0.001-0.00001':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([0.001, 0.0001]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features': ef.COUNT_BASED_FEATURES,
+        'non_count_features':[
+            f for f in ef.NON_COUNT_FEATURES if f!='suffix'],
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-normalized-nowhite-optC-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':ef.COUNT_BASED_FEATURES,
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-normalized-nowhite-C10-optGamma-devTopRand':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': 10.,
+        'gamma': tc.SearchValues([0.01, 0.1, 1., 10., 100.]),
+        'kind':'svm',
+        'data_source': tc.SearchValues([
+           'crowdflower-dev-rand', 'crowdflower-dev-top']),
+        'data_format':'vector',
+        'count_based_features':ef.COUNT_BASED_FEATURES,
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-normalized-nowhite-optC-Gamma0.01-devTopRand':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([0.01, 0.1, 1., 10., 100.]),
+        'gamma': 0.01,
+        'kind':'svm',
+        'data_source': tc.SearchValues([
+           'crowdflower-dev-rand', 'crowdflower-dev-top']),
+        'data_format':'vector',
+        'count_based_features':ef.COUNT_BASED_FEATURES,
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-normalized-nowhite-C10-gamma0.01-devTopRand':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': 10.,
+        'gamma': 0.01,
+        'kind':'svm',
+        'data_source': tc.SearchValues([
+           'crowdflower-dev-rand', 'crowdflower-dev-top']),
+        'data_format':'vector',
+        'count_based_features':ef.COUNT_BASED_FEATURES,
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<baseline>-normalized-nowhite-optC-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if f!='baseline'],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<dep>-normalized-nowhite-optC-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if f!='dependency'],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<dep>-normalized-nowhite-C100-gamma0.001-testing':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten':False,
+        'C': 100.,
+        'gamma': 0.001,
+        'kind':'svm',
+        'data_source': tc.SearchValues([
+            'crowdflower-annotated-rand', 'crowdflower-annotated-top']),
+        'data_format':'vector',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if f!='dependency'],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold':False,
+        'use_threshold': -0.23498053631221705,
+        'cache_size':8000
+    }, # Done
+
+
+    'svm-(+0|-)-[min1000]-<hand>-normalized-nowhite-optC-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if f!='hand_picked'],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<lemma>-normalized-nowhite-optC-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if f!='hand_picked'],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<lemma>-normalized-nowhite-optC-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if not f.startswith('lemma')],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<surface>-normalized-nowhite-optC-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if not f.startswith('surface')],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<pos>-normalized-nowhite-optC-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if not f.startswith('pos')],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<pos>-normalized-nowhite-optC-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if not f.startswith('pos')],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<derivational>-normalized-nowhite-optC-gamma0.01':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': 0.01,
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features': ef.COUNT_BASED_FEATURES,
+        'non_count_features':[
+            f for f in ef.NON_COUNT_FEATURES if f!='derivational'],
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<derivational>-normalized-nowhite-optC-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features': ef.COUNT_BASED_FEATURES,
+        'non_count_features':[
+            f for f in ef.NON_COUNT_FEATURES if f!='derivational'],
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<google>-normalized-nowhite-optC-gamma0.01':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([1., 0.1, 0.01]),
+        'gamma': 0.01,
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features': ef.COUNT_BASED_FEATURES,
+        'non_count_features':[
+            f for f in ef.NON_COUNT_FEATURES if f!='google_vectors'],
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<google>-normalized-nowhite-optC-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features': ef.COUNT_BASED_FEATURES,
+        'non_count_features':[
+            f for f in ef.NON_COUNT_FEATURES if f!='google_vectors'],
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<suffix>-normalized-nowhite-C100-gamma0.001-test':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': 100.,
+        'gamma': 0.001,
+        'kind':'svm',
+        'data_source': tc.SearchValues([
+            'crowdflower-annotated-rand', 'crowdflower-annotated-top']),
+        'data_format':'vector',
+        'count_based_features': ef.COUNT_BASED_FEATURES,
+        'non_count_features':[
+            f for f in ef.NON_COUNT_FEATURES if f!='suffix'],
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<suffix>-normalized-nowhite-optC-gamma0.01':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': 0.01,
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features': ef.COUNT_BASED_FEATURES,
+        'non_count_features':[
+            f for f in ef.NON_COUNT_FEATURES if f!='suffix'],
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[min1000]-<suffix>-normalized-nowhite-optC-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features': ef.COUNT_BASED_FEATURES,
+        'non_count_features':[
+            f for f in ef.NON_COUNT_FEATURES if f!='suffix'],
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[top10000]-normalized-nowhite-optC-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-top_10000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':ef.COUNT_BASED_FEATURES,
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[top20000]-normalized-nowhite-optC-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-top_20000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':ef.COUNT_BASED_FEATURES,
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
+
+    'svm-(+0|-)-[top40000]-normalized-nowhite-optC-optGamma':{
+        'features_dirname': 'accumulated450-min_token_5-top_40000',
+        'binarize_mode':'+0/-',
+        'count_feature_mode':'normalized',
+        'whiten': False,
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'gamma': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'kind':'svm',
+        'data_source':'crowdflower-dev',
+        'data_format':'vector',
+        'count_based_features':ef.COUNT_BASED_FEATURES,
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold': True,
+        'cache_size':8000
+    },  # cross-validate C, gamma
 
     'svm-(+1|-)-log-nowhite-optC-gamma0.1':{
         'binarize_mode':'+0/-',
@@ -491,6 +1255,23 @@ runs = {
         'find_threshold':True,
         'cache_size':8000
     },
+
+    'svm-(+0|-)-baseline-raw-nowhite-C1-gamma10-testing':{
+        'kind':'svm',
+        'C': 1.,
+        'gamma': 10.,
+        'data_source': tc.SearchValues([
+            'crowdflower-annotated-rand', 'crowdflower-annotated-top']),
+        'count_feature_mode': 'raw',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features': ['baseline'],
+        'non_count_features': [],
+        'find_threshold':True,
+        'cache_size':8000
+    }, # Done
+
 
     'svm-(+0|-)-baseline-optRep-nowhite-optC-optGamma':{
         'kind':'svm',
@@ -819,6 +1600,409 @@ runs = {
         'find_threshold':True,
     }, # Done
 
+    'logistic-[min1000]-(+0|-)-log-nowhite-optPenalty-optC':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': tc.SearchValues(['l1','l2']),
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features':ef.COUNT_BASED_FEATURES,
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[min1000]-(+0|-)-log-nowhite-optPenalty-optC1e-5':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': 'l2',
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'C': tc.SearchValues([0.001, 0.0001, 0.00001]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features':ef.COUNT_BASED_FEATURES,
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[min1000]-(+0|-)-log-nowhite-L1-optC1000-100000':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': 'l1',
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'C': tc.SearchValues([1000,10000,100000]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features':ef.COUNT_BASED_FEATURES,
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[min1000]-(+0|-)-<baseline>-log-nowhite-optPenalty-optC':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': tc.SearchValues(['l1','l2']),
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if f != 'baseline'],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[min1000]-(+0|-)-<baseline>-log-nowhite-optPenalty-optC1e-5':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': 'l2',
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'C': tc.SearchValues([0.001, 0.0001, 0.00001]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if f != 'baseline'],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[min1000]-(+0|-)-<dependency>-log-nowhite-optPenalty-optC':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': tc.SearchValues(['l1','l2']),
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if f != 'dependency'],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[min1000]-(+0|-)-<dependency>-log-nowhite-optPenalty-optC1e-5':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': 'l2',
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'C': tc.SearchValues([0.001, 0.0001, 0.00001]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if f != 'dependency'],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[min1000]-(+0|-)-<hand>-log-nowhite-optPenalty-optC':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': tc.SearchValues(['l1','l2']),
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if f != 'hand_picked'],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[min1000]-(+0|-)-<hand>-log-nowhite-optPenalty-optC1e-5':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': 'l2',
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'C': tc.SearchValues([0.001, 0.0001, 0.00001]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if f != 'hand_picked'],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[min1000]-(+0|-)-<lemma>-log-nowhite-optPenalty-optC':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': tc.SearchValues(['l1','l2']),
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if not f.startswith('lemma')],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[min1000]-(+0|-)-<lemma>-log-nowhite-optPenalty-optC1e-5':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': 'l2',
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'C': tc.SearchValues([0.001, 0.0001, 0.00001]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if not f.startswith('lemma')],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[min1000]-(+0|-)-<surface>-log-nowhite-optPenalty-optC':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': tc.SearchValues(['l1','l2']),
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if not f.startswith('surface')],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[min1000]-(+0|-)-<surface>-log-nowhite-optPenalty-optC1e-5':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': 'l2',
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'C': tc.SearchValues([0.001, 0.0001, 0.00001]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if not f.startswith('surface')],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[min1000]-(+0|-)-<pos>-log-nowhite-optPenalty-optC':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': tc.SearchValues(['l1','l2']),
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if not f.startswith('pos')],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[min1000]-(+0|-)-<pos>-log-nowhite-optPenalty-optC1e-5':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': 'l2',
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'C': tc.SearchValues([0.001, 0.0001, 0.00001]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features':[
+            f for f in ef.COUNT_BASED_FEATURES if not f.startswith('pos')],
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[min1000]-(+0|-)-<derivational>-log-nowhite-optPenalty-optC':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': tc.SearchValues(['l1','l2']),
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features': ef.COUNT_BASED_FEATURES,
+        'non_count_features': [
+            f for f in ef.NON_COUNT_FEATURES if f != 'derivational'],
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[min1000]-(+0|-)-<derivational>-log-nowhite-optPenalty-optC1e-5':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': 'l2',
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'C': tc.SearchValues([0.001, 0.0001, 0.00001]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features': ef.COUNT_BASED_FEATURES,
+        'non_count_features': [
+            f for f in ef.NON_COUNT_FEATURES if f != 'derivational'],
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[min1000]-(+0|-)-<google>-log-nowhite-optPenalty-optC':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': tc.SearchValues(['l1','l2']),
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features': ef.COUNT_BASED_FEATURES,
+        'non_count_features': [
+            f for f in ef.NON_COUNT_FEATURES if f != 'google_vectors'],
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[min1000]-(+0|-)-<google>-log-nowhite-optPenalty-optC1e-5':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': 'l2',
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'C': tc.SearchValues([0.001, 0.0001, 0.00001]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features': ef.COUNT_BASED_FEATURES,
+        'non_count_features': [
+            f for f in ef.NON_COUNT_FEATURES if f != 'google_vectors'],
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[min1000]-(+0|-)-<suffix>-log-nowhite-optPenalty-optC':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': tc.SearchValues(['l1','l2']),
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features': ef.COUNT_BASED_FEATURES,
+        'non_count_features': [
+            f for f in ef.NON_COUNT_FEATURES if f != 'suffix'],
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[min1000]-(+0|-)-<suffix>-log-nowhite-optPenalty-optC1e-5':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': 'l2',
+        'features_dirname': 'accumulated450-min_token_5-min_feat1000',
+        'C': tc.SearchValues([0.001, 0.0001, 0.00001]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features': ef.COUNT_BASED_FEATURES,
+        'non_count_features': [
+            f for f in ef.NON_COUNT_FEATURES if f != 'suffix'],
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[top10000]-(+0|-)-log-nowhite-optPenalty-optC':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': tc.SearchValues(['l1','l2']),
+        'features_dirname': 'accumulated450-min_token_5-top_10000',
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features':ef.COUNT_BASED_FEATURES,
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[top20000]-(+0|-)-log-nowhite-optPenalty-optC':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': tc.SearchValues(['l1','l2']),
+        'features_dirname': 'accumulated450-min_token_5-top_20000',
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features':ef.COUNT_BASED_FEATURES,
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold':True,
+    }, # Done
+
+    'logistic-[top40000]-(+0|-)-log-nowhite-optPenalty-optC':{
+        'kind':'logistic',
+        'solver': 'liblinear',
+        'penalty': tc.SearchValues(['l1','l2']),
+        'features_dirname': 'accumulated450-min_token_5-top_40000',
+        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'data_source':'crowdflower-dev',
+        'count_feature_mode':'log',
+        'data_format':'vector',
+        'whiten':False,
+        'binarize_mode':'+0/-',
+        'count_based_features':ef.COUNT_BASED_FEATURES,
+        'non_count_features':ef.NON_COUNT_FEATURES,
+        'find_threshold':True,
+    }, # Done
+
+
     'logistic-(+0|-)-log-nowhite-L2-0.1-testTop-setThresh':{
         'kind':'logistic',
         'solver': 'liblinear',
@@ -855,7 +2039,7 @@ runs = {
         'kind':'logistic',
         'solver': 'liblinear',
         'penalty': 'l2',
-        'C': tc.SearchValues([100., 10., 1., 0.1, 0.01]),
+        'C': tc.SearchValues([100., 1., 0.1, 0.01]),
         'data_source': 'crowdflower-dev',
         'count_feature_mode':'log',
         'data_format':'vector',
