@@ -1,4 +1,14 @@
+linguini_markers
+SETTINGS.py
+resources
 *.swp
 *.pyc
 data
 .DS_Store
+del
+env
+venv
+startenv
+test-data
+src/embedder/pbs/*.stderr
+src/embedder/pbs/*.stdout

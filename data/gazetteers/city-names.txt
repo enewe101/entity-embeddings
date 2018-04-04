@@ -1,0 +1,400 @@
+Aberdeen
+Adelaide
+Aix-en-Provence
+Albany
+Albuquerque
+Aleppo
+Alexandria
+Almeria
+Almería
+Alpine
+Amalfi
+Ammon
+Amsterdam
+Angeles
+Aosta
+Armagh
+Armidale
+Asheville
+Athens
+Atlanta
+Auckland
+Austin
+Bacolod
+Baltimore
+Bandung
+Bangalore
+Bangkok
+Barcelona
+Baton Rouge
+Bedford
+Beijing
+Beirut
+Belfast
+Belgrade
+Belo Horizonte
+Benevento
+Bergamo
+Berlin
+Bern
+Birmingham
+Bogota
+Bologna
+Bolton
+Bordeaux
+Boston
+Brasilia
+Bratislava
+Bremen
+Brescia
+Brighton
+Brisbane
+Bristol
+Bronx
+Brooklyn
+Brussels
+Bucharest
+Budapest
+Buenos Aires
+Buffalo
+Cadiz
+Cagayan de Oro
+Cairns
+Cairo
+Calgary
+Cambridge
+Campinas
+Campo Grande
+Canberra
+Cape Town
+Caracas
+Cardiff
+Carlisle
+Carson City
+Carystus
+Cebu
+Charlotte
+Chelmsford
+Chennai
+Chicago
+Chittagong
+Christchurch
+Cincinnati
+Cleveland
+Columbus
+Copenhagen
+Corinth
+Cork
+Cracow
+Culiacan
+Culiacán
+Curitiba
+Cádiz
+Córdoba
+Da Lat
+Dallas
+Damascus
+Darwin
+Davao
+Delhi
+Denver
+Derry
+Detroit
+Devonport
+Dhaka
+Dresden
+Dubai
+Dublin
+Duluth
+Dundee
+Dunedin
+Durban
+East Troy
+Edinburgh
+Edmonton
+Epidaurus
+Florence
+Fort Lauderdale
+Fort Wayne
+Fort Worth
+Foz do Iguacu
+Foz do Iguaçu
+Frankfurt
+Fredericton
+Fresno
+Galway
+Geneva
+Genoa
+Germiston
+Glasgow
+Gold Coast
+Gothenburg
+Granada
+Grand Rapids
+Graz
+Grenoble
+Guadalajara
+Halifax
+Hamburg
+Hamilton
+Hanoi
+Hanover
+Hartlepool
+Hastings
+Helsinki
+Ho Chi Minh City
+Hobart
+Hong Kong
+Honolulu
+Houston
+Huelva
+Hyderabad
+Iloilo
+Indianapolis
+Invercargill
+Inverness
+Iqaluit
+Islamabad
+Istanbul
+Itabira
+Izmir
+Jacksonville
+Jaen
+Jakarta
+Jaén
+Jerusalem
+Johannesburg
+Juiz de Fora
+Juneau
+Kaluga
+Karachi
+Kastoria
+Kenosha
+Kiev
+Kingston
+Kitchener
+Knoxville
+Krakow
+Kraków
+Kuching
+La Paz
+Lagos
+Lahore
+Lancaster
+Las Vegas
+Laval
+Leeds
+Leipzig
+Leon
+León
+Lima
+Linz
+Lisbon
+Liverpool
+Livorno
+London
+Londrina
+Los Angeles
+Lucca
+Lviv
+Lyon (Lyons)
+Macau
+Madrid
+Malacca
+Malaga
+Manaus
+Manchester
+Manhattan
+Manila
+Mantua
+Marathon
+Marseille
+Megara
+Melbourne
+Memphis
+Messina
+Mexico City
+Miami
+Milan
+Milwaukee
+Minneapolis
+Minot
+Misrata
+Modena
+Monterrey
+Montreal
+Moose Jaw
+Moscow
+Mumbai
+Muncie
+Munich
+Málaga
+Napier
+Naples
+Nashville
+Nassau
+Navarre
+Nelson
+New Orleans
+New York City
+Newcastle
+Newcastle upon Tyne
+Nice
+Nicosia
+Norfolk
+Northampton
+Nuremberg
+Oakbank
+Oakland
+Oamaru
+Odessa
+Omak
+Osaka
+Ottawa
+Oxford
+Paddock Lake
+Padua
+Palermo
+Palmerston North
+Paris
+Parma
+Peking
+Penang
+Perth
+Perugia
+Peterborough
+Philadelphia
+Phoenix
+Pisa
+Pittsburgh
+Polmont
+Pompeii
+Ponferrada
+Port Harcourt
+Portland
+Porto
+Porto Alegre
+Prague
+Pristina
+Providence
+Provo
+Pylos
+Quebec City
+Queens
+Randall
+Reading
+Red Deer
+Regina
+Reims
+Reno
+Rethymno
+Rheims
+Rhodes
+Richmond
+Riga
+Rio de Janeiro
+Rochester
+Rome
+Rotorua
+Rotterdam
+Rouen
+Sacramento
+Saint Petersburg
+Salem
+Salerno
+Salt Lake City
+Salvador
+Salzburg
+San Antonio
+San Diego
+San Francisco
+San Jose
+Santa Clarita
+Santa Cruz
+Sao Carlos
+Sao Luís
+Sao Paulo
+Sarajevo
+Saskatoon
+Savannah
+Seattle
+Seoul
+Serres
+Seville
+Shanghai
+Sheffield
+Shkoder
+Siena
+Sienna
+Silver Lake
+Skopje
+Slough
+Sofia
+Solihull
+Somers
+Sorrento
+Sparta
+Spoleto
+St. Louis
+Staten Island
+Stockholm
+Strasbourg
+Stuttgart
+Sunderland
+Swindon
+Sydney
+Sylhet
+Syracuse
+São Carlos
+São Luís
+São Paulo
+Tallinn
+Taranto
+Tartu
+Tbilisi
+The Hague
+Thebes
+Thessaloniki
+Tirana
+Tokyo
+Toowoomba
+Toronto
+Tournai
+Townsville
+Trent
+Trevor
+Trieste
+Tripoli
+Trois-Rivières
+Tucson
+Tulsa
+Turin
+Twin Lakes
+Uberlandia
+Valencia
+Valladolid
+Vancouver
+Venice
+Veracruz
+Verona
+Vicenza
+Vichy
+Vienna
+Vilnius
+Warsaw
+Washington
+Waterford
+Wellington
+Wheatland
+Wichita
+Wilmot
+Winchester
+Winnipeg
+Wolverhampton
+Xalapa
+Xanthi
+Yerevan
+Zagreb
+Zamboanga
+Zintan
+Zurich

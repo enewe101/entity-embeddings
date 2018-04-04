@@ -22,6 +22,8 @@ class Annotations(object):
 
     def __init__(self, vocabulary=utils.read_wordnet_index()):
 
+        self.vocabulary = vocabulary
+
         # All tokens and their classification are stored here, according to 
         # their source
         self.examples_by_source = {
@@ -48,7 +50,7 @@ class Annotations(object):
 
             # Parse and store this example
             token, sources, annotator, label = line.split('\t')
-            if vocabulary is not None and token not in vocabulary:
+            if self.vocabulary is not None and token not in self.vocabulary:
                 continue
             self.examples[token] = get_label(label)
             self.example_source_lookup[token] = (
@@ -74,14 +76,13 @@ class Annotations(object):
                 continue
 
             # Don't add seeds that are outside the vocabulary
-            if vocabulary is not None and token not in vocabulary:
+            if self.vocabulary is not None and token not in self.vocabulary:
                 continue
 
             # Store this token, it's label, and its source ('seed').
             try:
                 self.examples[token] = get_label(label)
             except UnknownLabelError:
-                print token
                 continue
             self.example_source_lookup[token] = ['seed']
             self.examples_by_source['seed'].add(token)

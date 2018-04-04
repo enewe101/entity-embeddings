@@ -691,7 +691,6 @@ def evaluate_classifier(name, classifier_definition, features, out_path=None):
         #    )
 
     # Test it on the test set, generating a confusion matrix
-
     Y_predicted = clf.predict(X_test)
     for word, pred, actual in zip(Q_test, Y_predicted, Y_test):
         if actual == 1:
