@@ -1,0 +1,2 @@
+echo $1
+qsub -I -l nodes=1:ppn=1:gpus=1 -l walltime=$1 -A eeg-641-aa

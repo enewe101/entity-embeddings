@@ -1,0 +1,5 @@
+Multi-view and multi-task training of RST discourse parsers
+Recursive Deep Models for Discourse Parsing
+A Latent Variable Recurrent Neural Network for Discourse Relation Language Models
+Discourse Parsing with Attention-based Hierarchical Neural Networks
+

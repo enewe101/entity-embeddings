@@ -1,0 +1,16 @@
+CHANGELOG.rst
+MANIFEST.in
+README.rst
+requirements-dev.txt
+selectors34.py
+setup.cfg
+setup.py
+tox.ini
+selectors34.egg-info/PKG-INFO
+selectors34.egg-info/SOURCES.txt
+selectors34.egg-info/dependency_links.txt
+selectors34.egg-info/not-zip-safe
+selectors34.egg-info/requires.txt
+selectors34.egg-info/top_level.txt
+tests/support.py
+tests/test_selectors34.py

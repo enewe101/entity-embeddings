@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=1:gpus=1
+#PBS -l walltime=12:00:00
+#PBS -o /gs/project/eeg-641-aa/enewel3/entity-embeddings/src/embedder/pbs/prepare-dictionaries.stdout
+#PBS -e /gs/project/eeg-641-aa/enewel3/entity-embeddings/src/embedder/pbs/prepare-dictionaries.stderr
+#PBS -N prepare-dicts
+
+module load Python/2.7.10 CUDA/7.5.18 cuDNN/5.0-ga
+cd /gs/project/eeg-641-aa/enewel3/entity-embeddings/src/embedder 
+source ../../env/bin/activate
+THEANO_FLAGS='floatX=float32,device=gpu' python train_r2v.py \
+command=prepare \
+save_dir=/gs/project/eeg-641-aa/enewel3/entity-embeddings/data/dictionaries

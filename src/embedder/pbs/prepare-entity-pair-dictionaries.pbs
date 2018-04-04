@@ -1,0 +1,13 @@
+#!/bin/bash
+#PBS -l nodes=1:ppn=1
+#PBS -l walltime=6:00:00
+#PBS -o /gs/project/eeg-641-aa/enewel3/entity-embeddings/src/embedder/pbs/prepare-entity-pair-dictionaries.stdout
+#PBS -e /gs/project/eeg-641-aa/enewel3/entity-embeddings/src/embedder/pbs/prepare-entity-pair-dictionaries.stderr
+#PBS -N prepare-ep-dicts
+
+module load Python/2.7.10
+cd /gs/project/eeg-641-aa/enewel3/entity-embeddings/src/embedder 
+source ../../env/bin/activate
+EXCLUDE_THEANO=1 python train_ep2v.py \
+command=prepare \
+save_dir=/gs/project/eeg-641-aa/enewel3/entity-embeddings/data/entity-pair-dictionaries

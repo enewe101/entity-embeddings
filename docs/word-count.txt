@@ -1,0 +1,963 @@
+\abstract{
+  Relational nouns refer to an entity by virtue of how it relates to another
+entity. Their identification in text is a prerequisite for the correct semantic
+interpretation of a sentence, and could be used to improve information
+extraction.  Although various systems for extracting relations expressed using
+nouns have been developed, there are no dedicated lexical resources for
+relational nouns. We contribute a lexicon of 5,832 labeled nouns which includes
+1,358 relational nouns.  We describe the bootstrapped annotation of relational
+nouns, and develop a classifier that achieves 0.71 F1 when tested on held out
+nouns that are among the most common 2,500 word types in Gigaword, and 0.45 F1
+on held out nouns uniformly sampled across types.  We make the lexicon and
+classifier available to the scientific community. \\ 
+  \newline \Keywords{
+  relational noun, relation extraction, possessive, lexicon
+  } 
+}
+
+\begin{document}
+
+\maketitleabstract
+
+\section{Introduction}
+The extraction of relations is a fundamental aspect of natural language
+understanding, playing a central role in knowledge base construction, question
+answering, and recognizing textual entailment.
+It is well known that semantic relations can be expressed via a syntactically
+diverse set of constructions. Consider the following statements which are
+approximate paraphrases:
+\begin{enumerate}[label=\textbf{(1\alph*)},noitemsep]
+\item Jack \textbf{befriended} Jill 5 years ago.
+\item Jack and Jill's \textbf{friendship} is now 5 years old.
+\item Jack has been Jill's \textbf{friend} for 5 years.
+\end{enumerate}
+
+Whereas \textbf{(1a)} establishes the relation by means of a verb,
+\textbf{(1b)} and \textbf{(1c)} do so by means of nouns. In example
+\textbf{(1c)}, ``friend'' is part of a semantically motivated class of nouns
+called \textit{relational nouns}, a class we will focus on in this work.
+
+Relational nouns are nouns that identify an entity by virtue of how it relates
+to something else \cite{barker2011possessives}. In the above example,
+``friend'' establishes a relation between its referent, Jack, and the external
+entity, Jill, which could be depicted using a two-place predicate such as
+\texttt{friend(Jack, Jill)}. This differs from how a sortal (i.e.,
+non-relational) noun like ``person'' is interpreted.  The sentence
+\textit{Jill is a person} could be depicted as a unary predicate,
+\texttt{person(Jill)}. In other words, there is an absolute set of scientists,
+but there is no absolute set of friends, without first specifying the person
+with whom they are friends.
+
+Identifying relational nouns is a prerequisite for building a correct semantic
+interpretation of a sentence. While they behave syntactically like other nouns,
+semantically, they often behave as two-place predicates, as shown above.
+Semantic parsers such as Boxer that are trained on CCGBank do not currently
+distinguish between relational and non-relational nouns, leading to errors in
+sentences that contain them \cite{bos2008wide}.  Relation extraction systems
+such as \textsc{ReNoun} \cite{yahya2014renoun} and \textsc{RelNoun}
+\cite{pal2016demonyms} rely on automatically extracted patterns, and also do
+not make a distinction between relational and non-relational nouns.  
+Various information extraction systems could be improved by the identification
+of relational nouns. In this work, we approach the creation of a high-quality
+lexicon of relational nouns, using bootstrapped manual annotation.
+
+The definition of relational nouns is difficult to apply in practice during
+annotation, in part because the meaning of most nouns involves some relation at
+least indirectly. Part of our contribution is a series of decisions about what
+should be included or excluded from the class; decisions which are made with
+applications to relation extraction in mind. We describe these decisions and
+the approach to annotation. 
+
+Based on our annotation results, approximately one out of every 15 nouns, by
+type, is relational. While this represents a substantial semantic class, it
+nevertheless means that a significant amount of annotation effort will be
+expended on annotating the negative class. To more efficiently deploy
+annotation effort, we use a classifier to select candidate nouns in a
+bootstrapping process. 
+
+We obtain a dataset of 5,832 labelled nouns. Among these nouns, 1,358 are
+labelled as relational 
+%(862) or partly relational (496), 
+with the remaining 4,501 labelled non-relational.
+
+In addition to the dataset, we obtain a classifier capable of achieving 0.71 F1
+when classifying held-out nouns from the top 2,500 most common nouns, and 0.45
+F1 from nouns chosen uniformly at random. The dataset and classifier are
+released to the scientific community so they can be used to augment relation
+extraction systems and in other NLP applications.
+
+\section{Related work}
+There exists a line of work examining the properties of relational nouns using
+a formal theoretical framework
+\cite{de1988interpretation,partree2008genitives,laczko2009relational,barker2011possessives}.
+There, the focus is on developing a consistent theoretical treatment rather
+than lexical resources.  Many of our decisions and heuristics used in
+annotation and classification are based on this literature.
+
+Other work focuses on the development of resources and systems for nominal
+semantics, which is complementary to our work. This includes NomBank
+\cite{meyers2004nombank}, and other work on nominal semantic role labelling
+\cite{pado2008semantic,gerber2010beyond}. These resources and systems are
+concerned with the argument structure of nouns. Relational nouns are often
+treated as taking arguments, so this overlaps somewhat with our work, but these
+resources do not focus on relational nouns in particular. NomBank, by its
+extension to NomLex \cite{macleod1998nomlex}, does include a short list of 331
+nouns identified as relational. By focusing specifically on relational nouns,
+we generate a lexicon with a greater than fourfold increase in relational nouns
+(1,358).   
+Within the context of Open Information Extraction, earlier work such as ReVerb
+focused on extracting relations from verbs \cite{fader2011identifying}.
+\newcite{mausam2012open} examined the role of nouns and adjectives as bearers
+of predicates as well, showing that doing so increases coverage.
+\newcite{yahya2014renoun} developed the \textsc{ReNoun} system, which focuses
+on extracting information about rarer attributes expressed using nouns.
+
+The work most related to our work is the \textsc{RelNoun} Open IE system, most
+recently augmented by \newcite{pal2016demonyms}. This work extracts relations
+expressed using nouns, including relational nouns, using a combination of
+deterministic patterns and lexical resources, yielding 209 correct extractions
+from 2,000 newswire sentences. 
+
+Our current work complements automated extraction systems like \textsc{ReNoun}
+and \textsc{RelNoun} by assembling a lexicon of relational nouns. Rather than
+only relying on automatically extracted patterns, we use manual annotation and
+bootstrapping to create a high-quality lexicon. This lexicon of relational
+nouns can be used as a semantic resource in various applications, including
+relation extraction systems.
+
+\section{Operationalizing Relational Nouns}
+
+\begin{table*}
+\centering
+\label{tbl:liwc}
+{
+\setlength{\tabcolsep}{3pt}
+
+\resizebox{\textwidth}{!}{ 
+\begin{tabular}{c c c}
+\specialrule{.1em}{.05em}{.05em} 
+\textbf{Subclass} & \textbf{Literature examples} & \textbf{Additional examples}
+\\
+
+\specialrule{.05em}{.0em}{.5em}
+
+\pbox{2cm}{\centering Kinship} & 
+\pbox{9cm}{\centering
+\textbf{Brother}$^6$, 
+\textbf{sister}$^5$, \textbf{mother}$^4$, 
+\textbf{child}$^{4\dagger}$,
+\textbf{grandmother}$^3$,
+\textbf{husband}$^2$,
+\textbf{wife}, 
+\textbf{spouse}, 
+\textbf{father}, 
+\textbf{daughter},
+\textbf{aunt},
+\textbf{uncle},
+\textbf{cousin},
+\textbf{family}, 
+\textbf{relative}}
+&
+\pbox{9cm}{\centering
+\textbf{Stepdaughter}, 
+\textbf{brother-in-law}, 
+\textbf{kin}, 
+\textbf{kindred}} \\
+
+\specialrule{.05em}{.5em}{.5em}
+
+\pbox{2cm}{\centering Social non-kin} & 
+\pbox{9cm}{\centering
+\textbf{Enemy}$^4$,  \textbf{friend}$^3$,
+\textbf{pet}$^2$, \textbf{stranger}$^2$, \textbf{neighbour}$^2$,
+\textbf{mayor}, \textbf{governor}, \textbf{commander}, \textbf{co-author},
+\textbf{employee}, \textbf{tutor}} 
+&
+\pbox{9cm}{\centering
+\textbf{Captain}$^\dagger$, \textbf{guitarist}$^\dagger$,
+\textbf{investor}$^\dagger$, \textbf{linebacker}, \textbf{lawyer}$^\dagger$,
+\textbf{spokesperson}, \textbf{entourage}, \textbf{confidante}} \\
+
+\specialrule{.05em}{.5em}{.5em}
+
+\pbox{2cm}{\centering Operational} & 
+\pbox{9cm}{\centering
+\textbf{Name}$^2$, 
+\textbf{birthday}$^2$,
+\textbf{picture}$^2$,
+\textbf{portrait}$^{2\dagger}$,
+\textbf{tracks}$^\dagger$,
+\textbf{sake},
+rumor,
+\textbf{description},
+\textbf{reputation}
+} 
+&
+\pbox{9cm}{\centering \textbf{Passenger}, \textbf{solution}, \textbf{cure},
+\textbf{hole}
+} \\
+
+\specialrule{.05em}{.5em}{.5em}
+
+\pbox{2cm}{\centering Relative part} & 
+\pbox{9cm}{\centering
+\textbf{Edge}$^2$,
+\textbf{mantel}$^\dagger$,
+\textbf{side}, \textbf{corner}, \textbf{middle}
+} 
+&
+\pbox{9cm}{\centering 
+\textbf{Top}, \textbf{tip}$^\dagger$, \textbf{base}$^\dagger$, 
+%\textbf{heart}$^\dagger$, \textbf{stern}, \textbf{entrance},
+\textbf{skin}$^\dagger$,
+\textbf{leg}$^\dagger$, \textbf{head}$^\dagger$, \textbf{eye}$^\dagger$,
+\textbf{body}$^\dagger$, \textbf{face}$^\dagger$,
+} \\
+
+\specialrule{.05em}{.5em}{.5em}
+
+\pbox{2cm}{\centering Body part} & 
+\pbox{9cm}{\centering
+\textbf{Leg}$^{3\dagger}$, hand$^2$, \textbf{head}$^\dagger$,
+\textbf{eye}$^\dagger$,  \textbf{body}$^\dagger$, \textbf{face}$^\dagger$, 
+bone, blood, voice, ulcer,  nose, sweat, hairdo, tears, finger
+} 
+&
+\pbox{9cm}{\centering 
+Epithelium, duodenum
+} \\
+
+\specialrule{.05em}{.5em}{.5em}
+
+\pbox{2cm}{\centering Properties} & 
+\pbox{9cm}{\centering
+Height$^2$, speed$^2$, distance, rating,  length, readiness, color, weight,
+shape, temperature, gesture, habit, fear, posture, shadow
+} 
+&
+\pbox{9cm}{\centering 
+Happiness, badness, capacity, range, clarity, piety, extravagance
+} \\
+
+%\specialrule{.05em}{.5em}{.5em}
+%
+%\pbox{2cm}{\centering Acts} & 
+%&
+%\pbox{9cm}{\centering 
+%Reconciliation, submission, paying, commitment, recovery, discovery, argument,
+marriage, agreement
+%} \\
+%
+%\specialrule{.05em}{.5em}{.5em}
+%
+%\pbox{2cm}{\centering Linkages} &  &
+%\pbox{9cm}{\centering 
+%Friendship, siblinghood, parenthood, alliance
+%} \\
+
+\specialrule{.1em}{.5em}{.05em} 
+\end{tabular}
+}
+}
+\caption{Relational noun examples drawn from the literature
+\cite{lichtenberk2011interpretation,partree2008genitives,laczko2009relational,Cresswell1996,de1988interpretation,barker2011possessives,Asudeh2005,partee2003genitives},
+grouped by subclass, along with additional examples we provide.  Superscripts
+indicate the number of distinct authors that used the noun as an example.  The
+nouns which we consider relational under our operationalization are shown in
+bold, with a dagger  ($\dagger$) indicating that the noun also has a prominent
+non-relational meaning(s).}
+\label{table:relnouns}
+\end{table*}
+
+Our operationalization of relational nouns follows the theoretical treatment in
+the context of possessive constructs (see
+section~\ref{sec:existing-treatments}) fairly closely. However, we deviate in
+certain cases (as will be noted) due to an interest in prioritizing relation
+extraction applications.
+
+Applying the definition of relational nouns during annotation is quite
+difficult, in part because relational nouns carry no strong syntactic
+characteristics that distinguish them. It helps to decompose the definition of
+relational nouns into two criteria: 
+(1) relational nouns must provide intrinsic lexical evidence that a relation is
+being expressed, and (2) relational nouns must refer to one of the members in
+the relationship expressed.  
+
+Notice that this is equivalent to the definition already given: a relational
+noun identifies an entity by virtue of how it relates to something else. This
+decomposition shows that there are fundamentally two ways that a noun can fail
+to be relational. 
+
+Sortal nouns such as \textit{car} are eliminated by criterion 1, even though
+they participate in relations in a way that is often grammatically
+indistinguishable from relational nouns.  This is best illustrated by example.
+In the sentences \textit{that is Jill's car} and \textit{Jack is Jill's
+brother}, we see the referents of \textit{car} and \textit{brother} (Jack) both
+participating in respective relations. However, if Jill utters the sentence
+\textit{Jack is a brother} she probably means \texttt{brother(Jack, Jill)},
+whereas uttering \textit{that is a car} does not indicate a corresponding
+relation.
+
+Criterion 2 eliminates nouns that indicate relationships yet which are not
+relational nouns. For example, event and result nominals such as
+\textit{disagreement} and \textit{reconciliation}, refer to the relation
+itself, not one of the participants.  So too do nouns like \textit{friendship}.
+Note that agent and patient deverbal nouns, such as \textit{employee} and
+\textit{employer} adhere to criterion 2.
+
+To further clarify the boundaries of what will be considered relational, we
+collected a large number of examples of relational nouns given in semantic
+theoretical literature, and organized them into a typology based on the kind of
+relation expressed, see 
+\textbf{Table \ref{table:relnouns}}. This allows us to structure and simplify
+the annotation task.  By learning each of the relational noun subclasses, the
+annotator can decide whether a candidate noun is relational by considering
+whether it belongs to any of the accepted subclasses.  We now review the
+subclasses chosen for inclusion below.
+
+\paragraph{Kinship.} Kinship nouns like \textit{brother} or \textit{aunt},
+describe family relations.  Kinship nouns are comparatively easy to identify,
+and are the most common  example in the literature.
+
+\paragraph{Social non-kin.} These nouns depict social roles which are not
+family relations, including informal roles, like \textit{friend}, and formal or
+organizational roles like \textit{mayor}, \textit{CEO}, or \textit{goalie}.
+Nouns that depict roles without any inherent relational affiliation, such as
+\textit{butcher} are excluded.  %Nouns with relational and non-relational uses
+are included., for example, \textit{teacher} can indicate a pupil-teacher
+relationship (\textit{he is my teacher}) or simply refer to the vocation
+(\textit{he has been a teacher for 10 years}).
+
+\paragraph{Operational.} These nouns indicate non-social relations, such as
+cause/effect, function, purpose, and representation.  Semantic theory
+describing possessive constructs dictates that relational nouns can occupy
+postnominal possessive construction (see
+section~\ref{sec:existing-treatments}), but we include some nouns in this
+subclass that cannot. For example, we include \textit{cure}; even though it is
+more natural to say \textit{the cure for the disease}, than to use the
+postnominal possessive, \textit{the cure of the disease}.  
+
+\paragraph{Relative parts.} This subclass includes nouns that designate a
+physical region based on a spatial or temporal relationship to a whole,
+including examples like \textit{edge} and \textit{intro}.  
+Unlike other relational nouns, these are typically reified by the relation
+itself: the corner of a desk exists by virtue of being the corner---it cannot
+exist apart from its relation to the desk.
+
+\vspace{5mm}
+The union of these four subclasses, \textit{kinship}, \textit{social non-kin},
+\textit{operational}, and \textit{relative part}, constitute our definition of
+relational nouns.  
+
+We specifically exclude two subclasses that contain nouns normally considered
+relational in the context of theoretical discussions of possessive constructs:
+
+\paragraph{Body parts.}  All body part nouns are considered to be relational
+\cite{laczko2009relational}. While this classification may be convenient for
+semantic theory, body part nouns provide weak evidence at the lexical level of
+a specific relationships, so we consider them eliminated by criterion 1.
+However, we do include body parts that have an alternative sense that falls
+under an accepted subclass, e.g. \textit{head} as in \textit{head of the
+department} or \textit{leg} as in \textit{leg of the journey}. 
+
+\paragraph{Properties.} Nouns such as \textit{height}, or \textit{colour} are
+also treated as relational nouns, but we draw a distinction between nouns that
+identify the properties of individual entities and nouns that establish
+relationships \textit{between} entities (hence we consider properties
+eliminated by criterion 1).  Properties are useful for information extraction,
+but we consider them to warrant a separate effort (in part undertaken in
+\cite{de1988interpretation}).
+
+\vspace{5mm}
+
+%In addition to nouns that are theoretically treated as relational, we note
+that there are ways of expressing relations using non-relational nouns, which
+we group into two additional subclasses:
+%
+%\paragraph{Acts.} These are deverbal nouns, including event (or process)
+nominals and result nominals, that retain relational meaning of their verb
+form, for example \textit{disagreement} and \textit{reconciliation}.  Note that
+unlike relational nouns, which refer to one of the entities involved in the
+relation, these nouns refer to the relation itself, hence they fail criterion
+2. Prior work has treated these nouns [cite Joice Chi's work that looked at
+event nominals].  We do not include all deverbal nouns in this class: agent or
+patient deverbal nouns (\textit{employee}, \textit{employer}) should be classed
+under social non-kin or operational nouns, and are relational according to our
+classification.
+%
+%\paragraph{Linkages.} Linkages refer directly to relationships as static
+structures, for example \textit{friendship}.  Like acts, they differ from
+relational nouns in that they refer to the relation, not one of the entities
+involved in the relation, and so fail criterion 2.
+
+Note that, provided one accepts that body part nouns and properties are not
+relational, the four included subclasses are exhaustive, for the trivial reason
+that the operational subclass can absorb any relation that is non-social and
+non-spatio-temporal.  In that respect it functions as a catch-all.
+
+\subsection{Annotation}
+The two criteria introduced in the previous section are central concepts in the
+annotation guidelines.  We also collect a large number of examples for the four
+subclasses considered to be relational (\textit{kinship}, \textit{social
+non-kin}, \textit{operational}, and \textit{relative part}).
+
+We conducted annotation using three experts (natural language processing and
+linguistics researchers) and 13 non-experts.
+To train annotators, we rely on a large number of examples, selected by the
+experts prior to annotation.  In an initial training phase, annotators annotate
+examples from each subclass, and receiving immediate feedback.  Then annotators
+must complete 25 test examples and annotate at least 70\% correctly.  Test
+examples are also inserted throughout the annotations, and annotators must
+maintain this proportion of correct answers for their data to be used.
+
+Due to polysemy, many nouns have relational and non-relational meanings.  Since
+this resource is meant to be an input for NLP systems, we adopt a
+recall-oriented stance, and consider a noun to be relational if any of its
+meanings are relational.  However, during annotation, we distinguish between
+nouns whose primary meaning is relational, and those having a subordinate
+relational sense.  Specifically, annotators are instructed to label a noun as
+``usually relational'' if, in their estimation, a relational sense of the noun
+applies to strictly more than half of its occurrences.  
+Nouns having relational senses that do not account for the majority of
+occurrences were to be labelled ``occasionally relational'', while nouns
+lacking any intrinsic relational sense were to be labelled ``almost never
+relational''.
+
+Multiple annotations of the same noun were combined as follows.  If, for a
+given noun, one of the labels was applied in strict majority, that label was
+accepted as final.  If no single label was in strict majority, the noun was
+classified as partly relational.
+
+For the purposes of bootstrapping and classification, we consider both
+``occasionally relational'' and ``usually relational'' to constitute the
+positive class of relational nouns.  However, we preserve the distinction
+between ``usually relational'' and ``occasionally relational'' in the final
+dataset since it may be of use to NLP systems.
+
+Interested readers can access a complete reproduction of the annotation
+guidelines\footnote{[Redacted to preserve anonymity]}.
+
+\subsubsection{Annotator pool}
+We used a combination of three expert coders and 13 non-expert coders to
+annotate 5,832 nouns.  A subset of 250 nouns was annotated by all expert and
+non-expert participants to measure agreement.
+Agreement (Krippendorff's $\alpha$, squared error metric) was 0.53 among expert
+annotators and 0.47 among non-expert participants.  
+%The class for a word was taken to be the mode annotation, unless there was a
+tie between classes, in which case the noun was labeled as occasionally
+relational.
+
+One expert and the non-expert annotators annotated the remainder of the nouns.
+Each noun was either labeled by the expert or the participant annotators.
+Nouns labeled by participants were annotated by at least three annotators, and
+up to five if the initial labels were not unanimous.  Final labels for the 250
+nouns annotated by both experts and non-experts were based on the experts'
+annotations.
+
+\subsection{Bootstrapping}
+Our approach to annotation reflected a balance between a desire to cover common
+words, and to discover as many relational nouns as possible overall, while
+still obtaining data for rare phenomena.
+
+To achieve this, we used a bootstrapping approach.  We began with a seed set of
+expert-annotated nouns.  These included the examples collected from the
+literature (\textbf{Table \ref{table:relnouns}}), and additional examples found
+by sampling nouns from Gigaword \cite{citeulike:4789716}.  During each
+iteration,  we trained a model based on the existing annotations, and
+oversampled nouns predicted by the classifier to be relational.  In each round,
+we also included a sample from the most common nouns (based on occurrence in
+Gigaword) and a uniform random sample over token types.  
+The nouns selected by the classifier were enriched in relational nouns by a
+factor of 8, being 49.8\% relational. To avoid biasing subsequent models, we
+included some nouns predicted to be non-relational in each round of annotation.
+
+Three rounds of annotation, each consisting of approximately 2,000 nouns, were
+performed.
+
+%\vspace{5mm}
+%Examples of relational nouns from the final dataset are shown in \textbf{Table
+\ref{table:relnoun-excerpts}}.
+%
+%
+%\begin{table*}
+%\centering
+%\label{tbl:liwc}
+%{
+%\setlength{\tabcolsep}{3pt}
+%
+%\resizebox{\textwidth}{!}{ 
+%\begin{tabular}{c c c}
+%\specialrule{.1em}{.05em}{.05em} 
+%\textbf{Subclass} & \textbf{Literature examples} & \textbf{Additional
+examples} \\
+%
+%\specialrule{.05em}{.0em}{.5em}
+%
+%\pbox{2cm}{\centering Kinship} & 
+%\pbox{9cm}{\centering
+%\textbf{Brother}$^6$, 
+%\textbf{sister}$^5$, \textbf{mother}$^4$, 
+%\textbf{child}$^{4\dagger}$,
+%\textbf{grandmothter}$^3$,
+%\textbf{husband}$^2$,
+%\textbf{wife}, 
+%\textbf{spouse}, 
+%\textbf{father}, 
+%\textbf{daughter},
+%\textbf{aunt},
+%\textbf{uncle},
+%\textbf{cousin},
+%\textbf{family}, 
+%\textbf{relative}}
+%&
+%\pbox{9cm}{\centering
+%\textbf{Stepdaughter}, 
+%\textbf{brother-in-law}, 
+%\textbf{kin}, 
+%\textbf{kindred}} \\
+%
+%\specialrule{.05em}{.5em}{.5em}
+%
+%\pbox{2cm}{\centering Social non-kin} & 
+%\pbox{9cm}{\centering
+%\textbf{Enemy}$^4$,  \textbf{friend}$^3$,
+%\textbf{pet}$^2$, \textbf{stranger}$^2$, \textbf{neighbour}$^2$,
+\textbf{mayor}, \textbf{governor}, \textbf{commander}, \textbf{co-author},
+\textbf{employee}, \textbf{tutor}} 
+%&
+%\pbox{9cm}{\centering
+%\textbf{Captain}$^\dagger$, \textbf{guitarist}$^\dagger$,
+\textbf{investor}$^\dagger$, \textbf{linebacker}, \textbf{lawyer}$^\dagger$,
+\textbf{spokesperson}, \textbf{entourage}, \textbf{confidante}} \\
+%
+%\specialrule{.05em}{.5em}{.5em}
+%
+%\pbox{2cm}{\centering Operational} & 
+%\pbox{9cm}{\centering
+%\textbf{Name}$^2$, 
+%\textbf{birthday}$^2$,
+%\textbf{picture}$^2$,
+%\textbf{portrait}$^{2\dagger}$,
+%\textbf{tracks}$^\dagger$,
+%\textbf{sake},
+%rumor,
+%\textbf{description},
+%\textbf{reputation}
+%} 
+%&
+%\pbox{9cm}{\centering \textbf{Passenger}, \textbf{solution}, \textbf{cure},
+\textbf{hole}
+%} \\
+%
+%\specialrule{.05em}{.5em}{.5em}
+%
+%\pbox{2cm}{\centering Relative part} & 
+%\pbox{9cm}{\centering
+%\textbf{Edge}$^2$,
+%\textbf{mantel}$^\dagger$,
+%\textbf{side}, \textbf{corner}, \textbf{middle}
+%} 
+%&
+%\pbox{9cm}{\centering 
+%\textbf{Top}, \textbf{tip}$^\dagger$, \textbf{base}$^\dagger$, 
+%%\textbf{heart}$^\dagger$, \textbf{stern}, \textbf{entrance},
+\textbf{skin}$^\dagger$,
+%\textbf{leg}$^\dagger$, \textbf{head}$^\dagger$, \textbf{eye}$^\dagger$,
+\textbf{body}$^\dagger$, \textbf{face}$^\dagger$,
+%} \\
+%
+%\specialrule{.05em}{.5em}{.5em}
+%
+%\pbox{2cm}{\centering Body part} & 
+%\pbox{9cm}{\centering
+%\textbf{Leg}$^{3\dagger}$, hand$^2$, \textbf{head}$^\dagger$,
+\textbf{eye}$^\dagger$,  \textbf{body}$^\dagger$, \textbf{face}$^\dagger$, 
+%bone, blood, voice, ulcer,  nose, sweat, hairdo, tears, finger
+%} 
+%&
+%\pbox{9cm}{\centering 
+%Epithelium, duodenum
+%} \\
+%
+%\specialrule{.05em}{.5em}{.5em}
+%
+%\pbox{2cm}{\centering Properties} & 
+%\pbox{9cm}{\centering
+%Height$^2$, speed$^2$, distance, rating,  length, readiness, color, weight,
+shape, temperature, gesture, habit, fear, posture, shadow
+%} 
+%&
+%\pbox{9cm}{\centering 
+%Happiness, badness, capacity, range, clarity, piety, extravagance
+%} \\
+%
+%%\specialrule{.05em}{.5em}{.5em}
+%%
+%%\pbox{2cm}{\centering Acts} & 
+%%&
+%%\pbox{9cm}{\centering 
+%%Reconciliation, submission, paying, commitment, recovery, discovery,
+argument, marriage, agreement
+%%} \\
+%%
+%%\specialrule{.05em}{.5em}{.5em}
+%%
+%%\pbox{2cm}{\centering Linkages} &  &
+%%\pbox{9cm}{\centering 
+%%Friendship, siblinghood, parenthood, alliance
+%%} \\
+%
+%\specialrule{.1em}{.5em}{.05em} 
+%\end{tabular}
+%}
+%}
+%\caption{Relational noun examples drawn from the literature
+\cite{lichtenberk2011interpretation,partree2008genitives,laczko2009relational,Cresswell1996,de1988interpretation,barker2011possessives,Asudeh2005,partee2003genitives}
+%, grouped by subclass, along with additional examples we provide.
+Superscripts indicate the number of distinct authors that used the noun as an
+example.  The nouns which we consider relational under our operationalization
+are shown in bold, with a dagger ($\dagger$) indicating that the noun also has
+a prominent non-relational meaning(s).}
+%\label{table:relnouns}
+%\end{table*}
+
+
+\section{Relational noun detection}
+In this section, we describe the classifiers that we built for automatically
+detecting relational nouns, used to bootstrap the annotation process.  After
+annotation was complete, we optimized a classifier based on held out dev and
+test sets.  The output from the decision function of this classifier can be
+used to provide a ``relationalness'' score on unannotated nouns. 
+
+As mentioned, the annotations provide three-class labels: ``usually
+relational'', ``occasionally relational'', and ``almost never relatoinal''.
+But for the purpose of building and testing our classifiers, we collapse
+``usually relational'' and ``occasionally relational'' into a single positive
+class.  This is based on the idea that the classification of a noun would be
+used as an input feature to an information extraction system.  Keeping the
+feature recall-oriented allows the information extraction system to refine
+precision based on other features. 
+
+Because we are interested in 
+using the classifier both for bootstrapping and for classification of
+unannotated nouns, we report two evaluation metrics: the average precision, and
+the F1 score.  During bootstrapping, we are less interested in the absolute
+prediction of the classifier, and more interested in which nouns are ranked as
+the ``most relational'' by the classifier's decision function.  Average
+precision provides a measure of the performance of the ranking provided by the
+classifier's decision function, while F1 provides a measure of the binary
+prediction recall and precision.
+
+
+One can expect that automatically detecting relational nouns is quite
+difficult, given 
+(a) relational nouns behave grammatically the same way as sortal nouns, (b) the
+annotation of relational nouns is quite difficult even for people, and (c) even
+when merging the ``usually relational'' and ``occasionally relational''
+classes, there are far more negative than positive examples.
+
+\subsection{Baseline}
+To construct a baseline classifier, we draw on the observation of
+\newcite{barker2011possessives} that relational nouns characteristically arise
+under the possessive constructs, such as the prenominal (\textit{Jill's
+brother}) and the postnominal (\textit{the brother of Jill}) constructions.
+Using the Gigaword \cite{citeulike:4789716} corpus, we collect counts for the
+number of times a given word appears in the prenominal and postnominal
+constructions, as a fraction of total occurrences, and use this feature in a
+support vector machine (SVM).
+
+\subsection{Feature engineering}
+To create a more performant classifier, we add the following features:
+
+\paragraph{Dependency tree features.} For each noun, we note the frequency with
+which it arises in particular dependency tree contexts.  We encode the
+dependency tree context as follows.  Starting from the word, we follow
+dependency tree links for up to three hops, noting the sequence of dependency
+relations, direction of the relations, and the part of speech (POS) tags of the
+nodes.  A count is recorded for each such path, for each occurrence of a lemma.
+
+Dependency tree features were based on statistics gathered from parsing English
+Gigaword \cite{citeulike:4789716} with the CoreNLP dependency parser
+\cite{manning-EtAl:2014:P14-5}, considering only occurrences where the token is
+a noun according to CoreNLP's part-of-speech tagger.
+
+\paragraph{Sequence features.} For each noun, we record counts for the POS,
+lemma, and surface form, and bigrams thereof, of the surrounding 10 tokens
+along with their relative position.
+
+\paragraph{Morphological features.} We record the suffix of the token, based on
+a list of common suffixes (see supplementary material).
+
+\paragraph{Derivational features.}  We record when nouns are related
+derivationally to other words. For each such case, we record the related word's
+POS based on WordNet's \texttt{derivationally\_related\_forms}
+\cite{fellbaum1998wordnet}.
+
+\paragraph{Semantic features.} We include the 300-dimensional Google word
+embeddings as features \cite{mikolov2013efficient}. 
+
+\paragraph{Hand-crafted features.}
+Based on observations of occurrences in Gigaword \cite{citeulike:4789716}, and
+descriptions of relational nouns in the literature, we created a hand-crafted
+set of 31 features that fire when specific rules are satisfied, based on
+sequences of specific lemmas, dependency-tree context, POS-tags, and presence
+of named entities (see supplementary material).   
+
+\paragraph{Feature transformations.}
+For the count-based features (dependency tree features and sequence features),
+we used various encodings: raw counts, counts normalized by the number of
+occurrences of the word, the natural log of the normalized counts, and a 0-1
+encoding based on whether the count exceeds the $p$th percentile, with $p \in
+\{25, 50, 75\}$.
+
+%In many cases, a classifier's performance can be optimized by whitening the
+features: scaling and translating each feature to have a standard deviation of
+1 and a mean of 0.  We optionally performed whitening on the features.
+
+The count-features (dependency features and sequence features) account for a
+very large number of features, so we pruned the count-features down to the top
+$k$ features based on mutual information, for $k\times10^{-3} \in \{10, 20, 40,
+80\}$.
+
+\subsection{Learning algorithms}
+We tested several learners, including support vector machine (SVM), logistic
+regression (LR), naive Bayes (NB), and random forest (RF).
+
+For the learners having a hyperplane-shaped decision surface (SVM, LR, and NB),
+after the learning algorithm finished, we used the training set to translate
+the decision surface to optimize F1 to account for the highly imbalanced
+training set.
+
+\subsection{Classifier performance}
+After optimizing the count-feature representation, learner, learner's
+hyperparameters, and ablating features, we found the best performance on the
+dev set was achieved using an SVM, with all feature types except morphological
+features, $k=80,000$, 
+%normalized count representation without whitening,
+radial basis function kernel, and hyperparameters $C=100$ and $\gamma=0.001$.  
+When run on the test set, this classifier achieved average precision $AP=0.761$
+and $F1=0.704$ on the 2500 most common nouns in Gigaword
+\cite{citeulike:4789716} and $AP=0.495$ and $F1=0.467$ on randomly sampled
+nouns occurring at least 5 times in Gigaword.
+
+
+%Using the initial set of expert labelled nouns as a dev set, we optimized
+feature selection and tuned hyperparameters, optimizing the F1 score.  All
+three blocks of features---syntactic, semantic, and morphological---contributed
+to improving F1.
+%
+%We used two learning algorithms based on support vector classifiers (SVC).
+The ``categorical'' classifier performs simple three-way classification.  The
+``ordinal'' classifier creates two models, one distinguishing \textit{usually
+relational} nouns from the others, with the second  distinguishing
+\textit{non-relational} nouns from the others.  The final classification is
+based on the distance of an example from either hyperplane. 
+%
+%These classifiers succeed in detect relational nouns with modest profficiency
+(\textbf{Table~\ref{table:classifiers}}).  Given that our aim was to use the
+classifiers in bootstrapped annotation, to enrich the number of relational
+nouns, a more meaningful metric is the proportion of enrichment they achieve.
+The best of the two classifiers, which we used to enrich the annotation task,
+achieved X\% enrichment.
+
+\section{Existing treatments of relational nouns}
+\label{sec:existing-treatments}
+As mentioned, relational nouns are nouns that identify an entity by virtue of
+how it relates to something else \cite{barker2011possessives}, however, it is
+very difficult to apply this definition to decide whether specific nouns are
+relational.
+While it seems straightforward that kinship nouns like \textit{brother} are
+relational, it is less obvious why  \textit{hand} or \textit{speed}, which are
+typically held as relational, should be considered as such. And, if we take
+\textit{hand} and \textit{speed} to be relational, it would be easy to go
+further.
+
+For instance, \newcite{gentner2005relational} has a notion of
+\textit{relational categories} with a nearly identical definition, but it is
+taken to include \textit{theft}, \textit{bridge}, and \textit{carnivore}---a
+much wider class overall.  Since an organism is a carnivore by virtue of eating
+animal prey (a relation), how do we conclude that \textit{carnivore} is not a
+relational noun but \textit{preditor} and \textit{prey} are?
+
+It will be helpful to consider how relational nouns are treated differently
+from other nouns in the semantic analysis of possessives.
+Three common possessive constructs are the 
+prenominal, postnominal, and predicative possessives
+\cite{barker2011possessives,partree2008genitives}:
+
+\begin{enumerate}[label=\textbf{(2\alph*)},noitemsep]
+\item Jill's brother \hfill (prenominal) \quad
+\item The brother of Jill \hfill (postnominal) \quad
+\item Jill has a brother \hfill (predicative)
+\end{enumerate}
+
+Possessive constructs establish a relation between the possessor (e.g. Jill)
+and the possessee (brother).  But the content of the relation is in general
+extremely malleable \cite{baron2001dimensions}.  This is particularly true for
+the prenominal possessive:
+\textit{Jill's painting} could mean the painting that Jill bought, the painting
+that Jill painted, the painting that Jill is in the process of restoring, etc.
+
+The postnominal possessive is somewhat more restrictive though, and
+\newcite{barker2011possessives} asserts that \textit{only} relational nouns can
+be the possessee in that case.  For example \textbf{(3a)} seems natural, in
+contrast to \textbf{(3b)}:
+
+\begin{enumerate}[label=\textbf{(3\alph*)},noitemsep]
+\item He's the brother of Jill.
+\item It's the car of Jill.
+\end{enumerate}
+
+While helpful, this diagnostic falls short.  It admits collection-unit
+relations that do not involve relational nouns (\textit{pair of shoes},
+\textit{audience of children}, \textit{book of spells}).  
+%Along similar lines ``made of'' or ``consisting of'' can comfortably be
+shortened to ``of'', resulting in, e.g., \textit{a dinner of rice and beans}.
+It can be used to refer to part-whole relations that do not involve relational
+nouns (\textit{the bucket of the backhoe}).
+Moreover, the cases that are purportedly ruled out, such as \textbf{(3b)}, are
+perhaps up to stylistic variation \cite{wals-59}, and in any case sound natural
+when changed to, e.g., \textit{It's the car of Jill's} which differs only
+subtly in its available interpretation \cite{partree2008genitives}.
+Nevertheless, even though non-relational nouns can appear in possessives,
+relational nouns frequently, perhaps characteristically, arise in possessive
+constructs and seem to occupy the postnominal construction more
+naturally---which we use to construct a baseline classifier.
+
+As we saw with \textit{Jill's painting}, the prenominal construction is more
+malleable in its range of available interpreted relations.  It has been
+suggested that one difference between relational and non-relational nouns is
+that relational nouns act to constrained the available interpretations for the
+prenominal construction
+\cite{lichtenberk2011interpretation,laczko2009relational,partree2008genitives}.
+Consider the phrase \textit{Jill's brother}, and notice that it is difficult to
+interpret any other relation than siblinghood. 
+Psycholinguistic experiments show that relational nouns tend to constrain the
+interpretation of possessives under changes to the possessor
+\cite{lichtenberk2011interpretation}.
+
+This constraint is a matter of degree, and subject to context, however, as
+Barker \newcite{barker2011possessives} illustrates with a scenario in which two
+journalists have each been assigned to cover one of a pair of
+brothers---\textit{John's brother} refers to the brother that John was
+assigned, not his sibling.
+Furthermore, \textit{non}-relational nouns also constrain the available
+interpretations of possessives:
+it is difficult to read \textit{the car's wheels} as indicating something other
+than the part-whole relation.
+While these observations help to define what counts as a relational noun for
+the sake of operationalization and annotation, they do not lead obviously to
+features for classification.
+
+%Moreover, nouns generally considered relational nevertheless leave a malleable
+interpretation of the relation signified by a possessive construct
+\cite{lichtenberk2011interpretation}: the relation established by ``Jill's
+\textbf{child}'' may be parenthood, or it may be the child that Jill is
+teaching, or the child Jill is watching over, etc. 
+
+
+% JC 4/14: No room to discuss alienability, imho
+
+%Another observed regularity is that relational nouns tend to establish
+inalianable relations.
+%An inalienable relation is one that is inherent and cannot be disrupted
+[CITE].  A typical example is brotherhood: even if Jill's brother dies, he is
+still Jill's brother.
+%The relations induced by relational nouns under possessives tend to be
+inalienable \cite{lichtenberk2011interpretation}.
+
+%But alienability might not be easier to judge than whether a noun is
+relational in the first place.  Body parts are seen as being in an inalienable
+part-whole relation to the rest of one's body
+\cite{laczko2009relational}\footnote{Actually \newcite{baron2001dimensions}
+consider body parts to not be relational, but that is not usual.} despite the
+fact that body parts can be lost through dismemberment, gained through
+prosthesis, or transferred through transplant.  So, particularly in English
+where inalienability is ungramaticallized
+\cite{lichtenberk2011interpretation}\footnote{Though
+\newcite{barker2011possessives} maintains that the postnominal possessive
+construction is only availbale for relational nouns and that relational nouns
+are identical with inalienable relations, and hence that inalienability
+\textit{is} gramaticalized in English.}, alienability is a matter of degree. 
+%And many relational nouns invoke alienable relations (\textit{neighbor},
+\textit{partner}, \textit{employee}, \textit{classmate}).
+
+Relational nouns have also been characterized as \textit{semantically
+unsaturated}, requiring a complement (in the form of the possessor) to be
+meaningful
+\cite{de1988interpretation,partree2008genitives,laczko2009relational,barker2011possessives}.
+Consider the nonsensicality of having a brother who is not the brother
+\textit{of someone}. 
+But grammatically, the argument is optional for the vast majority of relational
+nouns\footnote{There are some relational nouns that characteristically require
+a complement (\textit{Jill's sake}), but these seem to be as rare as those that
+prohibit binding a compliment by possession (\textit{\# Jill's stranger})
+\cite{barker2011possessives}; in the vast majority of cases the so-called
+complement seems to be optional; \newcite{de1988interpretation} assert they are
+\textit{always} optional.}. Compare \textit{She is a parent} with \textit{She
+is a celebrity}.  The case of \textit{parent} (relational) would be treated as
+having its argument suppressed by a covert type-shifting operation, which would
+not be necessary for the case of \textit{celebrity} (non-relational).
+Since arguments are optional and leave no syntactic trace, the notion of
+semantic unsaturation serves as a helpful but somewhat nebulous criterion for
+annotation, and does not obviously translate into features for classification.
+
+Our final observation for this section is a partial diagnostic described by
+\newcite{partree2008genitives}.  Notice that the transformation in
+\textbf{(4a)} preserves the original meaning, whereas for relational nouns, as
+in \textbf{(4b)}, the transformation induces a slightly changed meaning.
+
+
+\begin{enumerate}[label=\textbf{(4\alph*)},noitemsep]
+\item That is my car $\to$ That car is mine
+\item That is my brother $\to$ That brother is mine
+\item That is my hand $\to$ That hand is mine.
+\item That is my child $\to$ That child is mine.
+\end{enumerate}
+
+But for many relational nouns, no such shift in meaning occurs, particularly
+ones that are specializations of a part-whole relation \textbf{(4c)} or have
+some aspect of ownership or guardianship relation \textbf{(4d)}.
+
+To conclude this section, there are a variety of differences between relational
+and non-relational nouns described by semanticists, though they are difficult
+to apply due to their subtlety.  This makes both human annotation and automatic
+classification challenging.
+
+\section{Conclusions}
+In this paper we present the creation of an annotated lexicon of relational
+nouns.  
+We operationalize the class of relational nouns with consideration for their
+usefulness to relation extraction, and use this to guide annotation.  
+%The distinction between relational and non-relational nouns is a subtle
+semantic one, without any reliable syntactic or morphological cues. As a
+result, the annotation of relational nouns is very challenging, with agreement
+of only 0.53 (Krippendorff's $\alpha$) among our expert annotators. 
+We provide the dataset and classifier model to the research community for
+inclusion in relation extraction systems. 
+
+Our work has focused on building a lexicon of nouns which have at least one
+sense for which it is relational. Future work could use our lexicon as a
+starting point for developing a system which can distinguish between relational
+and non-relational readings of such nouns. 
+
+\section{Acknowledgements}
+
+Place all acknowledgements (including those concerning research grants and
+funding) in a separate section at the end of the article.
+
+% \nocite{*}
+\section{Bibliographical References}
+\label{main:ref}
+
+\bibliographystyle{lrec}
+\bibliography{lrec}
+
+
+\section{Language Resource References}
+\label{lr:ref}
+\bibliographystylelanguageresource{lrec}
+\bibliographylanguageresource{lrec}
+
+\end{document}
+

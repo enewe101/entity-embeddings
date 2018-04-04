@@ -1,0 +1,38 @@
+#!/usr/bin/env bash 
+subcommand=$1
+arg=$2
+
+# Handle the kill subcommand
+if [ "$1" == 'kill' ]; then
+
+    # Handle the kill all ("-a") argument
+    if [ "$2" == '-a' ]; then 
+        ps -ef | tr -s ' ' | cut -d' ' -f1,2,8 | grep $(whoami) | \
+        grep 'memory-server' | cut -d ' ' -f2 | xargs -n1 kill;
+
+    # Handle killing specifically named memory server
+    else
+
+        # If no name for the memory server to kill was given, print usage.
+        if [ "$2" == '' ]; then
+            echo -e '\tUsage: mem-server kill [-a | <mem-server-name>]'
+            echo -e '\tdo mem-sever -ls to see a list of mem-server names.'
+
+        # Kill the memory server having the name given.
+        else
+            pid=$(ps -ef | tr -s ' ' | cut -d' ' -f1,2,8 | grep $(whoami) | \
+                grep "memory-server-$2$" | cut -d' ' -f2)
+            if [ "$pid" == '' ]; then
+                echo -e "No such memory server ($2)."
+            else
+                kill $pid
+            fi
+        fi
+    fi
+fi
+
+# Handle the ls subcommand
+if [ "$1" == 'ls' ]; then
+    ps -ef | tr -s ' ' | cut -d' ' -f1,2,8 | grep $(whoami) | \
+        grep 'memory-server' | cut -d ' ' -f3 | cut -c 15-
+fi
