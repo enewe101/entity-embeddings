@@ -7,7 +7,7 @@ RELATIONAL_WORDS_PATH = os.path.join(DATA_DIR, 'relational-nouns')
 TRAIN_PATH = os.path.join(RELATIONAL_WORDS_PATH, 'train', 'all.tsv')
 TEST_PATH = os.path.join(RELATIONAL_WORDS_PATH, 'test', 'all.tsv')
 SEED_PATH = os.path.join(RELATIONAL_WORDS_PATH, 'categorized.tsv')
-
+NOMBANK_PATH = os.path.join(DATA_DIR, 'nombank.txt')
 
 TRAIN_POSITIVE_PATH = os.path.join(
 	RELATIONAL_WORDS_PATH, 'train-positive.txt'

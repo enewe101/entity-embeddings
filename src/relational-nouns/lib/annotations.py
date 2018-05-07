@@ -1,18 +1,22 @@
 import t4k
 import os
 import sys
-from SETTINGS import DATA_DIR, SEED_PATH
+import SETTINGS
 import numpy as np
 import random
 import utils
 
 ALL_SOURCES = {'rand', 'top', 'guess', 'seed'}
 ANNOTATIONS_PATH = os.path.join(
-    DATA_DIR, 'relational-nouns', 'all-annotations.tsv')
+    SETTINGS.DATA_DIR, 'relational-nouns', 'all-annotations.tsv')
 DICTIONARY_DIR = os.path.join(
-    DATA_DIR, 'relational-noun-features-wordnet-only', 
+    SETTINGS.DATA_DIR, 'relational-noun-features-wordnet-only', 
     'accumulated-pruned-5000', 'dictionary'
 )
+
+def read_nombank(path=SETTINGS.NOMBANK_PATH):
+    return set(open(path).read().split())
+
 
 class UnknownLabelError(Exception):
     pass
@@ -60,7 +64,7 @@ class Annotations(object):
             for source in get_guessed_sources(sources):
                 self.guessed_examples_by_source[source].add(token)
 
-        for line in open(SEED_PATH):
+        for line in open(SETTINGS.SEED_PATH):
 
             # Clean trailing whitespace and skip blank lines
             line = line.strip()
